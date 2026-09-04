@@ -69,7 +69,7 @@ class VoiceAssistant:
         self.hotkey = None
         hk = cfg.activation.get("hotkey") or {}
         if hk.get("enabled", True):
-            self.hotkey = Hotkey(hk.get("combo", "<ctrl>+<alt>+space"), self.trigger.fire, mode=hk.get("mode", "toggle"))
+            self.hotkey = Hotkey(hk.get("combo", "<ctrl>+<alt>+<space>"), self.trigger.fire, mode=hk.get("mode", "toggle"))
 
         self.hub: ToolHub | None = None
         self.agent: Agent | None = None

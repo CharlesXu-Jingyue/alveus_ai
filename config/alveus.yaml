@@ -134,7 +134,7 @@ activation:
   hotkey:
     enabled: true
     # pynput format. Press once to start listening, again (or stay silent) to stop.
-    combo: "<ctrl>+<alt>+space"
+    combo: "<ctrl>+<alt>+<space>"
     mode: toggle                 # toggle | hold
 
 # ---------------------------------------------------------------- Tools (MCP)

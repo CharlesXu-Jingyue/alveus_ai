@@ -24,6 +24,13 @@ class Hotkey:
         except Exception as e:  # noqa: BLE001
             log.warning("hotkey disabled (pynput unavailable: %s)", e)
             return
+        try:
+            self._start(keyboard)
+        except Exception as e:  # noqa: BLE001
+            log.warning("hotkey disabled (bad combo %r or no display: %s)", self.combo, e)
+            self._listener = None
+
+    def _start(self, keyboard) -> None:  # noqa: ANN001
         if self.mode == "hold" and self.on_release:
             hk = keyboard.HotKey(keyboard.HotKey.parse(self.combo), self.on_press)
             release_keys = set(keyboard.HotKey.parse(self.combo))
