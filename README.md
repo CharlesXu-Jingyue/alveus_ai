@@ -117,4 +117,4 @@ systemd/           user unit templates
 docs/              wake-words.md and more
 ```
 
-See `docs/wake-words.md` for pretrained wake words and training custom ones ("Alveus", "Aurea").
+Full documentation: [docs/README.md](docs/README.md) (overview, architecture, installation, configuration reference, usage, tools, backends, API, wake words, troubleshooting, development).
