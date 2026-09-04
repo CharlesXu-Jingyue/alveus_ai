@@ -1,0 +1,172 @@
+# Alveus default configuration.
+# Override anything here in config/local.yaml (git-ignored) or with ALVEUS_* env vars.
+# Paths may use ~ and ${ENV_VAR}. ${ALVEUS_HOME} = repo root, ${ALVEUS_MODELS} = model dir.
+
+assistant:
+  # The assistant answers to both names. Which one it introduces itself with follows
+  # the voice: female voice -> female_name, otherwise -> name (see tts.voice_gender).
+  name: Alveus
+  female_name: Aurea
+  user_name: Charles
+  language: en
+  persona_file: ${ALVEUS_HOME}/config/persona.md
+  max_history_turns: 30
+  # Speak while the model is still generating (sentence-level streaming).
+  streaming_tts: true
+
+# ---------------------------------------------------------------- LLM
+llm:
+  # Which profile under llm.profiles to use by default.
+  profile: bonsai-1bit
+  # Common request parameters (overridable per profile).
+  temperature: 0.7
+  top_p: 0.95
+  max_tokens: 4096
+  # Max tool-call rounds per user turn.
+  max_tool_rounds: 12
+  profiles:
+    bonsai-1bit:
+      backend: openai            # any OpenAI-compatible server (llama-server, vLLM, Ollama, LM Studio...)
+      base_url: http://127.0.0.1:8080/v1
+      api_key: local
+      model: bonsai-27b-1bit     # must match the id served by /v1/models (or --alias)
+      reasoning: true            # model emits reasoning_content; hide it from TTS
+      extra_body:
+        top_k: 20
+      # Used by `alveus llm serve` / systemd to launch the server for this profile.
+      serve:
+        command: ${ALVEUS_LLAMA_SERVER}
+        model_path: ${ALVEUS_MODELS}/bonsai/Bonsai-27B-Q1_0.gguf
+        args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek",
+               "-fa", "on", "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
+    bonsai-ternary:
+      backend: openai
+      base_url: http://127.0.0.1:8080/v1
+      api_key: local
+      model: bonsai-27b-ternary
+      reasoning: true
+      extra_body:
+        top_k: 20
+      serve:
+        command: ${ALVEUS_LLAMA_SERVER}
+        model_path: ${ALVEUS_MODELS}/bonsai-ternary/Ternary-Bonsai-27B-PQ2_0.gguf
+        args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek",
+               "-fa", "on", "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
+    # Example of a future swap: any other OpenAI-compatible endpoint.
+    # ollama-qwen:
+    #   backend: openai
+    #   base_url: http://127.0.0.1:11434/v1
+    #   api_key: ollama
+    #   model: qwen3:32b
+
+# ---------------------------------------------------------------- Speech to text
+stt:
+  backend: faster_whisper        # faster_whisper | parakeet | openai_http
+  device: cuda
+  faster_whisper:
+    model: large-v3-turbo        # or: distil-large-v3, medium, small
+    compute_type: float16
+    beam_size: 1
+    language: en                 # null = auto-detect
+  parakeet:
+    model: nemo-parakeet-tdt-0.6b-v3
+  openai_http:                   # any /v1/audio/transcriptions server (whisper.cpp server, speaches, ...)
+    base_url: http://127.0.0.1:8001/v1
+    model: whisper-1
+
+# ---------------------------------------------------------------- Text to speech
+tts:
+  backend: kokoro                # kokoro | chatterbox | openai_http
+  device: cuda
+  # auto = infer from the Kokoro voice prefix (af_/bf_ female, am_/bm_ male); or female | male
+  voice_gender: auto
+  kokoro:
+    voice: af_heart              # see: alveus tts voices
+    speed: 1.0
+    lang_code: a                 # a = American English, b = British
+  chatterbox:
+    model: turbo                 # turbo | standard
+    voice_ref: null              # path to a wav for voice cloning (optional)
+    exaggeration: 0.5
+    cfg_weight: 0.5
+  openai_http:                   # any /v1/audio/speech server (Kokoro-FastAPI, ...)
+    base_url: http://127.0.0.1:8880/v1
+    model: kokoro
+    voice: af_heart
+
+# ---------------------------------------------------------------- Audio I/O
+audio:
+  input_device: null             # null = system default; or a name substring, e.g. "SC-GN01"
+  output_device: null
+  sample_rate: 16000
+  # Voice activity detection (silero).
+  vad:
+    threshold: 0.5
+    min_speech_ms: 250
+    end_silence_ms: 700          # how long you must pause before Alveus answers
+    max_utterance_s: 60
+  # Play a short chime when listening starts / stops.
+  chimes: true
+  # Allow interrupting Alveus while it is speaking by talking over it.
+  barge_in: true
+
+# ---------------------------------------------------------------- Activation
+activation:
+  wake_word:
+    enabled: true
+    # mode: names  - listen for the assistant's names in speech ("Aurea, what time is it?")
+    #                using VAD + STT on each short utterance. No training needed; the
+    #                command in the same breath is executed directly.
+    #       oww    - openWakeWord model (pretrained: hey_jarvis, alexa, hey_mycroft ...,
+    #                or a custom .onnx in ${ALVEUS_MODELS}/wakeword/). Lowest latency.
+    #       both   - either one triggers.
+    mode: names
+    names: [Alveus, Aurea]
+    # Extra spellings STT tends to produce for the names (fuzzy-matched anyway).
+    name_aliases: [alvius, alvias, alveas, alvis, albius, auria, aria, oria, orea, aureia, oreo]
+    oww_model: hey_jarvis
+    threshold: 0.5
+    # Max length of a speech segment to check for a name (seconds). Longer segments are
+    # split at pauses, so a name at the start still triggers.
+    name_segment_s: 12
+    # Keep listening for follow-ups this many seconds after the assistant finishes speaking.
+    follow_up_window_s: 8
+  hotkey:
+    enabled: true
+    # pynput format. Press once to start listening, again (or stay silent) to stop.
+    combo: "<ctrl>+<alt>+space"
+    mode: toggle                 # toggle | hold
+
+# ---------------------------------------------------------------- Tools (MCP)
+tools:
+  # Built-in servers live in mcp_servers/. Any stdio/http MCP server can be added.
+  confirm_destructive: true      # ask (spoken) before rm, kill, shutdown, etc.
+  servers:
+    files:
+      command: [python, -m, mcp_servers.files_shell]
+      env:
+        ALVEUS_FS_ROOTS: "~"     # colon-separated roots the assistant may touch
+    desktop:
+      command: [python, -m, mcp_servers.desktop]
+    system:
+      command: [python, -m, mcp_servers.system]
+    web:
+      command: [python, -m, mcp_servers.web]
+    coder:
+      command: [python, -m, mcp_servers.coder]   # delegates coding tasks to opencode
+      enabled: true
+    # Example third-party server (disabled):
+    # home-assistant:
+    #   url: http://homeassistant.local:8123/mcp_server/sse
+    #   headers: { Authorization: "Bearer ${HASS_TOKEN}" }
+    #   enabled: false
+
+# ---------------------------------------------------------------- API (optional text/voice HTTP gateway)
+api:
+  enabled: true
+  host: 127.0.0.1
+  port: 8765
+
+logging:
+  level: INFO
+  dir: ${ALVEUS_HOME}/logs

@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alveus-ai"
+version = "0.1.0"
+description = "Alveus: a fully local, voice-driven AI assistant with swappable LLM/STT/TTS and MCP tool access."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "openai>=1.60",           # only for the openai_http STT/TTS backends
+  "pydantic>=2.7",
+  "pyyaml>=6",
+  "numpy>=1.26",
+  "sounddevice>=0.5",
+  "soundfile>=0.12",
+  "mcp>=1.10",
+  "httpx>=0.27",
+  "rich>=13",
+  "typer>=0.12",
+  "pynput>=1.7",
+  "psutil>=5.9",
+  "nvidia-ml-py>=12",
+  "trafilatura>=1.12",
+  "ddgs>=9",
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+# Torch is shared by several backends; installed explicitly by install.sh.
+torch = ["torch>=2.5", "torchaudio>=2.5"]
+vad = ["silero-vad>=5.1"]
+stt-whisper = ["faster-whisper>=1.1"]
+stt-parakeet = ["onnx-asr[hub]>=0.7"]
+tts-kokoro = ["kokoro>=0.9.4"]
+tts-chatterbox = ["chatterbox-tts"]
+# openwakeword is installed with --no-deps by install.sh (its tflite-runtime pin has no py3.12 wheels)
+wakeword = ["onnxruntime-gpu>=1.19", "scipy>=1.11", "tqdm", "requests"]
+dev = ["pytest>=8", "ruff"]
+
+[project.scripts]
+alveus = "alveus.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["alveus*", "mcp_servers*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "UP"]
+ignore = ["B008", "B904", "UP007"]

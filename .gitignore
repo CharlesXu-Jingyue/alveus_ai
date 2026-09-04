@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+.env
+.alveus.local.yaml
+config/local.yaml
+logs/
+*.wav
+!tests/fixtures/*.wav
+.pytest_cache/
+.ruff_cache/

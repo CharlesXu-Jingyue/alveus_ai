@@ -1,0 +1,15 @@
+[Unit]
+Description=Alveus LLM inference server (llama-server)
+After=default.target
+
+[Service]
+Type=simple
+Environment=ALVEUS_HOME=@ALVEUS_HOME@
+Environment=ALVEUS_MODELS=@ALVEUS_MODELS@
+ExecStart=@PYTHON_BIN@ -m alveus.cli llm serve
+WorkingDirectory=@ALVEUS_HOME@
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
