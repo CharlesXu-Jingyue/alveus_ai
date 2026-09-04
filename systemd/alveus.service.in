@@ -7,9 +7,9 @@ Wants=alveus-llm.service
 Type=simple
 Environment=ALVEUS_HOME=@ALVEUS_HOME@
 Environment=ALVEUS_MODELS=@ALVEUS_MODELS@
-# DISPLAY/XAUTHORITY are needed for the global hotkey & desktop tools on X11.
-# `systemctl --user import-environment DISPLAY XAUTHORITY WAYLAND_DISPLAY` at login keeps these fresh.
-Environment=DISPLAY=:0
+# DISPLAY/XAUTHORITY (hotkey + desktop tools) come from the systemd user environment, which
+# GNOME/GDM populate at login. If they are missing on your desktop, run once per login:
+#   systemctl --user import-environment DISPLAY XAUTHORITY WAYLAND_DISPLAY
 ExecStartPre=/bin/sh -c 'for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health >/dev/null && exit 0; sleep 2; done; exit 1'
 ExecStart=@PYTHON_BIN@ -m alveus.cli talk
 WorkingDirectory=@ALVEUS_HOME@
