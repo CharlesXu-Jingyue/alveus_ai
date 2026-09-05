@@ -161,6 +161,13 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
     async def index() -> FileResponse:
         return FileResponse(WEB_DIR / "index.html", media_type="text/html")
 
+    @app.get("/handbook", include_in_schema=False)
+    async def handbook() -> FileResponse:
+        path = REPO_ROOT / "docs" / "handbook.html"
+        if not path.exists():
+            raise HTTPException(404, "docs/handbook.html not built yet: run scripts/build_handbook.py")
+        return FileResponse(path, media_type="text/html")
+
     # ---- status
     @app.get("/health")
     async def health() -> dict[str, Any]:
@@ -323,8 +330,10 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         from .tts.kokoro_tts import KOKORO_VOICES
         ww_dir = Path(cfg._env["ALVEUS_MODELS"]) / "wakeword"
         custom_oww = sorted(p.stem for p in ww_dir.glob("*.onnx")) if ww_dir.is_dir() else []
+        defaults = yaml.safe_load((REPO_ROOT / "config" / "alveus.yaml").read_text()) or {}
         return {
             "effective": effective,
+            "defaults": defaults,
             "local": local,
             "local_yaml": local_text,
             "options": {
@@ -332,6 +341,9 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "stt_backends": ["faster_whisper", "parakeet", "openai_http"],
                 "tts_backends": ["kokoro", "chatterbox", "openai_http"],
                 "kokoro_voices": KOKORO_VOICES,
+                "chatterbox_models": ["turbo", "standard"],
+                "voice_genders": ["auto", "female", "male"],
+                "parakeet_models": ["nemo-parakeet-tdt-0.6b-v3", "nemo-parakeet-tdt-0.6b-v2", "nemo-parakeet-ctc-0.6b"],
                 "whisper_models": ["large-v3-turbo", "large-v3", "distil-large-v3", "medium", "small", "base"],
                 "oww_models": OWW_PRETRAINED + custom_oww,
                 "activation_modes": ["names", "oww", "both"],

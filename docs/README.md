@@ -1,5 +1,7 @@
 # Alveus documentation
 
+Browsable offline version: `docs/handbook.html` (open it directly, run `alveus handbook`, or visit `/handbook` in the GUI). Regenerate after editing these files with `python scripts/build_handbook.py`.
+
 | document | what it covers |
 |---|---|
 | [overview.md](overview.md) | What Alveus is, design goals, capabilities at a glance, hardware footprint, glossary |

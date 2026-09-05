@@ -191,7 +191,7 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
           <label><input type="checkbox" id="speakReplies"> Speak replies aloud</label>
           <label><input type="checkbox" id="showThinking"> Show reasoning</label>
         </div>
-        <span><span id="toolCount"></span> · <a href="#" id="resetChat">Reset conversation</a> · <a href="/docs" target="_blank" rel="noopener">API docs</a></span>
+        <span><span id="toolCount"></span> · <a href="#" id="resetChat">Reset conversation</a> · <a href="/handbook" target="_blank" rel="noopener">Handbook</a> · <a href="/docs" target="_blank" rel="noopener">API docs</a></span>
       </div>
     </div></div>
   </section>
@@ -378,23 +378,33 @@ const FIELDS = [
  {p:'llm.max_tokens', l:'Max reply tokens', h:'Includes the model’s hidden reasoning.', t:'number', min:256, max:32768},
  {p:'llm.max_tool_rounds', l:'Max tool rounds per request', t:'number', min:1, max:50},
  {g:'Speech', d:'Ears and voice.'},
- {p:'stt.backend', l:'Speech-to-text engine', t:'select', o:'stt_backends'},
- {p:'stt.faster_whisper.model', l:'Whisper model', h:'Only for faster_whisper.', t:'select', o:'whisper_models'},
- {p:'stt.faster_whisper.language', l:'Spoken language', h:'ISO code like en, de, zh. Empty = auto-detect.', t:'text'},
- {p:'tts.backend', l:'Text-to-speech engine', t:'select', o:'tts_backends'},
- {p:'tts.kokoro.voice', l:'Kokoro voice', h:'af_/bf_ = female, am_/bm_ = male. Decides Alveus vs Aurea.', t:'select', o:'kokoro_voices'},
- {p:'tts.kokoro.speed', l:'Speaking speed', t:'number', step:0.05, min:0.5, max:2},
- {p:'tts.chatterbox.voice_ref', l:'Chatterbox voice sample', h:'Path to a 5–15 s WAV to clone (chatterbox only).', t:'text'},
+ {p:'stt.backend', l:'Speech-to-text engine', h:'faster_whisper: robust, multilingual · parakeet: fastest · openai_http: external server', t:'select', o:'stt_backends'},
+ {p:'stt.faster_whisper.model', l:'Whisper model', h:'large-v3-turbo is the best speed/accuracy trade-off on a GPU.', t:'select', o:'whisper_models', when:{p:'stt.backend', v:['faster_whisper']}},
+ {p:'stt.faster_whisper.language', l:'Spoken language', h:'ISO code like en, de, zh. Empty = auto-detect.', t:'text', when:{p:'stt.backend', v:['faster_whisper']}},
+ {p:'stt.faster_whisper.compute_type', l:'Whisper precision', h:'float16 on GPU; int8_float16 halves VRAM.', t:'text', when:{p:'stt.backend', v:['faster_whisper']}},
+ {p:'stt.parakeet.model', l:'Parakeet model', t:'select', o:'parakeet_models', when:{p:'stt.backend', v:['parakeet']}},
+ {p:'stt.openai_http.base_url', l:'Transcription server URL', h:'Any /v1/audio/transcriptions endpoint.', t:'text', when:{p:'stt.backend', v:['openai_http']}},
+ {p:'stt.openai_http.model', l:'Transcription model name', t:'text', when:{p:'stt.backend', v:['openai_http']}},
+ {p:'tts.backend', l:'Text-to-speech engine', h:'kokoro: fast, 28 voices · chatterbox: most natural, voice cloning · openai_http: external server', t:'select', o:'tts_backends'},
+ {p:'tts.voice_gender', l:'Voice gender', h:'Decides whether it calls itself Alveus or Aurea. auto reads the Kokoro voice prefix.', t:'select', o:'voice_genders'},
+ {p:'tts.kokoro.voice', l:'Kokoro voice', h:'af_/bf_ = female, am_/bm_ = male; a/b = American/British.', t:'select', o:'kokoro_voices', when:{p:'tts.backend', v:['kokoro']}},
+ {p:'tts.kokoro.speed', l:'Speaking speed', t:'number', step:0.05, min:0.5, max:2, when:{p:'tts.backend', v:['kokoro']}},
+ {p:'tts.chatterbox.model', l:'Chatterbox model', h:'turbo: fastest · standard: more expressive controls.', t:'select', o:'chatterbox_models', when:{p:'tts.backend', v:['chatterbox']}},
+ {p:'tts.chatterbox.voice_ref', l:'Voice sample to clone', h:'Path to a clean 5–15 s WAV of the speaker. Empty = built-in voice.', t:'text', when:{p:'tts.backend', v:['chatterbox']}},
+ {p:'tts.chatterbox.exaggeration', l:'Expressiveness', h:'standard model only, 0–1.', t:'number', step:0.05, min:0, max:1, when:{p:'tts.chatterbox.model', v:['standard']}},
+ {p:'tts.openai_http.base_url', l:'Speech server URL', h:'Any /v1/audio/speech endpoint (e.g. Kokoro-FastAPI).', t:'text', when:{p:'tts.backend', v:['openai_http']}},
+ {p:'tts.openai_http.model', l:'Speech model name', t:'text', when:{p:'tts.backend', v:['openai_http']}},
+ {p:'tts.openai_http.voice', l:'Voice name', h:'As understood by that server.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
  {g:'Activation', d:'How a conversation starts.'},
  {p:'activation.wake_word.mode', l:'Wake mode', h:'names: say Alveus/Aurea · oww: openWakeWord phrase · both.', t:'select', o:'activation_modes'},
  {p:'activation.wake_word.names', l:'Names', h:'Comma-separated.', t:'list'},
  {p:'activation.wake_word.name_aliases', l:'Name aliases', h:'Spellings the transcriber produces for the names.', t:'list'},
- {p:'activation.wake_word.oww_model', l:'openWakeWord model', h:'Pretrained phrase or a custom model in the wakeword folder.', t:'select', o:'oww_models'},
- {p:'activation.wake_word.threshold', l:'Wake-word threshold', t:'number', step:0.05, min:0.1, max:0.95},
+ {p:'activation.wake_word.oww_model', l:'openWakeWord model', h:'Pretrained phrase or a custom model in the wakeword folder.', t:'select', o:'oww_models', when:{p:'activation.wake_word.mode', v:['oww','both']}},
+ {p:'activation.wake_word.threshold', l:'Wake-word threshold', t:'number', step:0.05, min:0.1, max:0.95, when:{p:'activation.wake_word.mode', v:['oww','both']}},
  {p:'activation.wake_word.follow_up_window_s', l:'Follow-up window (s)', h:'After a reply, speech is accepted without a name for this long. 0 disables.', t:'number', min:0, max:60},
  {p:'activation.hotkey.enabled', l:'Global hotkey', t:'bool'},
- {p:'activation.hotkey.combo', l:'Hotkey combo', h:'pynput syntax, e.g. <ctrl>+<alt>+<space>', t:'text'},
- {p:'activation.hotkey.mode', l:'Hotkey mode', h:'toggle: press to start · hold: push-to-talk', t:'select', o:'hotkey_modes'},
+ {p:'activation.hotkey.combo', l:'Hotkey combo', h:'pynput syntax, e.g. <ctrl>+<alt>+<space>', t:'text', when:{p:'activation.hotkey.enabled', v:[true]}},
+ {p:'activation.hotkey.mode', l:'Hotkey mode', h:'toggle: press to start · hold: push-to-talk', t:'select', o:'hotkey_modes', when:{p:'activation.hotkey.enabled', v:[true]}},
  {g:'Audio', d:'Microphone, silence detection, chimes.'},
  {p:'audio.backend', l:'Audio backend', t:'select', o:'audio_backends'},
  {p:'audio.input_device', l:'Microphone', h:'PipeWire node name (see wpctl status). Empty = default.', t:'text'},
@@ -413,6 +423,12 @@ const FIELDS = [
 ];
 let cfg=null, dirty={}, persona='', personaDirty=false, yamlDirty=false;
 const get = (o,p) => p.split('.').reduce((a,k)=> (a && a[k]!==undefined) ? a[k] : undefined, o);
+// value as it will be after saving: pending edit wins over the effective config
+const current = p => (p in dirty) ? (dirty[p]===null ? get(cfg.defaults||{}, p) ?? get(cfg.effective,p) : dirty[p]) : get(cfg.effective, p);
+function refreshVisibility(){
+  for (const f of FIELDS){ if(!f.when) continue; const row=document.querySelector(`.field[data-path="${f.p}"]`); if(!row) continue;
+    const v = current(f.when.p); row.hidden = !f.when.v.some(x => String(x)===String(v)); }
+}
 function fmt(v){ if(v===undefined||v===null) return '—'; if(Array.isArray(v)) return v.join(', '); return String(v); }
 
 async function loadSettings(force){
@@ -439,6 +455,7 @@ function renderSettings(){
   const a=document.createElement('a'); a.href='#g-Advanced'; a.textContent='Advanced'; a.onclick=e=>{e.preventDefault(); sec.scrollIntoView({behavior:'smooth'});}; nav.appendChild(a);
   const note=document.createElement('div'); note.className='note'; note.innerHTML=`Running: <b>${esc(cfg.running_profile)}</b><br>${cfg.managed_by_systemd?'Managed by systemd — restarts work from here.':'Not under systemd — restart <code>alveus talk</code> yourself after saving.'}<br><br>Models: <code>${esc(cfg.env.ALVEUS_MODELS)}</code>`; nav.appendChild(note);
   $('yamlEd').value = cfg.local_yaml; $('personaEd').value = persona;
+  refreshVisibility();
   $('yamlEd').oninput=()=>{yamlDirty=true; updateSavebar();}; $('personaEd').oninput=()=>{personaDirty=true; updateSavebar();};
   $('saveYaml').onclick = async () => { try{ const r=await j('/config',{method:'PUT', body:JSON.stringify({yaml:$('yamlEd').value})}); toast('local.yaml saved'); yamlDirty=false; await loadSettings(true); needRestart('assistant'); }catch(e){ toast(e.message,true);} };
   $('savePersona').onclick = async () => { try{ await j('/persona',{method:'PUT', body:JSON.stringify({text:$('personaEd').value})}); toast('Persona saved'); personaDirty=false; needRestart('assistant'); updateSavebar(); }catch(e){ toast(e.message,true);} };
@@ -450,7 +467,7 @@ function fieldRow(f){
   const ctl=document.createElement('div'); ctl.className='ctl';
   const meta=document.createElement('div'); meta.className='meta';
   let el;
-  const setDirty = v => { dirty[f.p]=v; row.classList.add('dirty'); updateSavebar(); };
+  const setDirty = v => { dirty[f.p]=v; row.classList.add('dirty'); updateSavebar(); refreshVisibility(); };
   if (f.t==='bool'){ el=document.createElement('button'); el.className='switch'; el.setAttribute('role','switch'); el.setAttribute('aria-checked', String(!!eff)); el.onclick=()=>{ const v=el.getAttribute('aria-checked')!=='true'; el.setAttribute('aria-checked',String(v)); setDirty(v); }; }
   else if (f.t==='select'){ el=document.createElement('select'); const opts=cfg.options[f.o]||[]; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur); el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o)}</option>`).join(''); el.onchange=()=>setDirty(el.value); }
   else if (f.t==='list'){ el=document.createElement('input'); el.type='text'; el.value=Array.isArray(eff)?eff.join(', '):(eff||''); el.oninput=()=>setDirty(el.value.split(',').map(s=>s.trim()).filter(Boolean)); }
@@ -458,7 +475,7 @@ function fieldRow(f){
   else { el=document.createElement('input'); el.type='text'; el.value=eff??''; el.oninput=()=>setDirty(el.value===''?null:el.value); }
   ctl.appendChild(el);
   meta.innerHTML = overridden ? `<span class="ov">overridden</span><br><button>reset to default</button>` : `default`;
-  if (overridden) meta.querySelector('button').onclick = () => { dirty[f.p]=null; row.classList.add('dirty'); meta.innerHTML='<span class="ov">will reset</span>'; updateSavebar(); };
+  if (overridden) meta.querySelector('button').onclick = () => { dirty[f.p]=null; row.classList.add('dirty'); meta.innerHTML='<span class="ov">will reset</span>'; updateSavebar(); refreshVisibility(); };
   row.append(lbl, ctl, meta); return row;
 }
 let restartKind=null;

@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -204,6 +205,18 @@ def ui(port: int = None):
         raise typer.Exit(1)
     console.print(f"opening {url}")
     webbrowser.open(url)
+
+
+@app.command()
+def handbook(rebuild: bool = typer.Option(False, help="regenerate docs/handbook.html from docs/*.md first")):
+    """Open the offline documentation (docs/handbook.html) in the browser."""
+    import webbrowser
+
+    path = REPO_ROOT / "docs" / "handbook.html"
+    if rebuild or not path.exists():
+        subprocess.run([sys.executable, str(REPO_ROOT / "scripts" / "build_handbook.py")], check=True)
+    console.print(f"opening {path}")
+    webbrowser.open(path.as_uri())
 
 
 @app.command()

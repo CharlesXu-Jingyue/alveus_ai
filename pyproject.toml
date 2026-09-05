@@ -40,7 +40,7 @@ tts-kokoro = ["kokoro>=0.9.4"]
 tts-chatterbox = ["chatterbox-tts"]
 # openwakeword is installed with --no-deps by install.sh (its tflite-runtime pin has no py3.12 wheels)
 wakeword = ["onnxruntime-gpu>=1.19", "scipy>=1.11", "tqdm", "requests"]
-dev = ["pytest>=8", "ruff"]
+dev = ["pytest>=8", "ruff", "markdown>=3.7"]
 
 [project.scripts]
 alveus = "alveus.cli:app"

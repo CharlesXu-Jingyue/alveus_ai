@@ -103,6 +103,7 @@ In text mode destructive confirmations are terminal `[y/N]` prompts.
 | `alveus chat [--speak] [--no-tools] [--show-thinking] [--profile P]` | text REPL |
 | `alveus api` | HTTP API only (no microphone), for other frontends |
 | `alveus ui` | open the browser GUI of the running assistant |
+| `alveus handbook [--rebuild]` | open the offline documentation (`docs/handbook.html`) |
 | `alveus trigger` | make the running assistant listen now (bind to a keyboard shortcut) |
 | `alveus say "text"` | speak through the running assistant (falls back to local synthesis) |
 | `alveus tools` | connect every MCP server and list tools (destructive ones marked) |
