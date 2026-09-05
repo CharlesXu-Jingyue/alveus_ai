@@ -77,16 +77,20 @@ alveus stt test           # microphone works (speak for 5 s)
 
 ## Services
 
+Both units are enabled and start automatically at login, so a reboot needs no manual steps
+(models take about a minute to load).
+
 ```bash
+systemctl --user stop alveus alveus-llm        # stop everything
+systemctl --user start alveus-llm alveus       # start everything
 systemctl --user status alveus-llm alveus      # state
 systemctl --user restart alveus                # after config changes
-systemctl --user stop alveus                   # before running `alveus talk` by hand
 systemctl --user disable alveus alveus-llm     # stop autostart
 journalctl --user -u alveus -f                 # live log
 ```
 
-`alveus.service` waits (`ExecStartPre`) until llama-server answers `/health`, then runs
-`alveus talk`. It inherits `DISPLAY`/`XAUTHORITY` from the systemd user environment, which GDM
+`alveus.service` runs `alveus talk`; it does not wait for the LLM, so the GUI is reachable even
+while `alveus-llm` is still loading or failing (the header shows the LLM state). It inherits `DISPLAY`/`XAUTHORITY` from the systemd user environment, which GDM
 populates at login; if the hotkey reports no display, run
 `systemctl --user import-environment DISPLAY XAUTHORITY` and restart the unit.
 

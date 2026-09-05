@@ -8,7 +8,7 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 |---|---|---|
 | `alveus.service` restarts in a loop, log shows `ValueError: space` | hotkey combo uses a bare key name | use pynput names in angle brackets: `<ctrl>+<alt>+<space>` |
 | `hotkey disabled … Can't connect to display ":0"` | unit had a hard-coded `DISPLAY`; or the systemd user env lacks `DISPLAY`/`XAUTHORITY` | current unit inherits them; if still missing: `systemctl --user import-environment DISPLAY XAUTHORITY` then restart |
-| `alveus.service` stuck in `ExecStartPre` | llama-server not healthy on :8080 | `systemctl --user status alveus-llm`, `journalctl --user -u alveus-llm`; check weights path in `alveus llm profiles` |
+| GUI header says "LLM service failed/activating" | llama-server not healthy on :8080 | `systemctl --user status alveus-llm`, `journalctl --user -u alveus-llm`; check weights path in `alveus llm profiles` |
 | Port 8080 in use | a manual `llama-server` is still running | `pkill llama-server` (careful with `pkill -f` matching your own shell), then start the unit |
 | Two answers to every question | service **and** manual `alveus talk` both running | `systemctl --user stop alveus` before running by hand |
 

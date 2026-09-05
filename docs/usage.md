@@ -123,6 +123,21 @@ In text mode destructive confirmations are terminal `[y/N]` prompts.
 
 All commands read the same configuration; `-v` on `talk`/`chat`/`api` enables debug logging.
 
+## Starting and stopping
+
+Both services are **enabled**, so after a reboot (or logging in) they start by themselves: the LLM
+server first, then the assistant with its GUI at `http://127.0.0.1:8765/`. Allow about a minute for
+the models to load. Nothing needs to be typed.
+
+```bash
+systemctl --user stop alveus alveus-llm      # stop everything
+systemctl --user start alveus-llm alveus     # start everything
+systemctl --user restart alveus              # restart only the assistant (after config changes)
+systemctl --user status alveus alveus-llm    # current state
+journalctl --user -u alveus -f               # live log
+systemctl --user disable alveus alveus-llm   # turn off autostart (enable to turn it back on)
+```
+
 ## Running as a service vs. by hand
 
 The systemd units start both the LLM server and the assistant at login. To iterate manually,
