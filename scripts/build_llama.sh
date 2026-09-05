@@ -14,6 +14,6 @@ if [ -z "$ARCH" ] && command -v nvidia-smi >/dev/null; then
   ARCH="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d '.')"
 fi
 ARCH_FLAG=""; [ -n "$ARCH" ] && ARCH_FLAG="-DCMAKE_CUDA_ARCHITECTURES=$ARCH"
-cmake -B build -DGGML_CUDA=ON $ARCH_FLAG -DCMAKE_BUILD_TYPE=Release
+cmake -B build -DGGML_CUDA=ON $ARCH_FLAG -DCMAKE_BUILD_TYPE=Release -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON
 cmake --build build -j"$(nproc)" --target llama-server llama-cli
 echo "built: $DEST/build/bin/llama-server"

@@ -38,6 +38,7 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 |---|---|---|
 | `LLM endpoint FAIL … model 'x' not in served models` | profile `model` ≠ llama-server `--alias` | keep them equal; `alveus llm serve` sets the alias from the profile |
 | `alveus-llm` crash-loops after switching to Ternary: `tensor 'output.weight' has invalid ggml type 142` | llama-server built from the fork's `master` (or upstream), which lacks the PQ2_0 kernels | rebuild from the fork's **prism** branch: `scripts/build_llama.sh` (does this by default now). The GUI's model check catches this before restarting |
+| `llama-server: error while loading shared libraries: libllama-server-impl.so` | the build directory was moved/renamed; cmake bakes the absolute build path into RPATH | rebuild in place (`scripts/build_llama.sh` now passes `-DCMAKE_BUILD_RPATH_USE_ORIGIN=ON`, which makes the build relocatable) or symlink the old path |
 | GUI "The LLM server did not come up" after a profile change | new profile's weights can't load | read the error shown, click *Revert*; see the row above |
 | Tool calls never happen | server started without `--jinja`, or model without tool template | profile `serve.args` include `--jinja`; check `curl :8080/v1/models` |
 | Reply is empty but "thinking" long | `max_tokens` hit during reasoning | raise `llm.max_tokens` or set `thinking: false` |
