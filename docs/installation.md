@@ -42,6 +42,12 @@ What it does, in order (each step is also a standalone script under `scripts/`):
 Flags: `--env NAME`, `--venv`, `--models DIR`, `--lib DIR`, `--ternary`, `--no-1bit`,
 `--with-chatterbox`, `--no-parakeet`, `--services`, `--skip-llama`, `--skip-models`.
 
+## Opening the GUI
+
+Once the `alveus` service (or `alveus talk` / `alveus api`) is running, the browser GUI is at
+`http://127.0.0.1:8765/` — `alveus ui` opens it. It is bound to the local machine; for a remote
+machine use `ssh -L 8765:127.0.0.1:8765 <host>` and browse to the same address.
+
 ## Verifying
 
 ```bash

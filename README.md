@@ -42,7 +42,8 @@ Optional desktop tools for full GNOME control: `sudo apt install xdotool wmctrl 
 
 ```bash
 alveus llm serve            # start the LLM server (or: systemctl --user start alveus-llm)
-alveus talk                 # voice assistant; also serves the local API on :8765
+alveus talk                 # voice assistant; also serves the browser GUI + API on :8765
+alveus ui                   # open http://127.0.0.1:8765/ — chat by typing, edit settings, restart
 alveus chat                 # text REPL with the same agent + tools
 alveus chat --speak         # text in, voice out
 ```
@@ -101,15 +102,18 @@ tools:
 Built-in servers live in `mcp_servers/` and are plain `MCPServer` (FastMCP) apps; copy one to
 add your own. Mark risky tools with `annotations=annot(destructive=True)` to get voice confirmation.
 
-## HTTP API (from `alveus talk` or `alveus api`)
+## Browser GUI and HTTP API (from `alveus talk` or `alveus api`)
 
-`POST /chat {"text": "..."}`, `POST /speak {"text": "...", "play": true}`, `POST /transcribe` (wav
-upload), `POST /trigger`, `POST /stop`, `GET /tools`, `GET /health`, docs at `/docs`.
+`http://127.0.0.1:8765/` serves a GUI: chat by typing with streamed replies, tool activity and
+Allow/Deny cards for destructive actions, a live view of voice turns, and a Settings tab that edits
+`config/local.yaml` and restarts the services. Local machine only; use an SSH tunnel from elsewhere.
+API: `POST /chat`, `POST /chat/stream` (SSE), `POST /speak`, `POST /transcribe`, `POST /trigger`,
+`POST /stop`, `GET /history`, `GET /events`, `GET/PUT /config`, `POST /restart`, docs at `/docs`.
 
 ## Layout
 
 ```
-alveus/            core package: config, llm/, stt/, tts/, audio/, agent/, voice.py, api.py, cli.py
+alveus/            core package: config, llm/, stt/, tts/, audio/, agent/, voice.py, api.py, cli.py, web/index.html (GUI)
 mcp_servers/       built-in MCP servers (files_shell, desktop, system, web, coder)
 config/            alveus.yaml (defaults), persona.md, local.yaml (per machine, git-ignored)
 scripts/           build_llama.sh, download_models.sh, pip_install_env.sh, install_services.sh, train_wakeword.sh

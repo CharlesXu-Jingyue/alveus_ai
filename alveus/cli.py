@@ -49,14 +49,19 @@ def talk(verbose: bool = typer.Option(False, "-v", "--verbose"), no_api: bool = 
         os.environ["ALVEUS_LLM_PROFILE"] = profile
     cfg = load_config()
     _setup_logging(cfg, verbose)
+    from .api import EventBus
     from .voice import VoiceAssistant
+
+    bus = EventBus()
 
     def on_state(s):
         console.print(f"[dim]{time.strftime('%H:%M:%S')}[/dim] [bold cyan]{s.value}[/bold cyan]")
+        bus.publish("state", state=s.value)
 
     def on_transcript(who, text):
         color = "green" if who == "user" else "magenta"
         console.print(f"[{color}]{who}:[/{color}] {text}")
+        bus.publish("transcript", who=who, text=text, source="voice")
 
     va = VoiceAssistant(cfg, on_state=on_state, on_transcript=on_transcript)
 
@@ -64,7 +69,9 @@ def talk(verbose: bool = typer.Option(False, "-v", "--verbose"), no_api: bool = 
         tasks = [asyncio.create_task(va.run_forever())]
         if cfg.api.get("enabled", True) and not no_api:
             from .api import build_app, serve
-            tasks.append(asyncio.create_task(serve(build_app(va), cfg.api.get("host", "127.0.0.1"), int(cfg.api.get("port", 8765)))))
+            host, port = cfg.api.get("host", "127.0.0.1"), int(cfg.api.get("port", 8765))
+            console.print(f"[dim]GUI + API at http://{host}:{port}/[/dim]")
+            tasks.append(asyncio.create_task(serve(build_app(va, bus), host, port)))
         try:
             await asyncio.gather(*tasks)
         except (KeyboardInterrupt, asyncio.CancelledError):
@@ -158,7 +165,7 @@ def api(verbose: bool = typer.Option(False, "-v", "--verbose")):
     async def main():
         ha = HeadlessAssistant(cfg)
         await ha.start()
-        console.print(f"API on http://{cfg.api.get('host')}:{cfg.api.get('port')}  (docs at /docs)")
+        console.print(f"GUI + API at http://{cfg.api.get('host')}:{cfg.api.get('port')}/  (API docs at /docs)")
         await serve(build_app(ha), cfg.api.get("host", "127.0.0.1"), int(cfg.api.get("port", 8765)))
 
     asyncio.run(main())
@@ -176,6 +183,27 @@ def trigger(port: int = None):
     except Exception as e:  # noqa: BLE001
         console.print(f"[red]alveus is not running ({e})[/red]")
         raise typer.Exit(1)
+
+
+@app.command()
+def ui(port: int = None):
+    """Open the browser GUI of the running assistant (or tell you how to start it)."""
+    import webbrowser
+
+    import httpx
+
+    cfg = load_config()
+    url = f"http://{cfg.api.get('host', '127.0.0.1')}:{port or int(cfg.api.get('port', 8765))}/"
+    try:
+        httpx.get(url + "health", timeout=2)
+    except Exception:  # noqa: BLE001
+        console.print(f"[yellow]Nothing is listening at {url}[/yellow]. Start the assistant first:\n"
+                      "  systemctl --user start alveus     (voice + GUI)\n"
+                      "  alveus talk                       (voice + GUI, foreground)\n"
+                      "  alveus api                        (GUI only, no microphone)")
+        raise typer.Exit(1)
+    console.print(f"opening {url}")
+    webbrowser.open(url)
 
 
 @app.command()

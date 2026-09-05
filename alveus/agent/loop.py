@@ -1,6 +1,7 @@
 """The Alveus agent loop: LLM <-> MCP tools, with streamed events for the voice layer."""
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import json
 import logging
@@ -80,6 +81,8 @@ class Agent:
         self.confirm_destructive = bool(cfg.tools.get("confirm_destructive", True))
         self.history: list[dict[str, Any]] = []
         self.system_prompt = self._build_system_prompt()
+        # one conversation at a time (voice loop, GUI and API share the history)
+        self.lock = asyncio.Lock()
 
     # ------------------------------------------------------------------ prompt
     def _build_system_prompt(self) -> str:
@@ -112,7 +115,11 @@ class Agent:
             self.history = self.history[idx[-self.max_history]:]
 
     # ------------------------------------------------------------------ run
-    async def run(self, user_text: str, *, thinking: bool | None = None) -> AsyncIterator[AgentEvent]:
+    async def run(self, user_text: str, *, thinking: bool | None = None,
+                  confirm: ConfirmFn | None = None) -> AsyncIterator[AgentEvent]:
+        """Stream events for one user turn. ``confirm`` overrides the default confirmer."""
+        confirm = confirm or self.confirm
+        self._declined_this_turn = False
         self.history.append({"role": "user", "content": user_text})
         self._trim()
         tools = self.hub.openai_tools() if self.hub else None
@@ -159,11 +166,16 @@ class Agent:
                 ],
             })
             for tc in tool_calls:
-                result = await self._execute(tc)
+                try:
+                    shown_args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                except json.JSONDecodeError:
+                    shown_args = {"_raw": tc["arguments"]}
+                yield AgentEvent("tool_start", tool=tc["name"], args=shown_args if isinstance(shown_args, dict) else {})
+                result = await self._execute(tc, confirm)
                 self.history.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
                 yield AgentEvent("tool_result", tool=tc["name"], text=result[:2000])
 
-    async def _execute(self, tc: dict[str, Any]) -> str:
+    async def _execute(self, tc: dict[str, Any], confirm: ConfirmFn | None) -> str:
         name, raw_args = tc["name"], tc["arguments"]
         try:
             args = json.loads(raw_args) if raw_args else {}
@@ -175,11 +187,19 @@ class Agent:
         if info is None:
             return json.dumps({"error": f"unknown tool {name}"})
 
-        if self.confirm_destructive and self.confirm and self._is_destructive(info, args):
+        if self.confirm_destructive and self._is_destructive(info, args):
+            if confirm is None:
+                return json.dumps({"cancelled": True, "message": "Destructive action needs user confirmation, "
+                                   "but no confirmation channel is available here."})
+            if getattr(self, "_declined_this_turn", False):
+                return json.dumps({"cancelled": True, "message": "The user already declined a destructive action "
+                                   "in this request. Do not retry or work around it; report that it was cancelled."})
             desc = f"{info.name.replace('_', ' ')} with {json.dumps(args)[:200]}"
-            ok = await self.confirm(desc)
+            ok = await confirm(desc)
             if not ok:
-                return json.dumps({"cancelled": True, "message": "The user declined this action."})
+                self._declined_this_turn = True
+                return json.dumps({"cancelled": True, "message": "The user declined this action. Do not retry it "
+                                   "or attempt it another way; tell the user it was cancelled."})
         return await self.hub.call(name, args)
 
     @staticmethod

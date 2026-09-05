@@ -124,3 +124,60 @@ def llm_profile(cfg: DotDict, name: str | None = None) -> DotDict:
         prof.setdefault(k, llm.get(k))
     prof["name"] = name
     return DotDict(prof)
+
+
+# ----------------------------------------------------------------------------- editing
+LOCAL_YAML = REPO_ROOT / "config" / "local.yaml"
+
+
+def read_local_yaml() -> str:
+    return LOCAL_YAML.read_text() if LOCAL_YAML.exists() else ""
+
+
+def write_local_yaml(text: str) -> dict:
+    """Validate and write config/local.yaml verbatim. Returns the parsed mapping."""
+    data = yaml.safe_load(text) if text.strip() else {}
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        raise ValueError("local.yaml must be a mapping at the top level")
+    LOCAL_YAML.parent.mkdir(parents=True, exist_ok=True)
+    LOCAL_YAML.write_text(text if text.endswith("\n") or not text else text + "\n")
+    return data
+
+
+def patch_local_yaml(patch: dict) -> dict:
+    """Deep-merge ``patch`` into config/local.yaml (a ``None`` leaf removes the override)."""
+    current = yaml.safe_load(read_local_yaml()) or {}
+    merged = _merge_patch(current, patch)
+    LOCAL_YAML.parent.mkdir(parents=True, exist_ok=True)
+    LOCAL_YAML.write_text("# Machine-specific overrides (git-ignored). Defaults are in alveus.yaml.\n"
+                          + yaml.safe_dump(merged, sort_keys=False, allow_unicode=True))
+    return merged
+
+
+def _merge_patch(base: dict, patch: dict) -> dict:
+    out = copy.deepcopy(base)
+    for k, v in patch.items():
+        if v is None:
+            out.pop(k, None)
+        elif isinstance(v, dict):
+            sub = out.get(k) if isinstance(out.get(k), dict) else {}
+            merged = _merge_patch(sub, v)
+            if merged:
+                out[k] = merged
+            else:
+                out.pop(k, None)
+        else:
+            out[k] = copy.deepcopy(v)
+    return out
+
+
+def set_path(d: dict, dotted: str, value: Any) -> dict:
+    """Build a nested patch dict from a dotted path."""
+    cur = d
+    parts = dotted.split(".")
+    for part in parts[:-1]:
+        cur = cur.setdefault(part, {})
+    cur[parts[-1]] = value
+    return d

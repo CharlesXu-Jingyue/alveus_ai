@@ -48,6 +48,9 @@ alveus = "alveus.cli:app"
 [tool.setuptools.packages.find]
 include = ["alveus*", "mcp_servers*"]
 
+[tool.setuptools.package-data]
+alveus = ["web/*.html"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

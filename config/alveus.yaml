@@ -161,7 +161,10 @@ tools:
     #   headers: { Authorization: "Bearer ${HASS_TOKEN}" }
     #   enabled: false
 
-# ---------------------------------------------------------------- API (optional text/voice HTTP gateway)
+# ---------------------------------------------------------------- GUI + API
+# The browser GUI (chat by typing, settings editor) and the JSON API are served together,
+# local machine only, at http://127.0.0.1:8765/ while `alveus talk` / `alveus api` runs.
+# To reach it from another device use an SSH tunnel: ssh -L 8765:127.0.0.1:8765 <host>
 api:
   enabled: true
   host: 127.0.0.1

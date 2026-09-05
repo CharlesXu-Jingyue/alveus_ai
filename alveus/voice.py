@@ -262,17 +262,18 @@ class VoiceAssistant:
         speaker_task = asyncio.create_task(speaker())
         streaming = bool(self.cfg.assistant.get("streaming_tts", True))
         try:
+          async with self.agent.lock:
             async for ev in self.agent.run(text):
-                if ev.kind == "content":
-                    reply_parts.append(ev.text)
-                    if streaming:
-                        for s in sb.feed(ev.text):
-                            await speak_q.put(s)
-                elif ev.kind == "tool_result":
-                    log.info("tool %s -> %s", ev.tool, ev.text[:160].replace("\n", " "))
-                elif ev.kind == "error":
-                    reply_parts.append(" " + ev.text)
-                    await speak_q.put(ev.text)
+                  if ev.kind == "content":
+                      reply_parts.append(ev.text)
+                      if streaming:
+                          for s in sb.feed(ev.text):
+                              await speak_q.put(s)
+                  elif ev.kind == "tool_result":
+                      log.info("tool %s -> %s", ev.tool, ev.text[:160].replace("\n", " "))
+                  elif ev.kind == "error":
+                      reply_parts.append(" " + ev.text)
+                      await speak_q.put(ev.text)
             if streaming:
                 for s in sb.flush():
                     await speak_q.put(s)

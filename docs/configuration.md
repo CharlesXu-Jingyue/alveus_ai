@@ -144,8 +144,10 @@ Built-in servers: `files`, `desktop`, `system`, `web`, `coder`. The coder server
 
 | key | default | meaning |
 |---|---|---|
-| `enabled` | `true` | start the HTTP API inside `alveus talk` |
-| `host`, `port` | `127.0.0.1`, `8765` | bind address |
+| `enabled` | `true` | start the browser GUI + HTTP API inside `alveus talk` |
+| `host`, `port` | `127.0.0.1`, `8765` | bind address (keep localhost; tunnel with SSH for remote use) |
+
+Most keys above can also be edited in the GUI's Settings tab, which writes `config/local.yaml`.
 
 ## `logging`
 

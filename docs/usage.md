@@ -54,6 +54,34 @@ minutes), "what's the git status of ~/local/repo/alveus-ai?".
 **Conversation** – anything else: explanations, drafting text, maths, planning. The model is
 Bonsai-27B (Qwen3.6-derived); expect solid general knowledge with a 1-bit quality trade-off.
 
+## Browser GUI
+
+While the assistant runs (service, `alveus talk`, or `alveus api`), open **http://127.0.0.1:8765/**
+or run `alveus ui`. The page is served by the assistant itself and is reachable from this machine
+only.
+
+**Chat tab.** Type a request (Enter sends, Shift+Enter for a newline). Replies stream in; tool calls
+appear as expandable chips above the answer with their arguments and results; the model's reasoning
+can be shown with the "Show reasoning" toggle. Destructive actions pause the reply with an
+**Allow / Deny** card. "Speak replies aloud" plays the answer through the speaker. Voice turns you
+say out loud appear in the same log (tagged *voice*), because GUI and microphone share one
+conversation. The header shows the live state (idle, listening, thinking, speaking), the LLM
+health, a **Listen** button (same as the hotkey) and **Stop** (interrupt speech).
+
+**Settings tab.** A form over every commonly changed option (names, model profile, speech engines and
+voice, activation mode and names, hotkey, VAD timing, chimes, tool safety, log level). Each row shows
+whether the value is overridden on this machine and offers *reset to default*. **Save** writes the
+changes to `config/local.yaml`; nothing is applied until you press **Restart assistant** (or
+**Restart LLM + assistant** when the model profile changed). The page reconnects by itself, usually
+in 10–40 s while models reload. The *Advanced* section edits `local.yaml` and the persona prompt as
+raw text.
+
+**On another machine.** After `./install.sh` there, the GUI is available the same way at
+`http://127.0.0.1:8765/` whenever `systemctl --user start alveus`, `alveus talk`, or `alveus api`
+(GUI without microphone) is running; `alveus ui` opens it in the default browser. To reach a remote
+machine's GUI from your laptop, tunnel the port rather than exposing it:
+`ssh -L 8765:127.0.0.1:8765 user@that-machine`, then browse to `http://127.0.0.1:8765/` locally.
+
 ## Text mode
 
 ```bash
@@ -74,6 +102,7 @@ In text mode destructive confirmations are terminal `[y/N]` prompts.
 | `alveus talk [-v] [--no-api] [--profile P]` | full voice assistant + HTTP API |
 | `alveus chat [--speak] [--no-tools] [--show-thinking] [--profile P]` | text REPL |
 | `alveus api` | HTTP API only (no microphone), for other frontends |
+| `alveus ui` | open the browser GUI of the running assistant |
 | `alveus trigger` | make the running assistant listen now (bind to a keyboard shortcut) |
 | `alveus say "text"` | speak through the running assistant (falls back to local synthesis) |
 | `alveus tools` | connect every MCP server and list tools (destructive ones marked) |

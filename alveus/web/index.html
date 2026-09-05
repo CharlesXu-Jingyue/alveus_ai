@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alveus</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='13' width='4' height='6' rx='2' fill='%230E7C86'/%3E%3Crect x='10' y='8' width='4' height='16' rx='2' fill='%230E7C86'/%3E%3Crect x='17' y='4' width='4' height='24' rx='2' fill='%230E7C86'/%3E%3Crect x='24' y='10' width='4' height='12' rx='2' fill='%230E7C86'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F4F6F3; --surface:#FFFFFF; --surface-2:#EAEEEA; --ink:#17232A; --ink-2:#4E5F66; --muted:#7C8B90;
+  --rule:#D5DCD8; --rule-2:#C2CBC6; --accent:#0E7C86; --accent-ink:#0A5E66; --accent-soft:#DDF0F1;
+  --warm:#B8641F; --warm-soft:#F7E9DA; --danger:#A8322D; --danger-soft:#F6E0DE; --ok:#2E7D4F;
+  --code-bg:#EDF1EE; --user-bubble:#E3EEEA; --sel:#CFEAEC;
+}
+@media (prefers-color-scheme: dark){ :root{
+  --bg:#0F1518; --surface:#141C20; --surface-2:#1B252A; --ink:#E4EBE9; --ink-2:#AEBDC1; --muted:#7F9197;
+  --rule:#243136; --rule-2:#2F3E44; --accent:#4FC3CF; --accent-ink:#8ADCE4; --accent-soft:#12333A;
+  --warm:#E39A4E; --warm-soft:#3A2A18; --danger:#E07A75; --danger-soft:#3B1F1E; --ok:#6FCB94;
+  --code-bg:#182226; --user-bubble:#1E2C30; --sel:#1F4A50;
+}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+::selection{background:var(--sel)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+
+/* ---------- header */
+header{display:flex;align-items:center;gap:14px;padding:0 18px;height:58px;border-bottom:1px solid var(--rule);background:var(--bg);position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:20px;letter-spacing:-.01em}
+.wave{display:flex;align-items:flex-end;gap:2px;height:22px}
+.wave i{display:block;width:3px;border-radius:2px;background:var(--accent);height:var(--h);transition:height .18s ease}
+.brand small{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--muted);font-weight:400;letter-spacing:.04em;margin-left:4px}
+.state{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rule-2);border-radius:999px;padding:3px 10px 3px 8px;font-size:12.5px;color:var(--ink-2);background:var(--surface)}
+.state .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.state[data-s="listening"] .dot{background:var(--ok);box-shadow:0 0 0 4px rgba(46,125,79,.18)}
+.state[data-s="thinking"] .dot{background:var(--warm);animation:pulse 1s infinite}
+.state[data-s="speaking"] .dot{background:var(--accent);animation:pulse .7s infinite}
+.state[data-s="offline"] .dot{background:var(--danger)}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+.tabs{display:flex;gap:2px;margin-left:10px;background:var(--surface-2);border-radius:8px;padding:3px}
+.tabs button{border:0;background:none;padding:5px 14px;border-radius:6px;color:var(--ink-2);font-weight:500;font-size:14px}
+.tabs button.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+.btn{border:1px solid var(--rule-2);background:var(--surface);border-radius:8px;padding:6px 12px;font-size:13.5px;color:var(--ink);display:inline-flex;gap:6px;align-items:center;line-height:1.2}
+.btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.06);color:#fff}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:default;filter:none}
+.llm{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.llm .dot{width:7px;height:7px;border-radius:50%;background:var(--danger)}
+.llm.ok .dot{background:var(--ok)}
+
+/* ---------- layout */
+main{flex:1;min-height:0;display:flex;flex-direction:column}
+.view{display:none;flex:1;min-height:0;flex-direction:column}
+.view.active{display:flex}
+
+/* ---------- chat */
+#log{flex:1;overflow:auto;padding:26px 0 12px;scroll-behavior:smooth}
+.col{width:min(860px,calc(100% - 40px));margin:0 auto}
+.msg{display:flex;flex-direction:column;gap:6px;margin:0 0 20px}
+.msg .who{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center}
+.msg .who .src{border:1px solid var(--rule-2);border-radius:4px;padding:0 5px;letter-spacing:.04em;text-transform:none}
+.msg.user{align-items:flex-end}
+.msg.user .bubble{background:var(--user-bubble);border-radius:14px 14px 4px 14px;padding:10px 14px;max-width:78%}
+.msg.assistant .bubble{max-width:100%;padding:2px 0}
+.bubble p{margin:0 0 8px} .bubble p:last-child{margin:0}
+.bubble code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px}
+.bubble pre{background:var(--code-bg);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:6px 0}
+.bubble pre code{background:none;padding:0;font-size:12.5px}
+.bubble ul{margin:4px 0 8px;padding-left:22px}
+.cursor::after{content:"▍";color:var(--accent);animation:pulse .9s infinite}
+.tools{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px}
+details.tool{border:1px solid var(--rule);border-radius:8px;background:var(--surface);font-size:13px;overflow:hidden}
+details.tool summary{list-style:none;display:flex;gap:10px;align-items:center;padding:7px 10px;cursor:pointer;color:var(--ink-2)}
+details.tool summary::-webkit-details-marker{display:none}
+details.tool summary .n{font-family:"IBM Plex Mono",ui-monospace,monospace;color:var(--accent-ink);font-weight:500}
+details.tool summary .a{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+details.tool summary .st{font-size:11px;color:var(--muted)}
+details.tool.running summary .st{color:var(--warm)}
+details.tool pre{margin:0;border:0;border-top:1px solid var(--rule);border-radius:0;max-height:260px;overflow:auto;font-size:12px}
+details.think{font-size:12.5px;color:var(--muted);margin:0 0 6px}
+details.think summary{cursor:pointer;list-style:none;display:inline-flex;gap:6px;align-items:center}
+details.think summary::-webkit-details-marker{display:none}
+details.think .t{white-space:pre-wrap;border-left:2px solid var(--rule-2);padding:4px 10px;margin-top:6px;max-height:220px;overflow:auto}
+.confirm{border:1px solid var(--warm);background:var(--warm-soft);border-radius:10px;padding:12px 14px;margin:6px 0 10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.confirm .q{flex:1;min-width:200px}
+.confirm .q b{color:var(--warm)}
+.confirm code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;font-size:.9em}
+.confirm.done{opacity:.6}
+.err{color:var(--danger);font-size:13.5px;border-left:3px solid var(--danger);padding:4px 10px;margin:4px 0}
+.empty{color:var(--muted);text-align:center;padding:60px 0 30px;font-size:14px}
+.empty b{display:block;font-family:"Bricolage Grotesque",sans-serif;font-size:26px;color:var(--ink);font-weight:700;margin-bottom:8px;letter-spacing:-.01em}
+.empty .ex{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
+.empty .ex button{border:1px solid var(--rule-2);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--ink-2)}
+.empty .ex button:hover{border-color:var(--accent);color:var(--accent-ink)}
+.composer{border-top:1px solid var(--rule);background:var(--bg);padding:12px 0 14px}
+.composer .box{display:flex;gap:10px;align-items:flex-end;background:var(--surface);border:1px solid var(--rule-2);border-radius:14px;padding:8px 8px 8px 14px}
+.composer .box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.composer textarea{flex:1;border:0;background:none;resize:none;max-height:180px;line-height:1.45;padding:6px 0;outline:none}
+.composer .row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12.5px;color:var(--muted);gap:12px;flex-wrap:wrap}
+.composer label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.composer .row a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--rule-2)}
+.composer .row a:hover{color:var(--danger);border-color:var(--danger)}
+
+/* ---------- settings */
+#settings{overflow:auto}
+.settings{width:min(980px,calc(100% - 40px));margin:0 auto;padding:28px 0 120px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:30px}
+.snav{position:sticky;top:20px;align-self:start;display:flex;flex-direction:column;gap:2px}
+.snav a{color:var(--ink-2);text-decoration:none;padding:6px 10px;border-radius:6px;font-size:14px}
+.snav a:hover{background:var(--surface-2)}
+.snav .note{font-size:12px;color:var(--muted);padding:12px 10px 0;line-height:1.5}
+.snav .note code{font-size:11px}
+section.grp{margin:0 0 34px}
+section.grp h2{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0 0 4px;scroll-margin-top:20px}
+section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.field{display:grid;grid-template-columns:minmax(180px,1fr) minmax(220px,1.4fr) 92px;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--rule)}
+.field:last-child{border-bottom:0}
+.field .lbl{font-weight:500}
+.field .lbl small{display:block;font-weight:400;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.4}
+.field .ctl input[type=text],.field .ctl input[type=number],.field .ctl select,.field .ctl textarea{width:100%;background:var(--bg);border:1px solid var(--rule-2);border-radius:8px;padding:7px 10px;font-size:14px}
+.field .ctl textarea{min-height:64px;resize:vertical;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px}
+.field .ctl input:focus,.field .ctl select:focus,.field .ctl textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field.dirty .ctl input,.field.dirty .ctl select,.field.dirty .ctl textarea{border-color:var(--warm)}
+.switch{position:relative;width:42px;height:24px;border-radius:12px;background:var(--rule-2);border:0;transition:background .15s}
+.switch[aria-checked="true"]{background:var(--accent)}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.switch[aria-checked="true"]::after{left:21px}
+.field .meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--muted);text-align:right;line-height:1.5}
+.field .meta .ov{color:var(--accent-ink)}
+.field .meta button{border:0;background:none;color:var(--muted);text-decoration:underline;font-size:11px;padding:0;font-family:inherit}
+.field .meta button:hover{color:var(--danger)}
+.field.restart-llm .lbl::after{content:"restarts LLM server";display:inline-block;margin-left:8px;font-size:10px;color:var(--warm);border:1px solid var(--warm);border-radius:4px;padding:0 4px;vertical-align:middle;font-weight:500;letter-spacing:.02em}
+.editor{background:var(--code-bg);border:1px solid var(--rule-2);border-radius:10px;width:100%;min-height:220px;padding:12px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;line-height:1.5;resize:vertical}
+.editor:focus{outline:none;border-color:var(--accent)}
+.adv-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 0 0;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.savebar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--rule);box-shadow:0 -6px 24px rgba(0,0,0,.06);transform:translateY(110%);transition:transform .2s ease}
+.savebar.show{transform:none}
+.savebar .in{width:min(980px,calc(100% - 40px));margin:0 auto;display:flex;align-items:center;gap:12px;padding:12px 0;flex-wrap:wrap}
+.savebar .msg-s{flex:1;font-size:14px}
+.savebar .msg-s b{font-weight:600}
+.savebar .msg-s small{display:block;color:var(--muted);font-size:12.5px}
+.toast{position:fixed;top:70px;right:18px;z-index:9;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transform:translateY(-6px);transition:all .2s}
+.toast.show{opacity:1;transform:none}
+.toast.err{background:var(--danger);color:#fff}
+.overlay{position:fixed;inset:0;background:rgba(15,21,24,.72);color:#E4EBE9;display:none;align-items:center;justify-content:center;z-index:20;text-align:center;padding:20px}
+.overlay.show{display:flex}
+.overlay b{display:block;font-family:"Bricolage Grotesque",sans-serif;font-size:26px;margin-bottom:8px}
+.overlay .sub{color:#AEBDC1;font-size:14px;max-width:46ch}
+@media (max-width:760px){
+  .settings{grid-template-columns:1fr} .snav{position:static;flex-direction:row;flex-wrap:wrap} .snav .note{display:none}
+  .field{grid-template-columns:1fr;gap:8px} .field .meta{text-align:left}
+  header{gap:8px;padding:0 12px} .brand small,.llm{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="wave" aria-hidden="true"><i style="--h:6px"></i><i style="--h:14px"></i><i style="--h:22px"></i><i style="--h:11px"></i><i style="--h:17px"></i></span><span id="brandName">Alveus</span><small id="brandSub"></small></div>
+  <span class="state" id="state" data-s="offline"><span class="dot"></span><span id="stateText">connecting…</span></span>
+  <div class="tabs" role="tablist"><button id="tabChat" class="active" role="tab" aria-selected="true">Chat</button><button id="tabSettings" role="tab" aria-selected="false">Settings</button></div>
+  <div class="actions">
+    <span class="llm" id="llm"><span class="dot"></span><span id="llmText">LLM</span></span>
+    <button class="btn" id="btnListen" title="Start listening now (same as the hotkey)">● Listen</button>
+    <button class="btn" id="btnStop" title="Stop speaking">■ Stop</button>
+  </div>
+</header>
+
+<main>
+  <!-- ================= CHAT ================= -->
+  <section class="view active" id="chat" role="tabpanel">
+    <div id="log"><div class="col" id="logCol">
+      <div class="empty" id="empty"><b id="emptyName">Alveus</b>Type below, or say the name out loud. Voice turns show up here too.
+        <div class="ex" id="examples"></div></div>
+    </div></div>
+    <div class="composer"><div class="col">
+      <div class="box">
+        <textarea id="input" rows="1" placeholder="Ask anything, or tell it what to do… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <button class="btn primary" id="send">Send</button>
+      </div>
+      <div class="row">
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <label><input type="checkbox" id="speakReplies"> Speak replies aloud</label>
+          <label><input type="checkbox" id="showThinking"> Show reasoning</label>
+        </div>
+        <span><span id="toolCount"></span> · <a href="#" id="resetChat">Reset conversation</a> · <a href="/docs" target="_blank" rel="noopener">API docs</a></span>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section class="view" id="settings" role="tabpanel">
+    <div class="settings">
+      <nav class="snav" id="snav"></nav>
+      <div id="form"></div>
+    </div>
+  </section>
+</main>
+
+<div class="savebar" id="savebar"><div class="in">
+  <div class="msg-s" id="saveMsg"><b>Unsaved changes</b><small>Saved settings are written to config/local.yaml. A restart applies them.</small></div>
+  <button class="btn" id="discard">Discard</button>
+  <button class="btn primary" id="save">Save changes</button>
+  <button class="btn" id="restartA" hidden>Restart assistant</button>
+  <button class="btn" id="restartB" hidden>Restart LLM + assistant</button>
+</div></div>
+<div class="toast" id="toast"></div>
+<div class="overlay" id="overlay"><div><b id="ovTitle">Restarting…</b><div class="sub" id="ovSub">Models are reloading. This page reconnects automatically (usually 10–40 s).</div></div></div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const j = async (url, opts={}) => { const r = await fetch(url, {headers:{'content-type':'application/json'}, ...opts}); if(!r.ok){ let d=''; try{ d=(await r.json()).detail }catch{}; throw new Error(d || r.status+' '+r.statusText); } return r.json(); };
+const toast = (msg, err=false) => { const t=$('toast'); t.textContent=msg; t.className='toast show'+(err?' err':''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='toast', 3200); };
+
+// ---------- markdown-lite for assistant text
+function md(text){
+  let s = esc(text);
+  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_,l,c)=>`<pre><code>${c}</code></pre>`);
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+  const blocks = s.split(/\n{2,}/).map(b => {
+    if (b.startsWith('<pre>')) return b;
+    if (/^(?:[-*•] .*\n?)+$/m.test(b) && b.split('\n').every(l=>/^[-*•] /.test(l))) return '<ul>'+b.split('\n').map(l=>'<li>'+l.replace(/^[-*•] /,'')+'</li>').join('')+'</ul>';
+    return '<p>'+b.replace(/\n/g,'<br>')+'</p>';
+  });
+  return blocks.join('');
+}
+
+// ---------- header / health
+let health = null, name = 'Alveus';
+async function refreshHealth(){
+  try{
+    health = await j('/health');
+    name = health.name; $('brandName').textContent = name; $('emptyName').textContent = name;
+    $('brandSub').textContent = `${health.profile} · ${health.stt} · ${health.tts}`;
+    $('llm').className = 'llm' + (health.ok?' ok':''); $('llmText').textContent = health.ok ? 'LLM ready' : 'LLM down';
+    $('llmText').title = health.llm;
+    $('toolCount').textContent = `${health.tools} tools`;
+    $('btnListen').disabled = !health.voice; $('btnStop').disabled = !health.voice;
+    if (!health.voice) setState('text-only');
+    return true;
+  }catch(e){ setState('offline'); return false; }
+}
+function setState(s){ const el=$('state'); el.dataset.s = s; $('stateText').textContent = s.replace('-',' '); 
+  const bars=[6,14,22,11,17]; document.querySelectorAll('.wave i').forEach((b,i)=>{ b.style.setProperty('--h', (s==='speaking'||s==='listening'? (6+Math.random()*16) : bars[i])+'px'); }); }
+setInterval(()=>{ if($('state').dataset.s==='speaking'||$('state').dataset.s==='listening') setState($('state').dataset.s); }, 220);
+
+// ---------- live events (voice transcripts, state)
+let es;
+function connectEvents(){
+  if (es) es.close();
+  es = new EventSource('/events');
+  es.onmessage = e => {
+    const ev = JSON.parse(e.data);
+    if (ev.type==='state' && health && health.voice) setState(ev.state);
+    else if (ev.type==='transcript' && ev.source!=='gui') addMessage(ev.who, ev.text, ev.source);
+    else if (ev.type==='reset') { clearLog(); }
+    else if (ev.type==='restarting') showOverlay('Restarting…');
+  };
+  es.onerror = () => { setState('offline'); es.close(); setTimeout(connectEvents, 3000); refreshHealth(); };
+  es.onopen = () => refreshHealth();
+}
+
+// ---------- chat log
+const log=$('log'), logCol=$('logCol');
+function clearLog(){ [...logCol.children].forEach(c => { if(c.id!=='empty') c.remove(); }); $('empty').style.display=''; }
+function scrollBottom(){ log.scrollTop = log.scrollHeight; }
+function addMessage(who, text, source){
+  $('empty').style.display='none';
+  const d=document.createElement('div'); d.className='msg '+who;
+  d.innerHTML = `<div class="who">${who==='user'?'You':esc(name)}${source&&source!=='gui'?`<span class="src">${esc(source)}</span>`:''}</div><div class="bubble">${who==='user'?esc(text).replace(/\n/g,'<br>'):md(text)}</div>`;
+  logCol.appendChild(d); scrollBottom(); return d;
+}
+function toolCard(name, args){
+  const det=document.createElement('details'); det.className='tool running';
+  det.innerHTML = `<summary><span class="n">${esc(name.replace('__',' · '))}</span><span class="a">${esc(JSON.stringify(args))}</span><span class="st">running…</span></summary><pre></pre>`;
+  return det;
+}
+async function loadHistory(){
+  try{
+    const h = await j('/history'); clearLog();
+    for (const t of h){
+      if (t.role==='user') addMessage('user', t.text);
+      else {
+        const m = addMessage('assistant', t.text || '');
+        if (t.tools && t.tools.length){
+          const wrap=document.createElement('div'); wrap.className='tools';
+          for (const tl of t.tools){ const c=toolCard(tl.name||'tool', tl.args||{}); c.className='tool'; c.querySelector('.st').textContent=tl.result==null?'no result':'done'; c.querySelector('pre').textContent=tl.result||''; wrap.appendChild(c); }
+          m.insertBefore(wrap, m.querySelector('.bubble'));
+        }
+      }
+    }
+    scrollBottom();
+  }catch(e){ /* offline */ }
+}
+
+// ---------- sending
+let busy=false;
+async function send(text){
+  text = (text||'').trim(); if(!text||busy) return;
+  busy=true; $('send').disabled=true; $('input').value=''; autosize();
+  addMessage('user', text);
+  const m = addMessage('assistant', ''); const bubble=m.querySelector('.bubble'); bubble.classList.add('cursor');
+  const tools=document.createElement('div'); tools.className='tools'; m.insertBefore(tools, bubble);
+  let think=null, full='', pendingTool=null;
+  try{
+    const r = await fetch('/chat/stream', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({text, speak: $('speakReplies').checked})});
+    if(!r.ok) throw new Error(r.status+' '+r.statusText);
+    const reader = r.body.getReader(); const dec=new TextDecoder(); let buf='';
+    while(true){
+      const {value, done} = await reader.read(); if(done) break;
+      buf += dec.decode(value, {stream:true});
+      let idx; while((idx=buf.indexOf('\n\n'))>=0){
+        const chunk=buf.slice(0,idx); buf=buf.slice(idx+2);
+        const line = chunk.split('\n').find(l=>l.startsWith('data:')); if(!line) continue;
+        const ev = JSON.parse(line.slice(5));
+        if (ev.type==='content'){ full+=ev.text; bubble.innerHTML = md(full); }
+        else if (ev.type==='reasoning'){ if(!think){ think=document.createElement('details'); think.className='think'; think.open=$('showThinking').checked; think.innerHTML='<summary>reasoning</summary><div class="t"></div>'; m.insertBefore(think, tools); } think.querySelector('.t').textContent += ev.text; }
+        else if (ev.type==='tool_start'){ pendingTool = toolCard(ev.tool, ev.args); tools.appendChild(pendingTool); }
+        else if (ev.type==='tool_result'){ const c = pendingTool || toolCard(ev.tool,{}); c.classList.remove('running'); c.querySelector('.st').textContent = /"error"/.test(ev.text)?'error':'done'; c.querySelector('pre').textContent = ev.text; if(!pendingTool) tools.appendChild(c); pendingTool=null; }
+        else if (ev.type==='confirm'){ confirmCard(ev, m, bubble); }
+        else if (ev.type==='error'){ const e=document.createElement('div'); e.className='err'; e.textContent=ev.text; m.insertBefore(e, bubble); }
+        else if (ev.type==='done'){ if(!full && !ev.reply) bubble.innerHTML='<span style="color:var(--muted)">(no reply)</span>'; }
+        scrollBottom();
+      }
+    }
+  }catch(e){ const el=document.createElement('div'); el.className='err'; el.textContent='Request failed: '+e.message; m.insertBefore(el,bubble); }
+  bubble.classList.remove('cursor'); busy=false; $('send').disabled=false; $('input').focus();
+}
+function confirmCard(ev, m, bubble){
+  const c=document.createElement('div'); c.className='confirm';
+  c.innerHTML = `<div class="q"><b>Confirm:</b> ${name} wants to <code>${esc(ev.description)}</code></div><button class="btn danger">Allow</button><button class="btn">Deny</button>`;
+  const [allow, deny] = c.querySelectorAll('button');
+  const answer = ok => { j('/confirm',{method:'POST', body:JSON.stringify({id:ev.id, ok})}); c.classList.add('done'); allow.disabled=deny.disabled=true; c.querySelector('.q').innerHTML += ok?' — <b>allowed</b>':' — denied'; };
+  allow.onclick=()=>answer(true); deny.onclick=()=>answer(false);
+  m.insertBefore(c, bubble); scrollBottom();
+}
+const input=$('input');
+function autosize(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,180)+'px'; }
+input.addEventListener('input', autosize);
+input.addEventListener('keydown', e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(input.value); } });
+$('send').onclick = () => send(input.value);
+$('resetChat').onclick = async e => { e.preventDefault(); await j('/history/reset',{method:'POST'}); clearLog(); toast('Conversation cleared'); };
+$('btnListen').onclick = async () => { try{ await j('/trigger',{method:'POST'}); toast('Listening…'); }catch(e){ toast(e.message,true);} };
+$('btnStop').onclick = async () => { try{ await j('/stop',{method:'POST'}); }catch(e){ toast(e.message,true);} };
+const EXAMPLES = ["What's my GPU temperature?", "How much disk space is left?", "What's the weather in Boston?", "Set the volume to 40 percent", "List the files in my repo folder", "Open Firefox"];
+$('examples').innerHTML = EXAMPLES.map(x=>`<button>${esc(x)}</button>`).join('');
+$('examples').querySelectorAll('button').forEach(b => b.onclick = () => send(b.textContent));
+
+// ---------- tabs
+function showTab(t){ $('chat').classList.toggle('active', t==='chat'); $('settings').classList.toggle('active', t==='settings');
+  $('tabChat').classList.toggle('active', t==='chat'); $('tabSettings').classList.toggle('active', t==='settings');
+  $('tabChat').setAttribute('aria-selected', t==='chat'); $('tabSettings').setAttribute('aria-selected', t==='settings');
+  location.hash = t==='settings' ? '#settings' : ''; if(t==='settings') loadSettings(); }
+$('tabChat').onclick=()=>showTab('chat'); $('tabSettings').onclick=()=>showTab('settings');
+
+// ---------- settings
+const FIELDS = [
+ {g:'Assistant', d:'Identity and how it talks.'},
+ {p:'assistant.name', l:'Name', h:'Used with a male or neutral voice. Always a wake name.', t:'text'},
+ {p:'assistant.female_name', l:'Female-voice name', h:'Used when the voice is female (default Kokoro voice is).', t:'text'},
+ {p:'assistant.user_name', l:'Your name', h:'How the assistant addresses you.', t:'text'},
+ {p:'assistant.streaming_tts', l:'Speak while generating', h:'Start talking after the first sentence instead of waiting for the full reply.', t:'bool'},
+ {p:'assistant.max_history_turns', l:'Conversation memory (turns)', h:'User turns kept in context.', t:'number', min:1, max:200},
+ {g:'Language model', d:'Which model answers, and how.'},
+ {p:'llm.profile', l:'Model profile', h:'Profiles are defined in config/alveus.yaml under llm.profiles.', t:'select', o:'llm_profiles', restart:'llm'},
+ {p:'llm.temperature', l:'Temperature', t:'number', step:0.05, min:0, max:2},
+ {p:'llm.max_tokens', l:'Max reply tokens', h:'Includes the model’s hidden reasoning.', t:'number', min:256, max:32768},
+ {p:'llm.max_tool_rounds', l:'Max tool rounds per request', t:'number', min:1, max:50},
+ {g:'Speech', d:'Ears and voice.'},
+ {p:'stt.backend', l:'Speech-to-text engine', t:'select', o:'stt_backends'},
+ {p:'stt.faster_whisper.model', l:'Whisper model', h:'Only for faster_whisper.', t:'select', o:'whisper_models'},
+ {p:'stt.faster_whisper.language', l:'Spoken language', h:'ISO code like en, de, zh. Empty = auto-detect.', t:'text'},
+ {p:'tts.backend', l:'Text-to-speech engine', t:'select', o:'tts_backends'},
+ {p:'tts.kokoro.voice', l:'Kokoro voice', h:'af_/bf_ = female, am_/bm_ = male. Decides Alveus vs Aurea.', t:'select', o:'kokoro_voices'},
+ {p:'tts.kokoro.speed', l:'Speaking speed', t:'number', step:0.05, min:0.5, max:2},
+ {p:'tts.chatterbox.voice_ref', l:'Chatterbox voice sample', h:'Path to a 5–15 s WAV to clone (chatterbox only).', t:'text'},
+ {g:'Activation', d:'How a conversation starts.'},
+ {p:'activation.wake_word.mode', l:'Wake mode', h:'names: say Alveus/Aurea · oww: openWakeWord phrase · both.', t:'select', o:'activation_modes'},
+ {p:'activation.wake_word.names', l:'Names', h:'Comma-separated.', t:'list'},
+ {p:'activation.wake_word.name_aliases', l:'Name aliases', h:'Spellings the transcriber produces for the names.', t:'list'},
+ {p:'activation.wake_word.oww_model', l:'openWakeWord model', h:'Pretrained phrase or a custom model in the wakeword folder.', t:'select', o:'oww_models'},
+ {p:'activation.wake_word.threshold', l:'Wake-word threshold', t:'number', step:0.05, min:0.1, max:0.95},
+ {p:'activation.wake_word.follow_up_window_s', l:'Follow-up window (s)', h:'After a reply, speech is accepted without a name for this long. 0 disables.', t:'number', min:0, max:60},
+ {p:'activation.hotkey.enabled', l:'Global hotkey', t:'bool'},
+ {p:'activation.hotkey.combo', l:'Hotkey combo', h:'pynput syntax, e.g. <ctrl>+<alt>+<space>', t:'text'},
+ {p:'activation.hotkey.mode', l:'Hotkey mode', h:'toggle: press to start · hold: push-to-talk', t:'select', o:'hotkey_modes'},
+ {g:'Audio', d:'Microphone, silence detection, chimes.'},
+ {p:'audio.backend', l:'Audio backend', t:'select', o:'audio_backends'},
+ {p:'audio.input_device', l:'Microphone', h:'PipeWire node name (see wpctl status). Empty = default.', t:'text'},
+ {p:'audio.output_device', l:'Speaker', h:'Empty = default.', t:'text'},
+ {p:'audio.vad.end_silence_ms', l:'End-of-speech pause (ms)', h:'How long you must pause before it answers.', t:'number', min:200, max:3000, step:50},
+ {p:'audio.vad.threshold', l:'Voice detection sensitivity', h:'Lower = more sensitive.', t:'number', step:0.05, min:0.1, max:0.95},
+ {p:'audio.chimes', l:'Listening chime', t:'bool'},
+ {p:'audio.barge_in', l:'Allow interrupting speech', h:'Hotkey (and openWakeWord) stop playback.', t:'bool'},
+ {g:'Tools & safety', d:'What the assistant may do on this computer.'},
+ {p:'tools.confirm_destructive', l:'Confirm destructive actions', h:'Ask before deleting, killing, shutting down, risky shell commands.', t:'bool'},
+ {p:'tools.servers.files.env.ALVEUS_FS_ROOTS', l:'Filesystem roots', h:'Colon-separated folders the files tool may touch.', t:'text'},
+ {p:'tools.servers.web.enabled', l:'Web tools (internet)', t:'bool'},
+ {p:'tools.servers.coder.enabled', l:'Coder tool (opencode)', t:'bool'},
+ {p:'tools.servers.desktop.enabled', l:'Desktop tools', t:'bool'},
+ {p:'logging.level', l:'Log level', t:'select', o:'log_levels'},
+];
+let cfg=null, dirty={}, persona='', personaDirty=false, yamlDirty=false;
+const get = (o,p) => p.split('.').reduce((a,k)=> (a && a[k]!==undefined) ? a[k] : undefined, o);
+function fmt(v){ if(v===undefined||v===null) return '—'; if(Array.isArray(v)) return v.join(', '); return String(v); }
+
+async function loadSettings(force){
+  if (cfg && !force) return;
+  try{ cfg = await j('/config'); persona = (await j('/persona')).text; }catch(e){ toast('Could not load config: '+e.message, true); return; }
+  dirty={}; personaDirty=false; yamlDirty=false; renderSettings(); updateSavebar();
+}
+function renderSettings(){
+  const form=$('form'), nav=$('snav'); form.innerHTML=''; nav.innerHTML='';
+  let card=null;
+  for (const f of FIELDS){
+    if (f.g){ const sec=document.createElement('section'); sec.className='grp'; sec.id='g-'+f.g.replace(/\W+/g,'-'); sec.innerHTML=`<h2>${esc(f.g)}</h2><p class="desc">${esc(f.d||'')}</p>`; card=document.createElement('div'); card.className='card'; sec.appendChild(card); form.appendChild(sec);
+      const a=document.createElement('a'); a.href='#'+sec.id; a.textContent=f.g; a.onclick=e=>{e.preventDefault(); sec.scrollIntoView({behavior:'smooth',block:'start'});}; nav.appendChild(a); continue; }
+    card.appendChild(fieldRow(f));
+  }
+  // advanced
+  const sec=document.createElement('section'); sec.className='grp'; sec.id='g-Advanced';
+  sec.innerHTML = `<h2>Advanced</h2><p class="desc">Everything else. <code class="mono">local.yaml</code> holds only this machine’s overrides; the full defaults live in <code class="mono">${esc(cfg.paths.defaults)}</code>.</p>
+    <h3 style="font-size:15px;margin:14px 0 6px">config/local.yaml</h3><textarea class="editor" id="yamlEd" spellcheck="false"></textarea>
+    <div class="adv-row"><span>Saving the YAML replaces the file; form edits above are merged into it.</span><button class="btn" id="saveYaml">Save YAML</button></div>
+    <h3 style="font-size:15px;margin:22px 0 6px">Persona (system prompt) — config/persona.md</h3><textarea class="editor" id="personaEd" spellcheck="false"></textarea>
+    <div class="adv-row"><span>Placeholders: {name} {other_name} {user_name} {date} {hostname} {os}</span><button class="btn" id="savePersona">Save persona</button></div>`;
+  form.appendChild(sec);
+  const a=document.createElement('a'); a.href='#g-Advanced'; a.textContent='Advanced'; a.onclick=e=>{e.preventDefault(); sec.scrollIntoView({behavior:'smooth'});}; nav.appendChild(a);
+  const note=document.createElement('div'); note.className='note'; note.innerHTML=`Running: <b>${esc(cfg.running_profile)}</b><br>${cfg.managed_by_systemd?'Managed by systemd — restarts work from here.':'Not under systemd — restart <code>alveus talk</code> yourself after saving.'}<br><br>Models: <code>${esc(cfg.env.ALVEUS_MODELS)}</code>`; nav.appendChild(note);
+  $('yamlEd').value = cfg.local_yaml; $('personaEd').value = persona;
+  $('yamlEd').oninput=()=>{yamlDirty=true; updateSavebar();}; $('personaEd').oninput=()=>{personaDirty=true; updateSavebar();};
+  $('saveYaml').onclick = async () => { try{ const r=await j('/config',{method:'PUT', body:JSON.stringify({yaml:$('yamlEd').value})}); toast('local.yaml saved'); yamlDirty=false; await loadSettings(true); needRestart('assistant'); }catch(e){ toast(e.message,true);} };
+  $('savePersona').onclick = async () => { try{ await j('/persona',{method:'PUT', body:JSON.stringify({text:$('personaEd').value})}); toast('Persona saved'); personaDirty=false; needRestart('assistant'); updateSavebar(); }catch(e){ toast(e.message,true);} };
+}
+function fieldRow(f){
+  const eff = get(cfg.effective, f.p), loc = get(cfg.local, f.p); const overridden = loc!==undefined;
+  const row=document.createElement('div'); row.className='field'+(f.restart==='llm'?' restart-llm':''); row.dataset.path=f.p;
+  const lbl=document.createElement('div'); lbl.className='lbl'; lbl.innerHTML=`${esc(f.l)}${f.h?`<small>${esc(f.h)}</small>`:''}`;
+  const ctl=document.createElement('div'); ctl.className='ctl';
+  const meta=document.createElement('div'); meta.className='meta';
+  let el;
+  const setDirty = v => { dirty[f.p]=v; row.classList.add('dirty'); updateSavebar(); };
+  if (f.t==='bool'){ el=document.createElement('button'); el.className='switch'; el.setAttribute('role','switch'); el.setAttribute('aria-checked', String(!!eff)); el.onclick=()=>{ const v=el.getAttribute('aria-checked')!=='true'; el.setAttribute('aria-checked',String(v)); setDirty(v); }; }
+  else if (f.t==='select'){ el=document.createElement('select'); const opts=cfg.options[f.o]||[]; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur); el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o)}</option>`).join(''); el.onchange=()=>setDirty(el.value); }
+  else if (f.t==='list'){ el=document.createElement('input'); el.type='text'; el.value=Array.isArray(eff)?eff.join(', '):(eff||''); el.oninput=()=>setDirty(el.value.split(',').map(s=>s.trim()).filter(Boolean)); }
+  else if (f.t==='number'){ el=document.createElement('input'); el.type='number'; if(f.step) el.step=f.step; if(f.min!==undefined) el.min=f.min; if(f.max!==undefined) el.max=f.max; el.value=eff??''; el.oninput=()=>{ const v=el.value===''?null:Number(el.value); setDirty(v); }; }
+  else { el=document.createElement('input'); el.type='text'; el.value=eff??''; el.oninput=()=>setDirty(el.value===''?null:el.value); }
+  ctl.appendChild(el);
+  meta.innerHTML = overridden ? `<span class="ov">overridden</span><br><button>reset to default</button>` : `default`;
+  if (overridden) meta.querySelector('button').onclick = () => { dirty[f.p]=null; row.classList.add('dirty'); meta.innerHTML='<span class="ov">will reset</span>'; updateSavebar(); };
+  row.append(lbl, ctl, meta); return row;
+}
+let restartKind=null;
+function updateSavebar(){ const n=Object.keys(dirty).length; const show = n>0 || yamlDirty || personaDirty || restartKind; $('savebar').classList.toggle('show', !!show);
+  $('save').hidden = !(n>0); $('discard').hidden = !(n>0||yamlDirty||personaDirty);
+  if (n>0) $('saveMsg').innerHTML = `<b>${n} unsaved change${n>1?'s':''}</b><small>Written to config/local.yaml on save. A restart applies them.</small>`;
+  else if (yamlDirty||personaDirty) $('saveMsg').innerHTML = `<b>Unsaved editor changes</b><small>Use the Save button next to the editor.</small>`;
+  else if (restartKind) $('saveMsg').innerHTML = `<b>Saved.</b><small>Restart to apply${restartKind==='llm'?' (the model profile changed, so the LLM server restarts too)':''}.</small>`;
+  $('restartA').hidden = !(restartKind==='assistant'); $('restartB').hidden = !(restartKind==='llm');
+  if (!cfg?.managed_by_systemd){ $('restartA').hidden = $('restartB').hidden = true; }
+}
+function needRestart(kind){ restartKind = (restartKind==='llm'||kind==='llm') ? 'llm' : 'assistant'; updateSavebar(); }
+$('discard').onclick = () => loadSettings(true);
+$('save').onclick = async () => {
+  const patch={}; let llmChange=false;
+  for (const [p,v] of Object.entries(dirty)){ const parts=p.split('.'); let cur=patch; for(const k of parts.slice(0,-1)) cur=cur[k]??(cur[k]={}); cur[parts.at(-1)]=v; if (p==='llm.profile') llmChange=true; }
+  try{ await j('/config',{method:'PUT', body:JSON.stringify({patch})}); toast('Settings saved'); await loadSettings(true); needRestart(llmChange?'llm':'assistant'); }
+  catch(e){ toast('Save failed: '+e.message, true); }
+};
+async function doRestart(what){
+  try{ await j('/restart',{method:'POST', body:JSON.stringify({what})}); }catch(e){ toast(e.message,true); return; }
+  showOverlay(what==='both'?'Restarting LLM server and assistant…':'Restarting assistant…');
+}
+$('restartA').onclick=()=>doRestart('assistant'); $('restartB').onclick=()=>doRestart('both');
+function showOverlay(title){ $('ovTitle').textContent=title; $('overlay').classList.add('show'); restartKind=null; if(es) es.close();
+  let tries=0; const poll = async () => { tries++; try{ const h = await j('/health'); if (h && h.tools!==undefined){ location.reload(); return; } }catch{} $('ovSub').textContent = `Models are reloading. Reconnecting… (${tries*2}s)`; setTimeout(poll, 2000); };
+  setTimeout(poll, 4000); }
+
+// ---------- boot
+(async () => {
+  await refreshHealth(); await loadHistory(); connectEvents();
+  if (location.hash==='#settings') showTab('settings');
+  setInterval(refreshHealth, 15000);
+})();
+})();
+</script>
+</body>
+</html>
