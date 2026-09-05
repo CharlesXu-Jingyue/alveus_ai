@@ -80,34 +80,39 @@ TEMPLATE = r'''<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alveus Handbook</title>
 <meta name="description" content="Documentation for Alveus / Aurea, a fully local voice AI assistant.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 :root{
-  --bg:#F4F6F3; --surface:#FFFFFF; --surface-2:#EAEEEA; --ink:#17232A; --ink-2:#4E5F66; --muted:#7C8B90;
-  --rule:#D5DCD8; --rule-2:#C2CBC6; --accent:#0E7C86; --accent-ink:#0A5E66; --accent-soft:#DDF0F1;
-  --warm:#B8641F; --code-bg:#EDF1EE; --sel:#CFEAEC; --shadow:0 1px 0 rgba(23,35,42,.06);
+  --bg:#F2F1F8; --surface:#FAF9FE; --surface-2:#E8E6F3; --ink:#1A1930; --ink-2:#4A4870; --muted:#7A78A0;
+  --rule:#D9D6E9; --rule-2:#C4C0DC; --accent:#5D51CF; --accent-ink:#4A3FB0; --accent-soft:#E6E3F9; --accent-glow:rgba(93,81,207,.28);
+  --warm:#9B5C9E; --warm-soft:#F1E4F3; --danger:#B4485F; --danger-soft:#F6DFE5; --ok:#2F8F7A;
+  --code-bg:#ECEAF6; --user-bubble:#E4E1F5; --sel:#D6D0F6; --shadow:0 1px 0 rgba(26,25,48,.06);
   --nav-w:236px; --toc-w:200px;
 }
 @media (prefers-color-scheme: dark){ :root{
-  --bg:#0F1518; --surface:#141C20; --surface-2:#1B252A; --ink:#E4EBE9; --ink-2:#AEBDC1; --muted:#7F9197;
-  --rule:#243136; --rule-2:#2F3E44; --accent:#4FC3CF; --accent-ink:#8ADCE4; --accent-soft:#12333A;
-  --warm:#E39A4E; --code-bg:#182226; --sel:#1F4A50; --shadow:0 1px 0 rgba(0,0,0,.4);
+  --bg:#0B0A18; --surface:#13122A; --surface-2:#1B1A38; --ink:#E6E4F6; --ink-2:#B4B0D3; --muted:#7F7CA6;
+  --rule:#262548; --rule-2:#35335D; --accent:#8B7CF6; --accent-ink:#B4A8FF; --accent-soft:#251F52; --accent-glow:rgba(139,124,246,.35);
+  --warm:#D08AD0; --warm-soft:#3A2445; --danger:#E27A92; --danger-soft:#3D1F2A; --ok:#6FD3B4;
+  --code-bg:#100F26; --user-bubble:#1F1B44; --sel:#3B3378; --shadow:0 1px 0 rgba(0,0,0,.45);
 }}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important} }
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+
+/* ultraviolet ground: a cool radial glow behind everything */
+body{background-image:radial-gradient(1100px 600px at 12% -10%, var(--accent-glow), transparent 60%),radial-gradient(900px 500px at 110% 10%, rgba(120,90,220,.12), transparent 60%);background-attachment:fixed}
 ::selection{background:var(--sel)}
 a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid transparent}
 a:hover{border-bottom-color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
-.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--rule);height:56px;display:flex;align-items:center;gap:18px;padding:0 22px}
-.brand{display:flex;align-items:center;gap:12px;font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:19px;letter-spacing:-.01em;color:var(--ink)}
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb, var(--bg) 82%, transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--rule);height:56px;display:flex;align-items:center;gap:18px;padding:0 22px}
+.brand{display:flex;align-items:center;gap:12px;font-family:"Chakra Petch","IBM Plex Sans",sans-serif;font-weight:700;font-size:19px;letter-spacing:.01em;color:var(--ink)}
 .brand a{color:inherit;border:0}
 .brand .slash{color:var(--muted);font-weight:400;margin:0 2px}
-.brand .aurea{color:var(--accent)}
+.brand .aurea{color:var(--accent);text-shadow:0 0 14px var(--accent-glow)}
 .wave{display:flex;align-items:center;gap:2px;height:22px}
-.wave i{display:block;width:3px;border-radius:2px;background:var(--accent);height:var(--h)}
+.wave i{display:block;width:3px;border-radius:2px;background:var(--accent);height:var(--h);box-shadow:0 0 8px var(--accent-glow)}
 .top .meta{margin-left:auto;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;color:var(--muted);letter-spacing:.02em;display:flex;gap:16px}
 .top .meta span b{color:var(--ink-2);font-weight:500}
 .menu-btn{display:none;background:none;border:1px solid var(--rule-2);color:var(--ink);border-radius:6px;padding:4px 10px;font:inherit;font-size:13px}
@@ -131,7 +136,7 @@ aside.toc a:hover{color:var(--ink)}
 aside.toc a.current{color:var(--accent-ink);border-left-color:var(--accent)}
 .crumb{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;color:var(--muted);letter-spacing:.02em;margin-bottom:14px;display:flex;gap:8px;align-items:center}
 .crumb .n{color:var(--accent);font-weight:500}
-article h1,article h2,article h3,article h4{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;text-wrap:balance;letter-spacing:-.015em;line-height:1.15;color:var(--ink);scroll-margin-top:76px}
+article h1,article h2,article h3,article h4{font-family:"Chakra Petch","IBM Plex Sans",sans-serif;text-wrap:balance;letter-spacing:0;line-height:1.15;color:var(--ink);scroll-margin-top:76px}
 article h1{font-size:38px;font-weight:700;margin:0 0 18px}
 article h2{font-size:24px;font-weight:600;margin:44px 0 12px;padding-top:18px;border-top:1px solid var(--rule)}
 article h3{font-size:18px;font-weight:600;margin:28px 0 8px}

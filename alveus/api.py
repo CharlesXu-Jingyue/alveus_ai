@@ -143,6 +143,10 @@ class RestartIn(BaseModel):
     what: str = "assistant"   # assistant | llm | both
 
 
+class LLMCheckIn(BaseModel):
+    profile: str
+
+
 # ----------------------------------------------------------------------------- app
 def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
     """`assistant` is a VoiceAssistant (talk mode) or a HeadlessAssistant (api mode)."""
@@ -178,7 +182,8 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "tools": len(assistant.hub.tools) if assistant.hub else 0,
                 "stt": assistant.stt.name, "tts": assistant.tts.name, "name": name, "other_name": other,
                 "voice": has_voice, "version": __version__, "profile": assistant.cfg.llm.profile,
-                "managed_by_systemd": bool(os.environ.get("INVOCATION_ID"))}
+                "managed_by_systemd": bool(os.environ.get("INVOCATION_ID")),
+                "llm_service": _unit_status("alveus-llm.service") if os.environ.get("INVOCATION_ID") else None}
 
     @app.get("/tools")
     async def tools() -> list[dict[str, Any]]:
@@ -399,7 +404,91 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return {"restarting": units}
 
+    @app.get("/services")
+    async def services() -> dict[str, Any]:
+        return {u: _unit_status(f"{u}.service") for u in ("alveus-llm", "alveus")}
+
+    @app.post("/llm/check")
+    async def llm_check(inp: LLMCheckIn) -> dict[str, Any]:
+        """Preflight: can the configured server binary load this profile's model file?
+        Starts llama-server on a spare port with the weights on the CPU (mmap, no VRAM),
+        waits for /health, then stops it. Typically 5-20 s; a bad file fails in <1 s."""
+        from .config import llm_profile
+        cfg = load_config()
+        try:
+            prof = llm_profile(cfg, inp.profile)
+        except KeyError as e:
+            raise HTTPException(404, str(e)) from e
+        serve = prof.get("serve") or {}
+        if not serve:
+            return {"ok": True, "skipped": "profile has no serve section (external server)"}
+        model_path = serve.get("model_path", "")
+        if not Path(model_path).exists():
+            return {"ok": False, "error": f"model file not found: {model_path}"}
+        server_bin = os.path.expanduser(serve.get("command", "llama-server"))
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _probe_model, server_bin, model_path)
+
     return app
+
+
+def _probe_model(server_bin: str, model_path: str, timeout: float = 180.0) -> dict[str, Any]:
+    import socket
+
+    import httpx
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    cmd = [server_bin, "-m", model_path, "--host", "127.0.0.1", "--port", str(port), "-ngl", "0", "-c", "512",
+           "--no-warmup", "--no-webui"]
+    t0 = time.time()
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                env={**os.environ, "LLAMA_LOG_COLORS": "0"})
+    except FileNotFoundError:
+        return {"ok": False, "error": f"server binary not found: {server_bin}"}
+    log_lines: list[str] = []
+    try:
+        while time.time() - t0 < timeout:
+            if proc.poll() is not None:
+                log_lines = (proc.stdout.read() if proc.stdout else "").splitlines()
+                errs = [ln for ln in log_lines if " E " in ln or "error" in ln.lower()]
+                return {"ok": False, "seconds": round(time.time() - t0, 1), "model_path": model_path,
+                        "error": "\n".join(errs[-6:]) or "\n".join(log_lines[-6:]) or f"exited with code {proc.returncode}"}
+            try:
+                r = httpx.get(f"http://127.0.0.1:{port}/health", timeout=1.0)
+                if r.status_code == 200:
+                    return {"ok": True, "seconds": round(time.time() - t0, 1), "model_path": model_path}
+            except httpx.HTTPError:
+                pass
+            time.sleep(0.5)
+        return {"ok": False, "error": f"model did not finish loading within {timeout:.0f} s", "model_path": model_path}
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
+
+def _unit_status(unit: str) -> dict[str, Any]:
+    try:
+        active = subprocess.run(["systemctl", "--user", "is-active", unit], capture_output=True, text=True,
+                                timeout=5, check=False).stdout.strip()
+    except Exception as e:  # noqa: BLE001
+        return {"active": "unknown", "error": str(e)}
+    out: dict[str, Any] = {"active": active}
+    if active != "active":
+        try:
+            j = subprocess.run(["journalctl", "--user", "-u", unit, "-n", "40", "--no-pager", "-o", "cat"],
+                               capture_output=True, text=True, timeout=5, check=False).stdout.splitlines()
+            errs = [ln for ln in j if " E " in ln or "error" in ln.lower() or "Failed" in ln]
+            out["last_error"] = "\n".join(errs[-4:]) if errs else "\n".join(j[-4:])
+        except Exception:  # noqa: BLE001
+            pass
+    return out
 
 
 def _normalize_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:

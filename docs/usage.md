@@ -72,7 +72,10 @@ health, a **Listen** button (same as the hotkey) and **Stop** (interrupt speech)
 voice, activation mode and names, hotkey, VAD timing, chimes, tool safety, log level). Each row shows
 whether the value is overridden on this machine and offers *reset to default*. **Save** writes the
 changes to `config/local.yaml`; nothing is applied until you press **Restart assistant** (or
-**Restart LLM + assistant** when the model profile changed). The page reconnects by itself, usually
+**Restart LLM + assistant** when the model profile changed). Changing the model profile first runs
+a load check of the new weights with your llama-server binary (5–20 s); if the file cannot be
+loaded, nothing is saved and the error is shown. If the LLM service still fails to come up after a
+restart, the page shows the server's error and offers to revert to the previous profile. The page reconnects by itself, usually
 in 10–40 s while models reload. The *Advanced* section edits `local.yaml` and the persona prompt as
 raw text.
 

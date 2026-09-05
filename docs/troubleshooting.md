@@ -37,6 +37,8 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 | symptom | cause | fix |
 |---|---|---|
 | `LLM endpoint FAIL … model 'x' not in served models` | profile `model` ≠ llama-server `--alias` | keep them equal; `alveus llm serve` sets the alias from the profile |
+| `alveus-llm` crash-loops after switching to Ternary: `tensor 'output.weight' has invalid ggml type 142` | llama-server built from the fork's `master` (or upstream), which lacks the PQ2_0 kernels | rebuild from the fork's **prism** branch: `scripts/build_llama.sh` (does this by default now). The GUI's model check catches this before restarting |
+| GUI "The LLM server did not come up" after a profile change | new profile's weights can't load | read the error shown, click *Revert*; see the row above |
 | Tool calls never happen | server started without `--jinja`, or model without tool template | profile `serve.args` include `--jinja`; check `curl :8080/v1/models` |
 | Reply is empty but "thinking" long | `max_tokens` hit during reasoning | raise `llm.max_tokens` or set `thinking: false` |
 | "I reached the tool-call limit" | model looping on a failing tool | check the tool's error in the log; raise `llm.max_tool_rounds` only if legitimately needed |

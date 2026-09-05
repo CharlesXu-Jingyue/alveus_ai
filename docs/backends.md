@@ -25,8 +25,11 @@ APIs (set `api_key`).
 | `bonsai-1bit` (default) | `Bonsai-27B-Q1_0.gguf` | 3.8 GB | ~90 % | 27B params, Qwen3.6 base, 262k ctx, native tool calling + thinking. ~60–95 tok/s |
 | `bonsai-ternary` | `Ternary-Bonsai-27B-PQ2_0.gguf` | 7.2 GB | ~95 % | better agentic/tool scores (BFCL, τ²-bench); same server flags |
 
-Both need the **PrismML fork of llama.cpp** for their custom kernels (upstream llama.cpp only runs
-the `Q2_g64` ternary variant). The fork is built by `scripts/build_llama.sh`.
+Both need the **PrismML fork of llama.cpp**, specifically its `prism` branch, for the custom
+kernels (`Q1_0` = type 41 is also on the fork's master, but `PQ2_0` = type 142 only exists on
+`prism`; upstream llama.cpp only runs the `Q2_g64` ternary variant). `scripts/build_llama.sh`
+clones/checks out `prism` and builds. Switching profiles in the GUI runs a load check first and
+refuses the switch if the binary cannot read the file.
 
 ### Swapping the LLM
 

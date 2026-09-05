@@ -10,7 +10,8 @@ Environment=ALVEUS_MODELS=@ALVEUS_MODELS@
 # DISPLAY/XAUTHORITY (hotkey + desktop tools) come from the systemd user environment, which
 # GNOME/GDM populate at login. If they are missing on your desktop, run once per login:
 #   systemctl --user import-environment DISPLAY XAUTHORITY WAYLAND_DISPLAY
-ExecStartPre=/bin/sh -c 'for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health >/dev/null && exit 0; sleep 2; done; exit 1'
+# Do not block on the LLM: the GUI/API must come up even if alveus-llm is failing, so the
+# problem can be seen and fixed from the browser. The assistant reports LLM errors itself.
 ExecStart=@PYTHON_BIN@ -m alveus.cli talk
 WorkingDirectory=@ALVEUS_HOME@
 Restart=on-failure

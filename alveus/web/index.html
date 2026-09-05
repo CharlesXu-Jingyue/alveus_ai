@@ -4,25 +4,28 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alveus</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='13' width='4' height='6' rx='2' fill='%230E7C86'/%3E%3Crect x='10' y='8' width='4' height='16' rx='2' fill='%230E7C86'/%3E%3Crect x='17' y='4' width='4' height='24' rx='2' fill='%230E7C86'/%3E%3Crect x='24' y='10' width='4' height='12' rx='2' fill='%230E7C86'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='13' width='4' height='6' rx='2' fill='%235D51CF'/%3E%3Crect x='10' y='8' width='4' height='16' rx='2' fill='%235D51CF'/%3E%3Crect x='17' y='4' width='4' height='24' rx='2' fill='%235D51CF'/%3E%3Crect x='24' y='10' width='4' height='12' rx='2' fill='%235D51CF'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 :root{
-  --bg:#F4F6F3; --surface:#FFFFFF; --surface-2:#EAEEEA; --ink:#17232A; --ink-2:#4E5F66; --muted:#7C8B90;
-  --rule:#D5DCD8; --rule-2:#C2CBC6; --accent:#0E7C86; --accent-ink:#0A5E66; --accent-soft:#DDF0F1;
-  --warm:#B8641F; --warm-soft:#F7E9DA; --danger:#A8322D; --danger-soft:#F6E0DE; --ok:#2E7D4F;
-  --code-bg:#EDF1EE; --user-bubble:#E3EEEA; --sel:#CFEAEC;
+  --bg:#F2F1F8; --surface:#FAF9FE; --surface-2:#E8E6F3; --ink:#1A1930; --ink-2:#4A4870; --muted:#7A78A0;
+  --rule:#D9D6E9; --rule-2:#C4C0DC; --accent:#5D51CF; --accent-ink:#4A3FB0; --accent-soft:#E6E3F9; --accent-glow:rgba(93,81,207,.28);
+  --warm:#9B5C9E; --warm-soft:#F1E4F3; --danger:#B4485F; --danger-soft:#F6DFE5; --ok:#2F8F7A;
+  --code-bg:#ECEAF6; --user-bubble:#E4E1F5; --sel:#D6D0F6; --shadow:0 1px 0 rgba(26,25,48,.06);
 }
 @media (prefers-color-scheme: dark){ :root{
-  --bg:#0F1518; --surface:#141C20; --surface-2:#1B252A; --ink:#E4EBE9; --ink-2:#AEBDC1; --muted:#7F9197;
-  --rule:#243136; --rule-2:#2F3E44; --accent:#4FC3CF; --accent-ink:#8ADCE4; --accent-soft:#12333A;
-  --warm:#E39A4E; --warm-soft:#3A2A18; --danger:#E07A75; --danger-soft:#3B1F1E; --ok:#6FCB94;
-  --code-bg:#182226; --user-bubble:#1E2C30; --sel:#1F4A50;
+  --bg:#0B0A18; --surface:#13122A; --surface-2:#1B1A38; --ink:#E6E4F6; --ink-2:#B4B0D3; --muted:#7F7CA6;
+  --rule:#262548; --rule-2:#35335D; --accent:#8B7CF6; --accent-ink:#B4A8FF; --accent-soft:#251F52; --accent-glow:rgba(139,124,246,.35);
+  --warm:#D08AD0; --warm-soft:#3A2445; --danger:#E27A92; --danger-soft:#3D1F2A; --ok:#6FD3B4;
+  --code-bg:#100F26; --user-bubble:#1F1B44; --sel:#3B3378; --shadow:0 1px 0 rgba(0,0,0,.45);
 }}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column}
+
+/* ultraviolet ground: a cool radial glow behind everything */
+body{background-image:radial-gradient(1100px 600px at 12% -10%, var(--accent-glow), transparent 60%),radial-gradient(900px 500px at 110% 10%, rgba(120,90,220,.12), transparent 60%);background-attachment:fixed}
 ::selection{background:var(--sel)}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -30,16 +33,16 @@ button{cursor:pointer}
 .mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
 
 /* ---------- header */
-header{display:flex;align-items:center;gap:14px;padding:0 18px;height:58px;border-bottom:1px solid var(--rule);background:var(--bg);position:sticky;top:0;z-index:5}
-.brand{display:flex;align-items:center;gap:10px;font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:20px;letter-spacing:-.01em}
+header{display:flex;align-items:center;gap:14px;padding:0 18px;height:58px;border-bottom:1px solid var(--rule);background:color-mix(in srgb, var(--bg) 82%, transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;font-family:"Chakra Petch","IBM Plex Sans",sans-serif;font-weight:700;font-size:20px;letter-spacing:.01em}
 .wave{display:flex;align-items:flex-end;gap:2px;height:22px}
-.wave i{display:block;width:3px;border-radius:2px;background:var(--accent);height:var(--h);transition:height .18s ease}
+.wave i{display:block;width:3px;border-radius:2px;background:var(--accent);height:var(--h);box-shadow:0 0 8px var(--accent-glow);transition:height .18s ease}
 .brand small{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--muted);font-weight:400;letter-spacing:.04em;margin-left:4px}
 .state{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rule-2);border-radius:999px;padding:3px 10px 3px 8px;font-size:12.5px;color:var(--ink-2);background:var(--surface)}
 .state .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.state[data-s="listening"] .dot{background:var(--ok);box-shadow:0 0 0 4px rgba(46,125,79,.18)}
+.state[data-s="listening"] .dot{background:var(--ok);box-shadow:0 0 0 4px rgba(111,211,180,.22),0 0 12px var(--ok)}
 .state[data-s="thinking"] .dot{background:var(--warm);animation:pulse 1s infinite}
-.state[data-s="speaking"] .dot{background:var(--accent);animation:pulse .7s infinite}
+.state[data-s="speaking"] .dot{background:var(--accent);box-shadow:0 0 10px var(--accent-glow);animation:pulse .7s infinite}
 .state[data-s="offline"] .dot{background:var(--danger)}
 @keyframes pulse{50%{opacity:.35}}
 @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
@@ -49,7 +52,7 @@ header{display:flex;align-items:center;gap:14px;padding:0 18px;height:58px;borde
 .actions{margin-left:auto;display:flex;gap:8px;align-items:center}
 .btn{border:1px solid var(--rule-2);background:var(--surface);border-radius:8px;padding:6px 12px;font-size:13.5px;color:var(--ink);display:inline-flex;gap:6px;align-items:center;line-height:1.2}
 .btn:hover{border-color:var(--accent);color:var(--accent-ink)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 70%,#3FB6D8));border-color:transparent;color:#fff;box-shadow:0 0 14px var(--accent-glow)}
 .btn.primary:hover{filter:brightness(1.06);color:#fff}
 .btn.danger{color:var(--danger);border-color:var(--danger)}
 .btn:disabled{opacity:.5;cursor:default;filter:none}
@@ -97,13 +100,13 @@ details.think .t{white-space:pre-wrap;border-left:2px solid var(--rule-2);paddin
 .confirm.done{opacity:.6}
 .err{color:var(--danger);font-size:13.5px;border-left:3px solid var(--danger);padding:4px 10px;margin:4px 0}
 .empty{color:var(--muted);text-align:center;padding:60px 0 30px;font-size:14px}
-.empty b{display:block;font-family:"Bricolage Grotesque",sans-serif;font-size:26px;color:var(--ink);font-weight:700;margin-bottom:8px;letter-spacing:-.01em}
+.empty b{display:block;font-family:"Chakra Petch",sans-serif;font-size:26px;color:var(--ink);font-weight:700;margin-bottom:8px;letter-spacing:.01em}
 .empty .ex{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
 .empty .ex button{border:1px solid var(--rule-2);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--ink-2)}
 .empty .ex button:hover{border-color:var(--accent);color:var(--accent-ink)}
 .composer{border-top:1px solid var(--rule);background:var(--bg);padding:12px 0 14px}
 .composer .box{display:flex;gap:10px;align-items:flex-end;background:var(--surface);border:1px solid var(--rule-2);border-radius:14px;padding:8px 8px 8px 14px}
-.composer .box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.composer .box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 0 24px var(--accent-glow)}
 .composer textarea{flex:1;border:0;background:none;resize:none;max-height:180px;line-height:1.45;padding:6px 0;outline:none}
 .composer .row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12.5px;color:var(--muted);gap:12px;flex-wrap:wrap}
 .composer label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
@@ -119,7 +122,7 @@ details.think .t{white-space:pre-wrap;border-left:2px solid var(--rule-2);paddin
 .snav .note{font-size:12px;color:var(--muted);padding:12px 10px 0;line-height:1.5}
 .snav .note code{font-size:11px}
 section.grp{margin:0 0 34px}
-section.grp h2{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0 0 4px;scroll-margin-top:20px}
+section.grp h2{font-family:"Chakra Petch","IBM Plex Sans",sans-serif;font-size:20px;font-weight:700;letter-spacing:.01em;margin:0 0 4px;scroll-margin-top:20px}
 section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
 .card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
 .field{display:grid;grid-template-columns:minmax(180px,1fr) minmax(220px,1.4fr) 92px;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--rule)}
@@ -153,7 +156,7 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
 .toast.err{background:var(--danger);color:#fff}
 .overlay{position:fixed;inset:0;background:rgba(15,21,24,.72);color:#E4EBE9;display:none;align-items:center;justify-content:center;z-index:20;text-align:center;padding:20px}
 .overlay.show{display:flex}
-.overlay b{display:block;font-family:"Bricolage Grotesque",sans-serif;font-size:26px;margin-bottom:8px}
+.overlay b{display:block;font-family:"Chakra Petch",sans-serif;font-size:26px;margin-bottom:8px}
 .overlay .sub{color:#AEBDC1;font-size:14px;max-width:46ch}
 @media (max-width:760px){
   .settings{grid-template-columns:1fr} .snav{position:static;flex-direction:row;flex-wrap:wrap} .snav .note{display:none}
@@ -243,8 +246,8 @@ async function refreshHealth(){
     health = await j('/health');
     name = health.name; $('brandName').textContent = name; $('emptyName').textContent = name;
     $('brandSub').textContent = `${health.profile} · ${health.stt} · ${health.tts}`;
-    $('llm').className = 'llm' + (health.ok?' ok':''); $('llmText').textContent = health.ok ? 'LLM ready' : 'LLM down';
-    $('llmText').title = health.llm;
+    $('llm').className = 'llm' + (health.ok?' ok':''); $('llmText').textContent = health.ok ? 'LLM ready' : (health.llm_service && health.llm_service.active!=='active' ? 'LLM service '+health.llm_service.active : 'LLM down');
+    $('llmText').title = health.ok ? health.llm : (health.llm_service?.last_error || health.llm);
     $('toolCount').textContent = `${health.tools} tools`;
     $('btnListen').disabled = !health.voice; $('btnStop').disabled = !health.voice;
     if (!health.voice) setState('text-only');
@@ -489,11 +492,25 @@ function updateSavebar(){ const n=Object.keys(dirty).length; const show = n>0 ||
 }
 function needRestart(kind){ restartKind = (restartKind==='llm'||kind==='llm') ? 'llm' : 'assistant'; updateSavebar(); }
 $('discard').onclick = () => loadSettings(true);
+let prevProfile=null;
 $('save').onclick = async () => {
   const patch={}; let llmChange=false;
   for (const [p,v] of Object.entries(dirty)){ const parts=p.split('.'); let cur=patch; for(const k of parts.slice(0,-1)) cur=cur[k]??(cur[k]={}); cur[parts.at(-1)]=v; if (p==='llm.profile') llmChange=true; }
+  if (llmChange){
+    // preflight: make sure the server binary can actually load the new model before touching services
+    const target = dirty['llm.profile'] ?? get(cfg.defaults,'llm.profile');
+    $('save').disabled=true; $('saveMsg').innerHTML=`<b>Checking that <code>${esc(target)}</code> loads…</b><small>Reads the model file with llama-cli on the CPU; 10–40 s.</small>`;
+    try{
+      const r = await j('/llm/check',{method:'POST', body:JSON.stringify({profile:target})});
+      if (!r.ok){ $('save').disabled=false; updateSavebar(); toast('Model check failed — not saved', true);
+        alert(`The model for profile "${target}" cannot be loaded by your llama-server build:\n\n${r.error}\n\nNothing was changed. If this is a newer Bonsai file, rebuild the PrismML llama.cpp fork (scripts/build_llama.sh) and try again.`); return; }
+      toast(`Model loads (${r.seconds ?? '?'} s)`);
+    }catch(e){ $('save').disabled=false; updateSavebar(); toast('Model check error: '+e.message, true); return; }
+    prevProfile = cfg.running_profile;
+  }
   try{ await j('/config',{method:'PUT', body:JSON.stringify({patch})}); toast('Settings saved'); await loadSettings(true); needRestart(llmChange?'llm':'assistant'); }
   catch(e){ toast('Save failed: '+e.message, true); }
+  $('save').disabled=false;
 };
 async function doRestart(what){
   try{ await j('/restart',{method:'POST', body:JSON.stringify({what})}); }catch(e){ toast(e.message,true); return; }
@@ -501,8 +518,22 @@ async function doRestart(what){
 }
 $('restartA').onclick=()=>doRestart('assistant'); $('restartB').onclick=()=>doRestart('both');
 function showOverlay(title){ $('ovTitle').textContent=title; $('overlay').classList.add('show'); restartKind=null; if(es) es.close();
-  let tries=0; const poll = async () => { tries++; try{ const h = await j('/health'); if (h && h.tools!==undefined){ location.reload(); return; } }catch{} $('ovSub').textContent = `Models are reloading. Reconnecting… (${tries*2}s)`; setTimeout(poll, 2000); };
+  let tries=0; const poll = async () => { tries++; try{ const h = await j('/health'); if (h && h.tools!==undefined){
+        if (h.llm_service && h.llm_service.active!=='active' && tries>8){ llmFailed(h); return; }
+        if (h.ok){ location.reload(); return; }
+        if (tries>40){ llmFailed(h); return; }
+      } }catch{} $('ovSub').textContent = `Models are reloading. Reconnecting… (${tries*2}s)`; setTimeout(poll, 2000); };
   setTimeout(poll, 4000); }
+function llmFailed(h){
+  const err = (h.llm_service && h.llm_service.last_error) || h.llm || 'unknown error';
+  $('ovTitle').textContent = 'The LLM server did not come up';
+  $('ovSub').innerHTML = `<pre style="text-align:left;white-space:pre-wrap;font-size:12px;max-height:180px;overflow:auto;background:rgba(0,0,0,.35);padding:10px;border-radius:8px">${esc(err)}</pre>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+      ${prevProfile?`<button class="btn primary" id="ovRevert">Revert to ${esc(prevProfile)} and restart</button>`:''}
+      <button class="btn" id="ovClose" style="color:#E4EBE9;border-color:#5b6b70">Open GUI anyway</button></div>`;
+  const rv=$('ovRevert'); if (rv) rv.onclick = async () => { try{ await j('/config',{method:'PUT', body:JSON.stringify({patch:{llm:{profile:prevProfile}}})}); await j('/restart',{method:'POST', body:JSON.stringify({what:'both'})}); prevProfile=null; showOverlay('Reverting…'); }catch(e){ toast(e.message,true);} };
+  $('ovClose').onclick = () => { $('overlay').classList.remove('show'); location.reload(); };
+}
 
 // ---------- boot
 (async () => {
