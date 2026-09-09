@@ -48,6 +48,9 @@ requirements-lock.txt   versions verified together on 2026-09-04
    memory the assistant can consult and update across restarts.
 4. **Image and video models** – vision input (Bonsai `mmproj`, screenshots, camera), image
    generation, video understanding and generation as pluggable backends.
+5. **Interrupt by speech** – (1) PipeWire echo cancellation so the mic does not hear the assistant;
+   (2) name-triggered barge-in while it speaks (VAD + STT on the cleaned signal, name match acts like
+   the Listen button); (3) custom wake-word models make the trigger instant.
 
 ## Extension points and ideas
 

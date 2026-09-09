@@ -139,4 +139,12 @@ causes — check `journalctl --user -u alveus` first.
    screenshots, camera), image generation, video understanding and generation, each a pluggable
    backend like STT/TTS.
 
-Other ideas: voice barge-in in names mode; timers/reminders; Home Assistant; speaker identification.
+5. **Interrupt by speech** (agreed 2026-09-09): (1) PipeWire echo cancellation (`module-echo-cancel`)
+so the mic no longer hears the assistant's own voice; select the cancelled source as
+`audio.input_device`; verify by recording while it speaks. (2) Name-triggered barge-in: while
+speaking, run VAD on the cleaned mic, transcribe short segments with the loaded STT, and treat a
+name match like the Listen button (interrupt, then listen). (3) Replace the transcription step with
+the custom wake-word models once trained; optionally allow any-speech interruption.
+
+Other ideas: timers/reminders (GNOME Clocks is not scriptable; use `systemd-run --user --on-active`
+or an in-process timer that also calls `/speak`); Home Assistant; speaker identification.

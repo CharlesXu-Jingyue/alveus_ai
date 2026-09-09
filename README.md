@@ -136,5 +136,8 @@ docs/              wake-words.md and more
    the assistant a memory that persists across restarts (facts, preferences, summaries).
 4. **Image and video models**: vision input (Bonsai ships an `mmproj` tower; screenshots and camera
    frames), image generation, and video understanding/generation as further pluggable backends.
+5. **Interrupt by speech**: step 1 is PipeWire echo cancellation so the microphone no longer hears
+   the assistant's own voice; then name-triggered barge-in ("Aurea…" while it speaks cuts it off and
+   listens); later the custom wake-word models make that instant.
 
 New here (human or AI agent)? Start with [AGENTS.md](AGENTS.md). Full documentation: [docs/README.md](docs/README.md), or open `docs/handbook.html` offline in a browser (`alveus handbook`; served at `/handbook` by the GUI) (overview, architecture, installation, configuration reference, usage, tools, backends, API, wake words, troubleshooting, development).
