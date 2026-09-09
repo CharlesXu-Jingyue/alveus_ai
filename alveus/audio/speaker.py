@@ -114,8 +114,8 @@ class StreamSpeaker:
                 continue
             try:
                 audio = await loop.run_in_executor(self.pool, self.tts.synthesize, s)
-                if audio is None or len(audio) == 0:
-                    continue
+                if audio is None or len(audio) == 0 or self._aborted:
+                    continue   # stopped while this sentence was being synthesized: never play it
                 if self.first_audio_s is None:
                     self.first_audio_s = time.monotonic() - self._t0
                 self.sentences += 1
