@@ -200,6 +200,15 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "managed_by_systemd": bool(os.environ.get("INVOCATION_ID")),
                 "llm_service": _unit_status("alveus-llm.service") if os.environ.get("INVOCATION_ID") else None}
 
+    @app.get("/debug/tasks", include_in_schema=False)
+    async def debug_tasks() -> list[dict[str, Any]]:
+        """Where every asyncio task currently is (for diagnosing a stuck turn)."""
+        out = []
+        for t in asyncio.all_tasks():
+            frames = [f"{Path(f.f_code.co_filename).name}:{f.f_lineno} {f.f_code.co_name}" for f in t.get_stack(limit=12)]
+            out.append({"name": t.get_name(), "coro": repr(t.get_coro())[:120], "stack": frames})
+        return out
+
     @app.get("/tools")
     async def tools() -> list[dict[str, Any]]:
         return [{"name": t.full_name, "server": t.server, "description": t.description, "destructive": t.destructive}
@@ -274,6 +283,7 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                             on_speaking=lambda: bus.publish("state", state="speaking"),
                             on_error=lambda m: speech_errors.append(m))
                         speaker.start()
+                        assistant.speaker = speaker   # so /stop can abort what is still queued
                     async for ev in assistant.agent.run(text, confirm=confirm):
                         if ev.kind == "content":
                             parts.append(ev.text)
@@ -297,9 +307,11 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 bus.publish("transcript", who="assistant", text=reply, source="gui")
                 if speaker:
                     await speaker.finish()
+                    assistant.speaker = None
                     for m in speech_errors:
                         await emit({"type": "error", "text": f"Speech output failed: {m}"})
-                    await asyncio.get_running_loop().run_in_executor(None, assistant.audio_out.wait)
+                    if not speaker.aborted:
+                        await asyncio.get_running_loop().run_in_executor(None, assistant.audio_out.wait)
                 if has_voice:
                     bus.publish("state", state="idle")
                 await emit({"type": "done", "reply": reply})
@@ -369,6 +381,10 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
 
     @app.post("/stop")
     async def stop() -> dict[str, bool]:
+        """Stop speaking: drop sentences not yet synthesized, then cut playback (generation continues)."""
+        sp = getattr(assistant, "speaker", None)
+        if sp is not None:
+            sp.abort()
         if has_voice:
             assistant.audio_out.stop()
         return {"stopped": True}
@@ -620,7 +636,15 @@ async def serve(app: FastAPI, host: str, port: int) -> None:
     import uvicorn
 
     config = uvicorn.Config(app, host=host, port=port, log_level="warning", loop="asyncio")
-    server = uvicorn.Server(config)
+
+    class _Server(uvicorn.Server):
+        # uvicorn would otherwise take over SIGTERM/SIGINT for itself and only stop the HTTP server,
+        # leaving the voice loop running; the caller (cli.talk) handles signals for the whole process
+        def capture_signals(self):
+            import contextlib
+            return contextlib.nullcontext()
+
+    server = _Server(config)
     await server.serve()
 
 
@@ -642,6 +666,7 @@ class HeadlessAssistant:
         self.load_speech = load_speech
         self.hub: ToolHub | None = None
         self.agent: Agent | None = None
+        self.speaker = None
         self._Agent, self._ToolHub, self._hub_env = Agent, ToolHub, hub_env
 
     async def start(self, confirm=None) -> None:

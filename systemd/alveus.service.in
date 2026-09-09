@@ -16,6 +16,8 @@ ExecStart=@PYTHON_BIN@ -m alveus.cli talk
 WorkingDirectory=@ALVEUS_HOME@
 Restart=on-failure
 RestartSec=5
+# a stuck speech synthesis must not hold a restart for systemd's default 90 s
+TimeoutStopSec=15
 
 [Install]
 WantedBy=default.target

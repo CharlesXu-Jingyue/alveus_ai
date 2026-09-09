@@ -67,18 +67,27 @@ def talk(verbose: bool = typer.Option(False, "-v", "--verbose"), no_api: bool = 
     va = VoiceAssistant(cfg, on_state=on_state, on_transcript=on_transcript)
 
     async def main():
+        import signal
+
         tasks = [asyncio.create_task(va.run_forever())]
         if cfg.api.get("enabled", True) and not no_api:
             from .api import build_app, serve
             host, port = cfg.api.get("host", "127.0.0.1"), int(cfg.api.get("port", 8765))
             console.print(f"[dim]GUI + API at http://{host}:{port}/[/dim]")
             tasks.append(asyncio.create_task(serve(build_app(va, bus), host, port)))
+        # SIGTERM (systemctl stop/restart) and Ctrl-C end everything, not just the HTTP server
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, lambda: [t.cancel() for t in tasks])
         try:
             await asyncio.gather(*tasks)
         except (KeyboardInterrupt, asyncio.CancelledError):
             pass
         finally:
-            await va.close()
+            try:
+                await asyncio.wait_for(va.close(), timeout=8)
+            except (TimeoutError, asyncio.CancelledError):
+                pass
 
     try:
         asyncio.run(main())

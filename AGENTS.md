@@ -107,6 +107,10 @@ curl -s localhost:8765/health | python -m json.tool
 - `hf download --include "*.gguf"` on the Bonsai repos pulls 54 GB F16 files; use exact names.
 - livekit-wakeword pins newer numpy/onnxruntime → keep it in its own env (`scripts/train_wakeword.sh`).
 - The `alveus.service` unit must not block on the LLM; the GUI has to stay reachable to fix things.
+- uvicorn captures SIGTERM for itself, so `systemctl stop` used to hang until SIGKILL (90 s);
+  `cli.talk` now owns the signal handlers and `serve()` disables uvicorn's. `TimeoutStopSec=15`.
+- Anything that drains the speaker queue must keep the `None` end marker (`StreamSpeaker.abort`);
+  dropping it hung every reply stopped after generation had finished. `/debug/tasks` finds such hangs.
 
 ## The owner
 

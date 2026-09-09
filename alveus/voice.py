@@ -74,6 +74,7 @@ class VoiceAssistant:
 
         self.hub: ToolHub | None = None
         self.agent: Agent | None = None
+        self.speaker = None
 
     # ------------------------------------------------------------------ lifecycle
     async def start(self) -> None:
@@ -245,6 +246,7 @@ class VoiceAssistant:
                                 streaming=bool(self.cfg.assistant.get("streaming_tts", True)),
                                 on_speaking=lambda: self._set(State.SPEAKING))
         speaker.start()
+        self.speaker = speaker   # /stop aborts it
         try:
             async with self.agent.lock:
                 async for ev in self.agent.run(text):
@@ -260,9 +262,11 @@ class VoiceAssistant:
                         speaker.abort()
         finally:
             await speaker.finish()
+            self.speaker = None
         reply = "".join(reply_parts).strip()
         self.on_transcript("assistant", reply)
-        await self._wait_playback()
+        if not speaker.aborted:
+            await self._wait_playback()
         return reply
 
     async def _wait_playback(self) -> None:

@@ -70,4 +70,10 @@ alveus talk -v                         # debug logging incl. ignored transcripts
 tail -f ~/local/repo/alveus-ai/logs/alveus.log
 python -m mcp_servers.system            # run a tool server alone; it waits on stdin
 curl -s localhost:8080/health; curl -s localhost:8765/health
+curl -s localhost:8765/debug/tasks | python -m json.tool   # where every asyncio task is stuck
+journalctl --user -u alveus -o cat | grep "speech:"        # per-reply speech timing / stops
 ```
+
+A reply that never finishes (GUI stays on "thinking"/"speaking", `/health` still answers) is an
+asyncio task waiting on something: `/debug/tasks` shows the file and line of each task. py-spy
+cannot attach to the service without ptrace rights, so this endpoint is the practical substitute.

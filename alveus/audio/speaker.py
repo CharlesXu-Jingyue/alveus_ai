@@ -39,6 +39,10 @@ class StreamSpeaker:
         self.sentences = 0
         self._aborted = False
 
+    @property
+    def aborted(self) -> bool:
+        return self._aborted
+
     # ---------------------------------------------------------------- lifecycle
     def start(self) -> None:
         self._t0 = time.monotonic()
@@ -47,7 +51,7 @@ class StreamSpeaker:
     async def feed(self, text: str) -> None:
         """Called for every streamed content chunk."""
         self._parts.append(text)
-        if self.streaming:
+        if self.streaming and not self._aborted:
             for s in self._sb.feed(text):
                 await self._q.put(s)
 
@@ -55,12 +59,21 @@ class StreamSpeaker:
         """Interrupted: drop what has not been spoken yet and cut playback."""
         self._aborted = True
         self._sb = SentenceBuffer()
-        while not self._q.empty():
+        dropped, ended = 0, False
+        while True:
             try:
-                self._q.get_nowait()
+                item = self._q.get_nowait()
             except asyncio.QueueEmpty:
                 break
+            if item is None:
+                ended = True      # finish() already queued the end marker: keep it or the worker never exits
+            else:
+                dropped += 1
+        if ended:
+            self._q.put_nowait(None)
         self.audio_out.stop()
+        log.info("speech: stopped by the user after %.1f s (%d queued sentence(s) dropped)",
+                 time.monotonic() - self._t0, dropped)
 
     async def say(self, text: str) -> None:
         """Speak an out-of-band sentence (e.g. an error) right away."""
@@ -78,6 +91,10 @@ class StreamSpeaker:
         else:
             await self._q.put("".join(self._parts))
         await self._q.put(None)
+        if self._aborted:
+            # a synthesis already running cannot be cancelled; let the worker skip the rest in the
+            # background rather than make the caller wait for it
+            return
         if self._task:
             await self._task
         if self.sentences:
