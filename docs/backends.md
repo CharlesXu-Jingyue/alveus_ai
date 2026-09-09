@@ -86,10 +86,13 @@ transcript is ready ~0.1–0.3 s after you stop speaking, which is what gates th
 | backend | engine | VRAM | speed (4090) | strengths | notes |
 |---|---|---|---|---|---|
 | `kokoro` (default) | Kokoro-82M (PyTorch) | ~0.6 GB | ~10× faster than real time after warm-up | crisp, 28 voices, tiny | no cloning; sample rate 24 kHz |
-| `chatterbox` | Resemble Chatterbox Turbo / standard | 3–4 GB | ~0.15 s to first audio | most natural, zero-shot voice cloning from a WAV | heavier install; installed and importable, not yet exercised in a session |
+| `chatterbox` | Resemble Chatterbox: `turbo` (English), `standard` (English), `multilingual` (23 languages) | 3–4 GB | ~0.2× real time (4 s of speech in 0.85 s) | most natural, zero-shot voice cloning from a WAV; multilingual speaks zh, ja, ko, de, fr, es, it, pt, ru, ar, hi… | multilingual picks the language per sentence (`tts.chatterbox.language: auto`): script detection for CJK/Cyrillic/Arabic/…, `langdetect` for Latin text, `fallback_language` otherwise |
 | `openai_http` | any `/v1/audio/speech` server | — | network | Kokoro-FastAPI, openedai-speech, … | |
 
-Switch: `tts.backend: chatterbox` (+ `chatterbox.voice_ref: ~/voices/me.wav` for cloning).
+Switch: `tts.backend: chatterbox` (+ `chatterbox.voice_ref: ~/voices/me.wav` for cloning; `chatterbox.model:
+multilingual` to speak other languages). For a bilingual conversation also clear
+`stt.faster_whisper.language` so Whisper auto-detects what you say; the LLM answers in the language
+you used, and the streaming splitter understands Chinese/Japanese sentence punctuation (。！？).
 Test: `alveus tts say "Hello there"`. The chosen voice's gender decides the spoken name
 (`tts.voice_gender`, auto from Kokoro voice prefixes).
 

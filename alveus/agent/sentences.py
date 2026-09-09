@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-_END = re.compile(r'([.!?]+["\')\]]*)(\s+|$)')
+_END = re.compile(r'([.!?]+["\')\]]*)(\s+|$)|([。！？；]+[」』）”]*)')
 _ABBREV = re.compile(r"\b(e\.g|i\.e|etc|vs|Dr|Mr|Mrs|Ms|St|No|Fig|approx)\.$", re.IGNORECASE)
 
 
@@ -19,14 +19,18 @@ class SentenceBuffer:
         while True:
             m = None
             for m_ in _END.finditer(self.buf):
-                cand = self.buf[: m_.end(1)]
-                if len(cand) >= self.min_chars and not _ABBREV.search(cand) and not _looks_like_decimal(self.buf, m_):
-                    m = m_
+                cjk = m_.group(3) is not None
+                end = m_.end(3) if cjk else m_.end(1)
+                cand = self.buf[:end]
+                min_chars = 6 if cjk else self.min_chars
+                if len(cand) >= min_chars and (cjk or (not _ABBREV.search(cand) and not _looks_like_decimal(self.buf, m_))):
+                    m = (m_, end)
                     break
             if m is None:
                 break
-            out.append(self.buf[: m.end(1)].strip())
-            self.buf = self.buf[m.end():]
+            m_, end = m
+            out.append(self.buf[:end].strip())
+            self.buf = self.buf[m_.end():]
         # very long run without punctuation -> split at last comma/space
         if len(self.buf) > self.max_chars:
             cut = max(self.buf.rfind(", ", 0, self.max_chars), self.buf.rfind(" ", 0, self.max_chars))

@@ -179,6 +179,16 @@ tts:
 the config. For a cloned voice, switch `tts.backend` to `chatterbox` and set `chatterbox.voice_ref`
 to a clean 5–15 s WAV of the speaker.
 
+## Speaking other languages
+
+1. Settings → Speech: Text-to-speech engine `chatterbox`, Chatterbox model `multilingual`, output
+   language `auto` (or fix one, e.g. `zh`).
+2. Settings → Speech: clear *Spoken language* so Whisper detects the language you speak.
+3. Save, restart. Speak Chinese (or German, Japanese…) and the assistant hears, thinks and answers in
+   that language; each sentence is voiced in the language it is written in, so mixed replies work.
+   The wake names still have to be said as "Alveus"/"Aurea" (add local spellings to *Name aliases*
+   if Whisper writes them differently in your language).
+
 ## Using Alveus from other programs
 
 Everything the voice loop can do is reachable over HTTP on `127.0.0.1:8765` while

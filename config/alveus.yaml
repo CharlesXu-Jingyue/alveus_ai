@@ -85,8 +85,11 @@ tts:
     speed: 1.0
     lang_code: a                 # a = American English, b = British
   chatterbox:
-    model: turbo                 # turbo | standard
+    model: turbo                 # turbo (English, fastest) | standard (English, expressive) |
+                                 # multilingual (23 languages incl. zh/ja/ko/de/fr/es, auto-detected per sentence)
     voice_ref: null              # path to a wav for voice cloning (optional)
+    language: auto               # multilingual only: auto = detect per sentence, or a fixed code like zh
+    fallback_language: en        # used when auto-detection is unsure
     exaggeration: 0.5
     cfg_weight: 0.5
   openai_http:                   # any /v1/audio/speech server (Kokoro-FastAPI, ...)
