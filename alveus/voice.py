@@ -93,6 +93,9 @@ class VoiceAssistant:
             log.warning("tool server '%s' unavailable: %s", k, v)
         log.info("Tools: %d (%s)", len(self.hub.tools), ", ".join(sorted({t.server for t in self.hub.tools.values()})))
         self.agent = Agent(llm, self.hub, self.cfg, confirm=self._confirm, thinking=prof.get("thinking"))
+        # Listen (hotkey / GUI button / API) while it is thinking or speaking = interrupt, then listen
+        self._loop = loop
+        self.trigger.on_fire = self._on_trigger
         self.audio_in.start()
         if self.hotkey:
             self.hotkey.start()
@@ -118,6 +121,24 @@ class VoiceAssistant:
     def _set(self, s: State) -> None:
         self.state = s
         self.on_state(s)
+
+    def _on_trigger(self) -> None:
+        """Runs on the firing thread: if a reply is in progress, cut it so the loop can listen."""
+        if self.state == State.LISTENING or not bool(self.cfg.audio.get("barge_in", True)):
+            return   # while recording, the hotkey means "stop recording" (see _record_utterance)
+        busy = (self.agent is not None and self.agent.lock.locked()) or self.speaker is not None \
+            or self.audio_out.busy
+        if busy:   # a voice or GUI turn is generating or speaking
+            self._loop.call_soon_threadsafe(self.interrupt)
+
+    def interrupt(self) -> None:
+        """Stop the current reply: generation, pending tool calls, queued and playing speech."""
+        log.info("interrupt: stopping generation and speech")
+        if self.agent is not None:
+            self.agent.interrupt()
+        if self.speaker is not None:
+            self.speaker.abort()
+        self.audio_out.stop()
 
     # ------------------------------------------------------------------ main loop
     async def run_forever(self) -> None:
@@ -283,8 +304,8 @@ class VoiceAssistant:
                 break
             if barge and self.wake is not None and frame is not None and self.wake.detected(frame):
                 log.info("barge-in (wake word): stopping playback")
-                self.audio_out.stop()
                 self.wake.reset()
+                self.interrupt()
                 self.trigger.fire()
                 break
 

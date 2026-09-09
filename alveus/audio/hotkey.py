@@ -58,9 +58,12 @@ class Trigger:
 
     def __init__(self):
         self._ev = threading.Event()
+        self.on_fire = None   # optional callback, called on whichever thread fires (hotkey, API)
 
     def fire(self) -> None:
         self._ev.set()
+        if self.on_fire:
+            self.on_fire()
 
     def take(self) -> bool:
         if self._ev.is_set():

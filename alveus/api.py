@@ -341,11 +341,14 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
     @app.post("/interrupt")
     async def interrupt() -> dict[str, bool]:
         """Abort the current turn: stop generating, skip pending tool calls, cut speech, deny open confirmations."""
-        if assistant.agent is not None:
+        if hasattr(assistant, "interrupt"):
+            assistant.interrupt()          # voice assistant: agent + speaker + playback
+        elif assistant.agent is not None:
             assistant.agent.interrupt()
+        sp = getattr(assistant, "speaker", None)
+        if sp is not None:
+            sp.abort()
         broker.cancel_all()
-        if has_voice:
-            assistant.audio_out.stop()
         return {"interrupted": True}
 
     # ---- speech

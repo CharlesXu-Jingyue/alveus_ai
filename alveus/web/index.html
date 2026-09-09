@@ -192,7 +192,7 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
     <div class="composer"><div class="col">
       <div class="box">
         <textarea id="input" rows="1" placeholder="Ask anything, or tell it what to do… (Enter to send, Shift+Enter for a new line)"></textarea>
-        <button class="btn" id="btnListen" title="Start listening now (same as the hotkey)">● Listen</button>
+        <button class="btn" id="btnListen" title="Listen now (same as the hotkey). If it is thinking or speaking, that reply is cut off first.">● Listen</button>
         <button class="btn primary" id="send">Send</button>
       </div>
       <div class="row">
@@ -454,7 +454,7 @@ const FIELDS = [
  {p:'audio.vad.end_silence_ms', l:'Pause that ends your sentence (ms)', h:'How long you must stay silent before it answers. Shorter = snappier but may cut you off mid-sentence; longer = more patient. 700 is a good default.', t:'number', min:200, max:3000, step:50},
  {p:'audio.vad.threshold', l:'Voice detection sensitivity', h:'How clearly a sound must be speech to count, from 0 to 1. Lower = picks up quieter or farther voices but also more background noise.', t:'number', step:0.05, min:0.1, max:0.95},
  {p:'audio.chimes', l:'Listening chime', h:'Play a short two-tone chime when it starts listening for your request.', t:'bool'},
- {p:'audio.barge_in', l:'Allow interrupting it', h:'While it is speaking, the keyboard shortcut (and the wake-word model, if enabled) cut it off so you can talk.', t:'bool'},
+ {p:'audio.barge_in', l:'Allow interrupting it', h:'While it is thinking or speaking, the keyboard shortcut, the Listen button (and the wake-word model, if enabled) cut the reply off — generation and speech — so you can talk.', t:'bool'},
  {g:'Tools & safety', d:'What the assistant is allowed to do on this computer.'},
  {p:'tools.confirm_destructive', l:'Ask before risky actions', h:'Before deleting or moving files, killing processes, changing services, shutting down, or running dangerous shell commands, it describes the action and waits for your yes. Strongly recommended.', t:'bool'},
  {p:'tools.servers.files.env.ALVEUS_FS_ROOTS', l:'Folders it may access', h:'The file and shell tools can only read, write, and run commands inside these folders. Separate several with a colon, e.g. ~:/data.', t:'text'},

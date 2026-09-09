@@ -21,7 +21,7 @@ Tips for reliable recognition:
   not treated as addressing.
 - A short pause is required to end an utterance (`audio.vad.end_silence_ms`, default 0.7 s).
   If the assistant cuts you off, raise it; if it feels slow, lower it to ~500.
-- Interrupt a long answer with the hotkey. (Voice interruption needs the openWakeWord mode.)
+- Interrupt a long answer with the hotkey or the GUI Listen button: generation and speech stop and it listens to you. (Interrupting by voice alone needs the openWakeWord mode.)
 - Destructive requests get a spoken question, e.g. *"I am about to delete path with
   {"path": "…"}. Should I go ahead?"* Answer "yes", "go ahead", "do it" — anything else cancels.
 
@@ -66,7 +66,7 @@ can be shown with the "Show reasoning" toggle. Destructive actions pause the rep
 **Allow / Deny** card. "Speak replies aloud" plays the answer through the speaker. Voice turns you
 say out loud appear in the same log (tagged *voice*), because GUI and microphone share one
 conversation. The header shows the live state (idle, listening, thinking, speaking) and the LLM
-health. Next to the message box, **Listen** starts a voice turn (same as the hotkey). While a reply
+health. Next to the message box, **Listen** starts a voice turn (same as the hotkey); pressed while it is thinking or speaking, it cuts that reply off first. While a reply
 is running the **Send** button turns into **Interrupt**, which stops generation, skips pending tool
 calls, cuts speech and denies any open confirmation. Under each answer: **Copy**, **Speak** (say it
 again), **Stop** (stop speaking) and **Retry** (ask the same question again).

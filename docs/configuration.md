@@ -107,7 +107,7 @@ sampling `--temp 0.7 --top-p 0.95 --top-k 20` as recommended by the model card.
 | `vad.end_silence_ms` | `700` | pause length that ends an utterance |
 | `vad.max_utterance_s` | `60` | hard cap |
 | `chimes` | `true` | play a chime when the assistant starts listening |
-| `barge_in` | `true` | hotkey (and openWakeWord, if enabled) interrupt playback |
+| `barge_in` | `true` | hotkey, Listen button, `/trigger` (and openWakeWord, if enabled) interrupt a reply in progress: generation, pending tool calls and speech, then listen |
 
 ## `activation`
 
