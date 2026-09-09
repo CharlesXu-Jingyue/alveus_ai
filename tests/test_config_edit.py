@@ -4,10 +4,13 @@ import alveus.config as c
 def test_patch_merge_and_remove(tmp_path, monkeypatch):
     monkeypatch.setattr(c, "LOCAL_YAML", tmp_path / "local.yaml")
     c.write_local_yaml("assistant:\n  user_name: Charles\naudio:\n  backend: pipewire\n")
-    merged = c.patch_local_yaml({"tts": {"kokoro": {"voice": "am_michael"}}, "audio": {"backend": None}})
+    merged = c.patch_local_yaml({"tts": {"kokoro": {"voice": "am_michael"}}, "audio": {"backend": c.UNSET}})
     assert merged == {"assistant": {"user_name": "Charles"}, "tts": {"kokoro": {"voice": "am_michael"}}}
-    merged = c.patch_local_yaml({"tts": {"kokoro": {"voice": None}}})
+    merged = c.patch_local_yaml({"tts": {"kokoro": {"voice": c.UNSET}}})
     assert "tts" not in merged  # empty branches are pruned
+    merged = c.patch_local_yaml({"stt": {"faster_whisper": {"language": None}}})
+    assert merged["stt"]["faster_whisper"]["language"] is None  # explicit null survives
+    assert "language: null" in c.read_local_yaml()
     text = c.read_local_yaml()
     assert "user_name: Charles" in text
 

@@ -369,70 +369,72 @@ $('tabChat').onclick=()=>showTab('chat'); $('tabSettings').onclick=()=>showTab('
 
 // ---------- settings
 const FIELDS = [
- {g:'Assistant', d:'Identity and how it talks.'},
- {p:'assistant.name', l:'Name', h:'Used with a male or neutral voice. Always a wake name.', t:'text'},
- {p:'assistant.female_name', l:'Female-voice name', h:'Used when the voice is female (default Kokoro voice is).', t:'text'},
+ {g:'Assistant', d:'Who the assistant is and how it speaks to you.'},
+ {p:'assistant.name', l:'Name', h:'The name it uses for itself with a male or neutral voice. Saying this name also wakes it.', t:'text'},
+ {p:'assistant.female_name', l:'Female-voice name', h:'The name it uses for itself when the voice is female. Saying this name also wakes it.', t:'text'},
  {p:'assistant.user_name', l:'Your name', h:'How the assistant addresses you.', t:'text'},
- {p:'assistant.streaming_tts', l:'Speak while generating', h:'Start talking after the first sentence instead of waiting for the full reply.', t:'bool'},
- {p:'assistant.max_history_turns', l:'Conversation memory (turns)', h:'User turns kept in context.', t:'number', min:1, max:200},
- {g:'Language model', d:'Which model answers, and how.'},
- {p:'llm.profile', l:'Model profile', h:'Profiles are defined in config/alveus.yaml under llm.profiles.', t:'select', o:'llm_profiles', restart:'llm'},
- {p:'llm.temperature', l:'Temperature', t:'number', step:0.05, min:0, max:2},
- {p:'llm.max_tokens', l:'Max reply tokens', h:'Includes the model’s hidden reasoning.', t:'number', min:256, max:32768},
- {p:'llm.max_tool_rounds', l:'Max tool rounds per request', t:'number', min:1, max:50},
- {g:'Speech', d:'Ears and voice.'},
- {p:'stt.backend', l:'Speech-to-text engine', h:'faster_whisper: robust, multilingual · parakeet: fastest · openai_http: external server', t:'select', o:'stt_backends'},
- {p:'stt.faster_whisper.model', l:'Whisper model', h:'large-v3-turbo is the best speed/accuracy trade-off on a GPU.', t:'select', o:'whisper_models', when:{p:'stt.backend', v:['faster_whisper']}},
- {p:'stt.faster_whisper.language', l:'Spoken language', h:'ISO code like en, de, zh. Empty = auto-detect.', t:'text', when:{p:'stt.backend', v:['faster_whisper']}},
- {p:'stt.faster_whisper.compute_type', l:'Whisper precision', h:'float16 on GPU; int8_float16 halves VRAM.', t:'text', when:{p:'stt.backend', v:['faster_whisper']}},
- {p:'stt.parakeet.model', l:'Parakeet model', t:'select', o:'parakeet_models', when:{p:'stt.backend', v:['parakeet']}},
- {p:'stt.openai_http.base_url', l:'Transcription server URL', h:'Any /v1/audio/transcriptions endpoint.', t:'text', when:{p:'stt.backend', v:['openai_http']}},
- {p:'stt.openai_http.model', l:'Transcription model name', t:'text', when:{p:'stt.backend', v:['openai_http']}},
- {p:'tts.backend', l:'Text-to-speech engine', h:'kokoro: fast, 28 voices · chatterbox: most natural, voice cloning · openai_http: external server', t:'select', o:'tts_backends'},
- {p:'tts.voice_gender', l:'Voice gender', h:'Decides whether it calls itself Alveus or Aurea. auto reads the Kokoro voice prefix.', t:'select', o:'voice_genders'},
- {p:'tts.kokoro.voice', l:'Kokoro voice', h:'af_/bf_ = female, am_/bm_ = male; a/b = American/British.', t:'select', o:'kokoro_voices', when:{p:'tts.backend', v:['kokoro']}},
- {p:'tts.kokoro.speed', l:'Speaking speed', t:'number', step:0.05, min:0.5, max:2, when:{p:'tts.backend', v:['kokoro']}},
- {p:'tts.chatterbox.model', l:'Chatterbox model', h:'turbo: fastest · standard: more expressive controls.', t:'select', o:'chatterbox_models', when:{p:'tts.backend', v:['chatterbox']}},
- {p:'tts.chatterbox.voice_ref', l:'Voice sample to clone', h:'Path to a clean 5–15 s WAV of the speaker. Empty = built-in voice.', t:'text', when:{p:'tts.backend', v:['chatterbox']}},
- {p:'tts.chatterbox.exaggeration', l:'Expressiveness', h:'standard model only, 0–1.', t:'number', step:0.05, min:0, max:1, when:{p:'tts.chatterbox.model', v:['standard']}},
- {p:'tts.openai_http.base_url', l:'Speech server URL', h:'Any /v1/audio/speech endpoint (e.g. Kokoro-FastAPI).', t:'text', when:{p:'tts.backend', v:['openai_http']}},
- {p:'tts.openai_http.model', l:'Speech model name', t:'text', when:{p:'tts.backend', v:['openai_http']}},
- {p:'tts.openai_http.voice', l:'Voice name', h:'As understood by that server.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
- {g:'Activation', d:'How a conversation starts.'},
- {p:'activation.wake_word.mode', l:'Wake mode', h:'names: say Alveus/Aurea · oww: openWakeWord phrase · both.', t:'select', o:'activation_modes'},
- {p:'activation.wake_word.names', l:'Names', h:'Comma-separated.', t:'list'},
- {p:'activation.wake_word.name_aliases', l:'Name aliases', h:'Spellings the transcriber produces for the names.', t:'list'},
- {p:'activation.wake_word.oww_model', l:'openWakeWord model', h:'Pretrained phrase or a custom model in the wakeword folder.', t:'select', o:'oww_models', when:{p:'activation.wake_word.mode', v:['oww','both']}},
- {p:'activation.wake_word.threshold', l:'Wake-word threshold', t:'number', step:0.05, min:0.1, max:0.95, when:{p:'activation.wake_word.mode', v:['oww','both']}},
- {p:'activation.wake_word.follow_up_window_s', l:'Follow-up window (s)', h:'After a reply, speech is accepted without a name for this long. 0 disables.', t:'number', min:0, max:60},
- {p:'activation.hotkey.enabled', l:'Global hotkey', t:'bool'},
- {p:'activation.hotkey.combo', l:'Hotkey combo', h:'pynput syntax, e.g. <ctrl>+<alt>+<space>', t:'text', when:{p:'activation.hotkey.enabled', v:[true]}},
- {p:'activation.hotkey.mode', l:'Hotkey mode', h:'toggle: press to start · hold: push-to-talk', t:'select', o:'hotkey_modes', when:{p:'activation.hotkey.enabled', v:[true]}},
- {g:'Audio', d:'Microphone, silence detection, chimes.'},
- {p:'audio.backend', l:'Audio backend', t:'select', o:'audio_backends'},
- {p:'audio.input_device', l:'Microphone', h:'PipeWire node name (see wpctl status). Empty = default.', t:'text'},
- {p:'audio.output_device', l:'Speaker', h:'Empty = default.', t:'text'},
- {p:'audio.vad.end_silence_ms', l:'End-of-speech pause (ms)', h:'How long you must pause before it answers.', t:'number', min:200, max:3000, step:50},
- {p:'audio.vad.threshold', l:'Voice detection sensitivity', h:'Lower = more sensitive.', t:'number', step:0.05, min:0.1, max:0.95},
- {p:'audio.chimes', l:'Listening chime', t:'bool'},
- {p:'audio.barge_in', l:'Allow interrupting speech', h:'Hotkey (and openWakeWord) stop playback.', t:'bool'},
- {g:'Tools & safety', d:'What the assistant may do on this computer.'},
- {p:'tools.confirm_destructive', l:'Confirm destructive actions', h:'Ask before deleting, killing, shutting down, risky shell commands.', t:'bool'},
- {p:'tools.servers.files.env.ALVEUS_FS_ROOTS', l:'Filesystem roots', h:'Colon-separated folders the files tool may touch.', t:'text'},
- {p:'tools.servers.web.enabled', l:'Web tools (internet)', t:'bool'},
- {p:'tools.servers.coder.enabled', l:'Coder tool (opencode)', t:'bool'},
- {p:'tools.servers.desktop.enabled', l:'Desktop tools', t:'bool'},
- {p:'logging.level', l:'Log level', t:'select', o:'log_levels'},
+ {p:'assistant.streaming_tts', l:'Speak while generating', h:'On: starts talking after the first sentence is ready. Off: waits for the whole reply, then speaks (fewer pauses, longer wait).', t:'bool'},
+ {p:'assistant.max_history_turns', l:'Conversation memory (turns)', h:'How many of your recent requests it remembers within a session. More memory = longer context sent to the model each turn.', t:'number', min:1, max:200},
+ {g:'Language model', d:'Which model thinks for the assistant, and how it generates text.'},
+ {p:'llm.profile', l:'Model profile', h:'bonsai-1bit: smaller and faster. bonsai-ternary: better quality and tool use, more VRAM. Profiles are defined in config/alveus.yaml. Saving checks that the model file loads, then restarts the LLM server.', t:'select', o:'llm_profiles', restart:'llm'},
+ {p:'llm.temperature', l:'Temperature', h:'Randomness of the wording. 0 = same answer every time, 0.7 = balanced (recommended), above 1 = more creative but less reliable with tools and facts.', t:'number', step:0.05, min:0, max:2},
+ {p:'llm.max_tokens', l:'Max reply length (tokens)', h:'Upper limit per reply, including the model’s hidden reasoning. About 4 tokens per 3 words. Too low cuts answers off mid-thought.', t:'number', min:256, max:32768},
+ {p:'llm.max_tool_rounds', l:'Max tool steps per request', h:'How many times it may call tools (files, web, system…) while working on one request before it must answer.', t:'number', min:1, max:50},
+ {g:'Speech', d:'How it hears you and how it sounds.'},
+ {p:'stt.backend', l:'Speech-to-text engine', h:'faster_whisper: accurate, many languages. parakeet: fastest, English and European languages. openai_http: use a separate transcription server instead.', t:'select', o:'stt_backends'},
+ {p:'stt.faster_whisper.model', l:'Whisper model size', h:'Bigger = more accurate but slower and more VRAM. large-v3-turbo is the best balance on a GPU; small/base for weak machines.', t:'select', o:'whisper_models', when:{p:'stt.backend', v:['faster_whisper']}},
+ {p:'stt.faster_whisper.language', l:'Spoken language', h:'Language you speak, as a two-letter code (en, de, zh, fr…). Leave empty to detect it automatically on every utterance (a little slower).', t:'text', nullable:true, when:{p:'stt.backend', v:['faster_whisper']}},
+ {p:'stt.faster_whisper.compute_type', l:'Whisper precision', h:'float16 is standard on a GPU. int8_float16 uses about half the VRAM with slightly lower accuracy.', t:'text', when:{p:'stt.backend', v:['faster_whisper']}},
+ {p:'stt.parakeet.model', l:'Parakeet model', h:'v3 understands 25 European languages; v2 is English-only and slightly faster.', t:'select', o:'parakeet_models', when:{p:'stt.backend', v:['parakeet']}},
+ {p:'stt.openai_http.base_url', l:'Transcription server address', h:'Where the external speech-to-text server is, e.g. http://127.0.0.1:8001/v1 (whisper.cpp server, speaches, or a hosted API).', t:'text', when:{p:'stt.backend', v:['openai_http']}},
+ {p:'stt.openai_http.model', l:'Transcription model name', h:'The model identifier that server expects in requests, e.g. whisper-1. It is passed through unchanged; check the server’s documentation.', t:'text', when:{p:'stt.backend', v:['openai_http']}},
+ {p:'tts.backend', l:'Text-to-speech engine', h:'kokoro: fast, 28 preset voices. chatterbox: most natural, can clone a voice from a recording, needs more VRAM. openai_http: use a separate speech server instead.', t:'select', o:'tts_backends'},
+ {p:'tts.voice_gender', l:'Voice gender', h:'Decides which name it calls itself: female → the female-voice name, otherwise the main name. auto works only with Kokoro voices (read from the voice name).', t:'select', o:'voice_genders'},
+ {p:'tts.kokoro.voice', l:'Kokoro voice', h:'Prefix tells you the voice: af/am = American female/male, bf/bm = British female/male. Preview with: alveus tts say "hello".', t:'select', o:'kokoro_voices', when:{p:'tts.backend', v:['kokoro']}},
+ {p:'tts.kokoro.speed', l:'Speaking speed', h:'1.0 = normal. 1.2 is brisk, 0.9 is relaxed.', t:'number', step:0.05, min:0.5, max:2, when:{p:'tts.backend', v:['kokoro']}},
+ {p:'tts.chatterbox.model', l:'Chatterbox model', h:'turbo: fastest, one built-in voice plus cloning. standard: slower, adds an expressiveness control.', t:'select', o:'chatterbox_models', when:{p:'tts.backend', v:['chatterbox']}},
+ {p:'tts.chatterbox.voice_ref', l:'Voice sample to clone', h:'Chatterbox has no preset voices; to change the voice, give it a clean 5–15 second WAV recording of the speaker to imitate. Leave empty for the built-in voice.', t:'text', nullable:true, when:{p:'tts.backend', v:['chatterbox']}},
+ {p:'tts.chatterbox.exaggeration', l:'Expressiveness', h:'0 = flat, 0.5 = natural, 1 = dramatic. Standard model only.', t:'number', step:0.05, min:0, max:1, when:{p:'tts.chatterbox.model', v:['standard']}},
+ {p:'tts.openai_http.base_url', l:'Speech server address', h:'Where the external text-to-speech server is, e.g. http://127.0.0.1:8880/v1 for Kokoro-FastAPI.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
+ {p:'tts.openai_http.model', l:'Speech model name', h:'The model identifier that server expects in requests, e.g. kokoro or tts-1. Passed through unchanged.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
+ {p:'tts.openai_http.voice', l:'Voice name', h:'A voice that server offers, e.g. af_heart on Kokoro-FastAPI.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
+ {g:'Activation', d:'How you get its attention.'},
+ {p:'activation.wake_word.mode', l:'Wake mode', h:'names: say one of its names in your sentence (“Aurea, what time is it?”), no training needed. oww: a trained wake-word model listens for a fixed phrase, reacts faster. both: either works.', t:'select', o:'activation_modes'},
+ {p:'activation.wake_word.names', l:'Names', h:'Words that count as addressing the assistant. Comma-separated.', t:'list'},
+ {p:'activation.wake_word.name_aliases', l:'Name aliases', h:'Ways the speech recognizer tends to misspell the names (e.g. “Aria” for Aurea). Also accepted as a wake name. Comma-separated.', t:'list'},
+ {p:'activation.wake_word.oww_model', l:'Wake-word model', h:'The phrase the wake-word model listens for. Built-in: hey_jarvis, alexa, hey_mycroft… Custom models trained with scripts/train_wakeword.sh appear here too. Only used in oww or both mode.', t:'select', o:'oww_models', when:{p:'activation.wake_word.mode', v:['oww','both']}},
+ {p:'activation.wake_word.threshold', l:'Wake-word sensitivity threshold', h:'How sure the wake-word model must be before it triggers, from 0 to 1. Lower = wakes more easily but more false alarms; higher = you may need to repeat yourself. 0.5 is a good start; tune with: alveus wakeword-test.', t:'number', step:0.05, min:0.1, max:0.95, when:{p:'activation.wake_word.mode', v:['oww','both']}},
+ {p:'activation.wake_word.follow_up_window_s', l:'Follow-up window (seconds)', h:'After it answers, you can keep talking without saying its name for this long. 0 turns the feature off.', t:'number', min:0, max:60},
+ {p:'activation.hotkey.enabled', l:'Keyboard shortcut', h:'A global key combination that makes it listen, like pressing a talk button.', t:'bool'},
+ {p:'activation.hotkey.combo', l:'Shortcut keys', h:'Written in pynput style: <ctrl>+<alt>+<space>, <ctrl>+<shift>+a, <cmd>+<space>.', t:'text', when:{p:'activation.hotkey.enabled', v:[true]}},
+ {p:'activation.hotkey.mode', l:'Shortcut behaviour', h:'toggle: press once to start listening, it stops when you pause. hold: listens only while the keys are held down.', t:'select', o:'hotkey_modes', when:{p:'activation.hotkey.enabled', v:[true]}},
+ {g:'Audio', d:'Microphone, speaker, and how it decides you have finished talking.'},
+ {p:'audio.backend', l:'Audio system', h:'auto picks PipeWire when available (normal on modern Linux desktops); sounddevice is the fallback for other systems.', t:'select', o:'audio_backends'},
+ {p:'audio.input_device', l:'Microphone', h:'Which microphone to use. Empty = the system default. Otherwise a PipeWire device name from “wpctl status”.', t:'text', nullable:true},
+ {p:'audio.output_device', l:'Speaker', h:'Which output to use. Empty = the system default.', t:'text', nullable:true},
+ {p:'audio.vad.end_silence_ms', l:'Pause that ends your sentence (ms)', h:'How long you must stay silent before it answers. Shorter = snappier but may cut you off mid-sentence; longer = more patient. 700 is a good default.', t:'number', min:200, max:3000, step:50},
+ {p:'audio.vad.threshold', l:'Voice detection sensitivity', h:'How clearly a sound must be speech to count, from 0 to 1. Lower = picks up quieter or farther voices but also more background noise.', t:'number', step:0.05, min:0.1, max:0.95},
+ {p:'audio.chimes', l:'Listening chime', h:'Play a short two-tone chime when it starts listening for your request.', t:'bool'},
+ {p:'audio.barge_in', l:'Allow interrupting it', h:'While it is speaking, the keyboard shortcut (and the wake-word model, if enabled) cut it off so you can talk.', t:'bool'},
+ {g:'Tools & safety', d:'What the assistant is allowed to do on this computer.'},
+ {p:'tools.confirm_destructive', l:'Ask before risky actions', h:'Before deleting or moving files, killing processes, changing services, shutting down, or running dangerous shell commands, it describes the action and waits for your yes. Strongly recommended.', t:'bool'},
+ {p:'tools.servers.files.env.ALVEUS_FS_ROOTS', l:'Folders it may access', h:'The file and shell tools can only read, write, and run commands inside these folders. Separate several with a colon, e.g. ~:/data.', t:'text'},
+ {p:'tools.servers.desktop.enabled', l:'Desktop tools', h:'Let it operate the desktop: open apps and files, manage windows, type and press keys, set volume, control music, use the clipboard, take screenshots, show notifications, toggle dark mode and Do Not Disturb, lock the screen.', t:'bool'},
+ {p:'tools.servers.web.enabled', l:'Web tools', h:'Let it search the web, read web pages, and check the weather. These are the only tools that send anything over the internet.', t:'bool'},
+ {p:'tools.servers.coder.enabled', l:'Coding tool (opencode)', h:'Let it hand programming tasks to the opencode agent, which can read, edit, and run code in a project folder you name.', t:'bool'},
+ {p:'logging.level', l:'Log detail', h:'How much is written to the log (journalctl / logs/alveus.log). WARNING: problems only. INFO: normal activity such as what it heard and which tools it used. DEBUG: everything, including speech it ignored — use when troubleshooting.', t:'select', o:'log_levels'},
 ];
 let cfg=null, dirty={}, persona='', personaDirty=false, yamlDirty=false;
+const UNSET = {"$unset": true};   // remove the machine override so the default applies again
+const isUnset = v => v && typeof v==='object' && v.$unset===true;
 const get = (o,p) => p.split('.').reduce((a,k)=> (a && a[k]!==undefined) ? a[k] : undefined, o);
 // value as it will be after saving: pending edit wins over the effective config
-const current = p => (p in dirty) ? (dirty[p]===null ? get(cfg.defaults||{}, p) ?? get(cfg.effective,p) : dirty[p]) : get(cfg.effective, p);
+const current = p => (p in dirty) ? (isUnset(dirty[p]) ? get(cfg.defaults||{}, p) : dirty[p]) : get(cfg.effective, p);
 function refreshVisibility(){
   for (const f of FIELDS){ if(!f.when) continue; const row=document.querySelector(`.field[data-path="${f.p}"]`); if(!row) continue;
     const v = current(f.when.p); row.hidden = !f.when.v.some(x => String(x)===String(v)); }
 }
-function fmt(v){ if(v===undefined||v===null) return '—'; if(Array.isArray(v)) return v.join(', '); return String(v); }
+function fmt(v){ if(v===undefined) return '—'; if(v===null) return 'empty'; if(Array.isArray(v)) return v.join(', '); return String(v); }
 
 async function loadSettings(force){
   if (cfg && !force) return;
@@ -449,11 +451,15 @@ function renderSettings(){
   }
   // advanced
   const sec=document.createElement('section'); sec.className='grp'; sec.id='g-Advanced';
-  sec.innerHTML = `<h2>Advanced</h2><p class="desc">Everything else. <code class="mono">local.yaml</code> holds only this machine’s overrides; the full defaults live in <code class="mono">${esc(cfg.paths.defaults)}</code>.</p>
-    <h3 style="font-size:15px;margin:14px 0 6px">config/local.yaml</h3><textarea class="editor" id="yamlEd" spellcheck="false"></textarea>
-    <div class="adv-row"><span>Saving the YAML replaces the file; form edits above are merged into it.</span><button class="btn" id="saveYaml">Save YAML</button></div>
-    <h3 style="font-size:15px;margin:22px 0 6px">Persona (system prompt) — config/persona.md</h3><textarea class="editor" id="personaEd" spellcheck="false"></textarea>
-    <div class="adv-row"><span>Placeholders: {name} {other_name} {user_name} {date} {hostname} {os}</span><button class="btn" id="savePersona">Save persona</button></div>`;
+  sec.innerHTML = `<h2>Advanced</h2><p class="desc">Two text files behind the settings above. You only need these for options the form does not show, or to fine-tune how the assistant behaves.</p>
+    <h3 style="font-size:15px;margin:14px 0 4px">This machine’s settings file</h3>
+    <p class="desc" style="margin-bottom:8px">Everything you change in the form is stored here (<code class="mono">config/local.yaml</code>). It lists only what differs from the built-in defaults in <code class="mono">config/alveus.yaml</code>, so an empty file means “all defaults”. You can add any option from the defaults file, for example a new model profile or an extra tool server.</p>
+    <textarea class="editor" id="yamlEd" spellcheck="false"></textarea>
+    <div class="adv-row"><span>Saving here replaces the whole file. Changes in the form above are merged into it when you save them.</span><button class="btn" id="saveYaml">Save settings file</button></div>
+    <h3 style="font-size:15px;margin:22px 0 4px">Personality and instructions</h3>
+    <p class="desc" style="margin-bottom:8px">The instructions the assistant reads before every conversation (<code class="mono">config/persona.md</code>): who it is, how it should talk, when to use tools, what to ask before doing. Edit it in plain language. The words in braces are filled in automatically: {name} and {other_name} are its names, {user_name} is you, {date}, {hostname} and {os} describe today and this computer.</p>
+    <textarea class="editor" id="personaEd" spellcheck="false"></textarea>
+    <div class="adv-row"><span>Takes effect after the assistant restarts.</span><button class="btn" id="savePersona">Save instructions</button></div>`;
   form.appendChild(sec);
   const a=document.createElement('a'); a.href='#g-Advanced'; a.textContent='Advanced'; a.onclick=e=>{e.preventDefault(); sec.scrollIntoView({behavior:'smooth'});}; nav.appendChild(a);
   const note=document.createElement('div'); note.className='note'; note.innerHTML=`Running: <b>${esc(cfg.running_profile)}</b><br>${cfg.managed_by_systemd?'Managed by systemd — restarts work from here.':'Not under systemd — restart <code>alveus talk</code> yourself after saving.'}<br><br>Models: <code>${esc(cfg.env.ALVEUS_MODELS)}</code>`; nav.appendChild(note);
@@ -474,11 +480,12 @@ function fieldRow(f){
   if (f.t==='bool'){ el=document.createElement('button'); el.className='switch'; el.setAttribute('role','switch'); el.setAttribute('aria-checked', String(!!eff)); el.onclick=()=>{ const v=el.getAttribute('aria-checked')!=='true'; el.setAttribute('aria-checked',String(v)); setDirty(v); }; }
   else if (f.t==='select'){ el=document.createElement('select'); const opts=cfg.options[f.o]||[]; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur); el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o)}</option>`).join(''); el.onchange=()=>setDirty(el.value); }
   else if (f.t==='list'){ el=document.createElement('input'); el.type='text'; el.value=Array.isArray(eff)?eff.join(', '):(eff||''); el.oninput=()=>setDirty(el.value.split(',').map(s=>s.trim()).filter(Boolean)); }
-  else if (f.t==='number'){ el=document.createElement('input'); el.type='number'; if(f.step) el.step=f.step; if(f.min!==undefined) el.min=f.min; if(f.max!==undefined) el.max=f.max; el.value=eff??''; el.oninput=()=>{ const v=el.value===''?null:Number(el.value); setDirty(v); }; }
-  else { el=document.createElement('input'); el.type='text'; el.value=eff??''; el.oninput=()=>setDirty(el.value===''?null:el.value); }
+  else if (f.t==='number'){ el=document.createElement('input'); el.type='number'; if(f.step) el.step=f.step; if(f.min!==undefined) el.min=f.min; if(f.max!==undefined) el.max=f.max; el.value=eff??''; el.oninput=()=>{ setDirty(el.value==='' ? UNSET : Number(el.value)); }; }
+  else { el=document.createElement('input'); el.type='text'; el.value=eff??''; if(f.nullable) el.placeholder='(empty)'; el.oninput=()=>setDirty(el.value==='' ? (f.nullable ? null : UNSET) : el.value); }
   ctl.appendChild(el);
-  meta.innerHTML = overridden ? `<span class="ov">overridden</span><br><button>reset to default</button>` : `default`;
-  if (overridden) meta.querySelector('button').onclick = () => { dirty[f.p]=null; row.classList.add('dirty'); meta.innerHTML='<span class="ov">will reset</span>'; updateSavebar(); refreshVisibility(); };
+  const defv = get(cfg.defaults, f.p);
+  meta.innerHTML = overridden ? `<span class="ov">changed here</span><br>default: ${esc(fmt(defv))}<br><button>reset to default</button>` : `default`;
+  if (overridden) meta.querySelector('button').onclick = () => { dirty[f.p]=UNSET; row.classList.add('dirty'); meta.innerHTML='<span class="ov">will reset</span>'; updateSavebar(); refreshVisibility(); };
   row.append(lbl, ctl, meta); return row;
 }
 let restartKind=null;

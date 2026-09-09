@@ -146,8 +146,15 @@ def write_local_yaml(text: str) -> dict:
     return data
 
 
+UNSET = {"$unset": True}
+
+
 def patch_local_yaml(patch: dict) -> dict:
-    """Deep-merge ``patch`` into config/local.yaml (a ``None`` leaf removes the override)."""
+    """Deep-merge ``patch`` into config/local.yaml.
+
+    A ``None`` leaf stores an explicit ``null`` (e.g. language: auto-detect); a leaf equal to
+    ``{"$unset": true}`` removes the override so the default from alveus.yaml applies again.
+    """
     current = yaml.safe_load(read_local_yaml()) or {}
     merged = _merge_patch(current, patch)
     LOCAL_YAML.parent.mkdir(parents=True, exist_ok=True)
@@ -159,7 +166,7 @@ def patch_local_yaml(patch: dict) -> dict:
 def _merge_patch(base: dict, patch: dict) -> dict:
     out = copy.deepcopy(base)
     for k, v in patch.items():
-        if v is None:
+        if isinstance(v, dict) and v.get("$unset") is True:
             out.pop(k, None)
         elif isinstance(v, dict):
             sub = out.get(k) if isinstance(out.get(k), dict) else {}
