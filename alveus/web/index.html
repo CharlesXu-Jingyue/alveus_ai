@@ -78,6 +78,12 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
 .bubble code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px}
 .bubble pre{background:var(--code-bg);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:6px 0}
 .bubble pre code{background:none;padding:0;font-size:12.5px}
+/* code block header: language + copy button */
+.bubble pre.code{padding:0}
+.bubble pre.code .cbar{display:flex;justify-content:space-between;align-items:center;padding:4px 8px 4px 12px;border-bottom:1px solid var(--rule);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.bubble pre.code code{display:block;padding:10px 12px;overflow-x:auto}
+.bubble pre.code .cc{border:1px solid transparent;background:none;color:var(--muted);font-size:11.5px;padding:2px 8px;border-radius:6px;text-transform:none;letter-spacing:0;font-family:inherit}
+.bubble pre.code .cc:hover{color:var(--accent-ink);border-color:var(--accent)}
 .bubble ul{margin:4px 0 8px;padding-left:22px}
 .cursor::after{content:"▍";color:var(--accent);animation:pulse .9s infinite}
 .tools{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px}
@@ -244,15 +250,20 @@ const toast = (msg, err=false) => { const t=$('toast'); t.textContent=msg; t.cla
 // ---------- markdown-lite for assistant text
 function md(text){
   let s = esc(text);
-  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_,l,c)=>`<pre><code>${c}</code></pre>`);
+  // lift code blocks out first so blank lines inside them survive paragraph splitting
+  const codes = [];
+  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_,l,c) => {
+    codes.push(`<pre class="code"><div class="cbar"><span class="lang">${esc(l||'')}</span><button class="cc" type="button" title="Copy code">⧉ Copy</button></div><code>${c.replace(/\n$/,'')}</code></pre>`);
+    return ` ${codes.length-1} `;
+  });
   s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
   s = s.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
   const blocks = s.split(/\n{2,}/).map(b => {
-    if (b.startsWith('<pre>')) return b;
+    if (/^\s* \d+ \s*$/.test(b)) return b.trim();
     if (/^(?:[-*•] .*\n?)+$/m.test(b) && b.split('\n').every(l=>/^[-*•] /.test(l))) return '<ul>'+b.split('\n').map(l=>'<li>'+l.replace(/^[-*•] /,'')+'</li>').join('')+'</ul>';
     return '<p>'+b.replace(/\n/g,'<br>')+'</p>';
   });
-  return blocks.join('');
+  return blocks.join('').replace(/ (\d+) /g, (_,i) => codes[i]);
 }
 
 // ---------- header / health
@@ -311,6 +322,13 @@ function connectEvents(){
 
 // ---------- chat log
 const log=$('log'), logCol=$('logCol');
+// copy buttons on code blocks (delegated: blocks are re-rendered while a reply streams)
+logCol.addEventListener('click', async e => {
+  const b = e.target.closest('button.cc'); if (!b) return;
+  const code = b.closest('pre').querySelector('code');
+  try{ await navigator.clipboard.writeText(code.textContent); b.textContent='✓ Copied'; setTimeout(()=>{ b.textContent='⧉ Copy'; }, 1500); }
+  catch{ toast('Copy failed (clipboard blocked)', true); }
+});
 // a voice turn streams into one assistant message; if something else (e.g. your spoken "yes")
 // was added after it, the rest of the reply continues in a fresh bubble below
 const voice = {msg:null, text:'', tool:null};
