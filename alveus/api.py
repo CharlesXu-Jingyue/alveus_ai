@@ -348,13 +348,7 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         local_text = read_local_yaml()
         local = yaml.safe_load(local_text) or {} if local_text.strip() else {}
         from .tts.kokoro_tts import KOKORO_VOICES
-        # voice samples for cloning: the current sample's folder plus the usual places
-        sample_dirs = {Path(REPO_ROOT / "voices"), Path.home() / "local/data/alveus-ai/voices",
-                       Path(cfg._env["ALVEUS_MODELS"]) / "voices"}
-        cur_ref = (cfg.tts.get("chatterbox") or {}).get("voice_ref")
-        if cur_ref:
-            sample_dirs.add(Path(os.path.expanduser(str(cur_ref))).parent)
-        voice_samples = sorted({str(f) for d in sample_dirs if d.is_dir() for f in d.glob("*.wav")})
+        voice_samples = _list_voices(cfg.tts.get("voices_dir"))
         ww_dir = Path(cfg._env["ALVEUS_MODELS"]) / "wakeword"
         custom_oww = sorted(p.stem for p in ww_dir.glob("*.onnx")) if ww_dir.is_dir() else []
         defaults = yaml.safe_load((REPO_ROOT / "config" / "alveus.yaml").read_text()) or {}
@@ -428,6 +422,14 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return {"restarting": units}
 
+    @app.get("/voices")
+    async def voices(dir: str = "") -> dict[str, Any]:
+        """List WAV voice samples in a folder (defaults to tts.voices_dir)."""
+        d = dir or load_config().tts.get("voices_dir") or ""
+        path = Path(os.path.expanduser(d)) if d else None
+        return {"dir": str(path) if path else "", "exists": bool(path and path.is_dir()),
+                "files": _list_voices(d)}
+
     @app.get("/services")
     async def services() -> dict[str, Any]:
         return {u: _unit_status(f"{u}.service") for u in ("alveus-llm", "alveus")}
@@ -495,6 +497,15 @@ def _probe_model(server_bin: str, model_path: str, timeout: float = 180.0) -> di
                 proc.wait(10)
             except subprocess.TimeoutExpired:
                 proc.kill()
+
+
+def _list_voices(voices_dir: str | None) -> list[str]:
+    if not voices_dir:
+        return []
+    d = Path(os.path.expanduser(str(voices_dir)))
+    if not d.is_dir():
+        return []
+    return sorted(f.name for f in d.iterdir() if f.suffix.lower() in (".wav", ".flac", ".mp3") and f.is_file())
 
 
 def _unit_status(unit: str) -> dict[str, Any]:

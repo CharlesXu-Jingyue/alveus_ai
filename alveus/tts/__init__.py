@@ -9,7 +9,7 @@ def make_tts(cfg) -> TTSBackend:
         return KokoroTTS(cfg.tts.get("kokoro") or {}, device)
     if backend == "chatterbox":
         from .chatterbox_tts import ChatterboxTTS
-        return ChatterboxTTS(cfg.tts.get("chatterbox") or {}, device)
+        return ChatterboxTTS(cfg.tts.get("chatterbox") or {}, device, voices_dir=cfg.tts.get("voices_dir"))
     if backend == "openai_http":
         from .openai_http_tts import OpenAIHttpTTS
         return OpenAIHttpTTS(cfg.tts.get("openai_http") or {})

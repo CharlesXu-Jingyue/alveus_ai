@@ -13,6 +13,20 @@ MULTILINGUAL_LANGS = ["ar", "da", "de", "el", "en", "es", "fi", "fr", "he", "hi"
                       "nl", "no", "pl", "pt", "ru", "sv", "sw", "tr", "zh"]
 
 
+def resolve_voice_ref(ref: str | None, voices_dir: str | None) -> str | None:
+    """A file name is looked up inside voices_dir; an absolute/expanded path is used as is."""
+    if not ref:
+        return None
+    cand = Path(os.path.expanduser(str(ref)))
+    if cand.is_file():
+        return str(cand)
+    if voices_dir:
+        cand2 = Path(os.path.expanduser(voices_dir)) / str(ref)
+        if cand2.is_file():
+            return str(cand2)
+    return None
+
+
 class ChatterboxTTS:
     """Resemble AI Chatterbox: turbo (English, fastest), standard (English, expressive) or
     multilingual (23 languages incl. Chinese, auto-detected per sentence). Zero-shot voice cloning."""
@@ -20,9 +34,9 @@ class ChatterboxTTS:
     name = "chatterbox"
     sample_rate = 24000
 
-    def __init__(self, opts: dict, device: str = "cuda"):
+    def __init__(self, opts: dict, device: str = "cuda", voices_dir: str | None = None):
         self.variant = opts.get("model", "turbo")
-        self.voice_ref = opts.get("voice_ref") or None
+        self.voice_ref = resolve_voice_ref(opts.get("voice_ref"), voices_dir)
         self.exaggeration = float(opts.get("exaggeration", 0.5))
         self.cfg_weight = float(opts.get("cfg_weight", 0.5))
         self.language = (opts.get("language") or "auto").lower()          # multilingual only
@@ -30,13 +44,10 @@ class ChatterboxTTS:
         self.device = device
         self._model = None
         self.warning: str | None = None
-        if self.voice_ref and not Path(os.path.expanduser(self.voice_ref)).exists():
-            self.warning = (f"voice sample not found: {self.voice_ref} — using the built-in voice. "
-                            "Fix the path in Settings → Speech → Voice sample to clone.")
+        if opts.get("voice_ref") and not self.voice_ref:
+            self.warning = (f"voice sample not found: {opts.get('voice_ref')} (voices folder: {voices_dir}) — "
+                            "using the built-in voice. Fix it in Settings → Speech → Voice sample to clone.")
             log.error(self.warning)
-            self.voice_ref = None
-        elif self.voice_ref:
-            self.voice_ref = os.path.expanduser(self.voice_ref)
 
     def load(self) -> None:
         if self._model is not None:

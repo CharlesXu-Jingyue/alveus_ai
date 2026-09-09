@@ -90,7 +90,8 @@ sampling `--temp 0.7 --top-p 0.95 --top-k 20` as recommended by the model card.
 | `kokoro.speed` | `1.0` | |
 | `kokoro.lang_code` | `a` | `a` American, `b` British English |
 | `chatterbox.model` | `turbo` | `turbo` or `standard` |
-| `chatterbox.voice_ref` | `null` | path to a 5–15 s WAV to clone a voice; name it `f_…wav` or `m_…wav` so the gender (and name) is inferred |
+| `voices_dir` | `${ALVEUS_HOME}/voices` | folder of WAV samples for cloning; the GUI's sample picker lists its files (set per machine in `local.yaml`) |
+| `chatterbox.voice_ref` | `null` | a file name inside `voices_dir`, or an absolute path, of a 5–15 s WAV to clone; name it `f_…wav` or `m_…wav` so the gender (and name) is inferred. A missing file falls back to the built-in voice with a warning |
 | `chatterbox.exaggeration`, `.cfg_weight` | `0.5`, `0.5` | standard model only |
 | `openai_http.base_url`, `.model`, `.voice` | | any `/v1/audio/speech` server (e.g. Kokoro-FastAPI on :8880) |
 

@@ -12,3 +12,4 @@ logs/
 !tests/fixtures/*.wav
 .pytest_cache/
 .ruff_cache/
+voices/

@@ -419,7 +419,8 @@ const FIELDS = [
  {p:'tts.chatterbox.model', l:'Chatterbox model', h:'turbo: English, fastest. standard: English, adds an expressiveness control. multilingual: 23 languages including Chinese, Japanese, Korean, German, French, Spanish; picks the language of each sentence automatically.', t:'select', o:'chatterbox_models', when:{p:'tts.backend', v:['chatterbox']}},
  {p:'tts.chatterbox.language', l:'Spoken output language', h:'auto: detect from each sentence (Chinese characters, kana, Cyrillic… are recognised directly; Latin-script text is identified statistically). Or fix one language code, e.g. zh.', t:'select', o:'chatterbox_languages', when:{p:'tts.chatterbox.model', v:['multilingual']}},
  {p:'tts.chatterbox.fallback_language', l:'Fallback language', h:'Used when a sentence is too short or ambiguous to identify (numbers, names, single words).', t:'select', o:'chatterbox_languages', when:{p:'tts.chatterbox.model', v:['multilingual']}},
- {p:'tts.chatterbox.voice_ref', l:'Voice sample to clone', h:'Chatterbox has no preset voices; to change the voice, give it a clean 5–15 second WAV recording of the speaker to imitate. Files found in the voices folders are listed; name them f_… or m_… (e.g. m_demo_charles.wav) so the voice gender — and the name it uses — is picked up automatically. Choose “built-in voice” for none.', t:'file', o:'voice_samples', nullable:true, when:{p:'tts.backend', v:['chatterbox']}},
+ {p:'tts.voices_dir', l:'Voices folder', h:'Folder with WAV recordings for voice cloning. Differs per machine; the picker below lists what it finds there. Create the folder and drop 5–15 s recordings in it, named f_… or m_….', t:'text', when:{p:'tts.backend', v:['chatterbox']}},
+ {p:'tts.chatterbox.voice_ref', l:'Voice sample to clone', h:'Chatterbox has no preset voices; to change the voice, give it a clean 5–15 second WAV recording of the speaker to imitate. Choices are the files in the voices folder above; name them f_… or m_… (e.g. m_demo_charles.wav) so the voice gender — and the name it uses — is picked up automatically. Choose “built-in voice” for none.', t:'file', o:'voice_samples', nullable:true, when:{p:'tts.backend', v:['chatterbox']}},
  {p:'tts.chatterbox.exaggeration', l:'Expressiveness', h:'0 = flat, 0.5 = natural, 1 = dramatic. Standard and multilingual models.', t:'number', step:0.05, min:0, max:1, when:{p:'tts.chatterbox.model', v:['standard','multilingual']}},
  {p:'tts.openai_http.base_url', l:'Speech server address', h:'Where the external text-to-speech server is, e.g. http://127.0.0.1:8880/v1 for Kokoro-FastAPI.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
  {p:'tts.openai_http.model', l:'Speech model name', h:'The model identifier that server expects in requests, e.g. kokoro or tts-1. Passed through unchanged.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
@@ -456,6 +457,14 @@ const isUnset = v => v && typeof v==='object' && v.$unset===true;
 const get = (o,p) => p.split('.').reduce((a,k)=> (a && a[k]!==undefined) ? a[k] : undefined, o);
 // value as it will be after saving: pending edit wins over the effective config
 const current = p => (p in dirty) ? (isUnset(dirty[p]) ? get(cfg.defaults||{}, p) : dirty[p]) : get(cfg.effective, p);
+let _voicesTimer=null;
+function refreshVoices(dir){
+  clearTimeout(_voicesTimer);
+  _voicesTimer = setTimeout(async () => {
+    try{ const r = await j('/voices?dir='+encodeURIComponent(dir||'')); const sel=document.querySelector('.field[data-path="tts.chatterbox.voice_ref"] select'); if (sel && sel._fill) sel._fill(r.files);
+      if (dir && !r.exists) toast('Voices folder not found: '+dir, true); }catch(e){}
+  }, 400);
+}
 function refreshVisibility(){
   for (const f of FIELDS){ if(!f.when) continue; const row=document.querySelector(`.field[data-path="${f.p}"]`); if(!row) continue;
     const v = current(f.when.p); row.hidden = !f.when.v.some(x => String(x)===String(v)); }
@@ -502,15 +511,21 @@ function fieldRow(f){
   const ctl=document.createElement('div'); ctl.className='ctl';
   const meta=document.createElement('div'); meta.className='meta';
   let el;
-  const setDirty = v => { dirty[f.p]=v; row.classList.add('dirty'); updateSavebar(); refreshVisibility(); };
+  const setDirty = v => { dirty[f.p]=v; row.classList.add('dirty'); updateSavebar(); refreshVisibility(); if (f.p==='tts.voices_dir') refreshVoices(v); };
   if (f.t==='bool'){ el=document.createElement('button'); el.className='switch'; el.setAttribute('role','switch'); el.setAttribute('aria-checked', String(!!eff)); el.onclick=()=>{ const v=el.getAttribute('aria-checked')!=='true'; el.setAttribute('aria-checked',String(v)); setDirty(v); }; }
   else if (f.t==='select'){ el=document.createElement('select'); const opts=cfg.options[f.o]||[]; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur); el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o)}</option>`).join(''); el.onchange=()=>setDirty(el.value); }
   else if (f.t==='file'){
-    el=document.createElement('select'); const files=(cfg.options[f.o]||[]).slice(); const cur=eff||'';
-    const missing = cur && !files.includes(cur);
-    el.innerHTML = `<option value="">built-in voice (no sample)</option>` + files.map(x=>`<option value="${esc(x)}"${x===cur?' selected':''}>${esc(x.split('/').pop())} <span>— ${esc(x)}</span></option>`).join('') + (missing?`<option value="${esc(cur)}" selected>${esc(cur.split('/').pop())} — FILE NOT FOUND</option>`:'') + `<option value="__custom__">other path…</option>`;
+    el=document.createElement('select'); const cur=eff||'';
+    const fill = files => {
+      const curName = cur.split('/').pop();
+      const known = files.includes(cur) || files.includes(curName);
+      el.innerHTML = `<option value="">built-in voice (no sample)</option>` + files.map(x=>`<option value="${esc(x)}"${(x===cur||x===curName)?' selected':''}>${esc(x)}</option>`).join('')
+        + (cur && !known ? `<option value="${esc(cur)}" selected>${esc(cur)} — NOT FOUND in folder</option>` : '') + `<option value="__custom__">other path…</option>`;
+      if (cur && !known) row.classList.add('dirty');
+    };
+    fill(cfg.options[f.o]||[]);
     el.onchange=()=>{ if(el.value==='__custom__'){ const v=prompt('Path to a WAV file:', cur||''); if(v){ const o=document.createElement('option'); o.value=v; o.textContent=v; el.appendChild(o); el.value=v; setDirty(v);} else el.value=cur; return; } setDirty(el.value===''?null:el.value); };
-    if (missing) row.classList.add('dirty');
+    el.dataset.refill='1'; el._fill = fill;
   }
   else if (f.t==='list'){ el=document.createElement('input'); el.type='text'; el.value=Array.isArray(eff)?eff.join(', '):(eff||''); el.oninput=()=>setDirty(el.value.split(',').map(s=>s.trim()).filter(Boolean)); }
   else if (f.t==='number'){ el=document.createElement('input'); el.type='number'; if(f.step) el.step=f.step; if(f.min!==undefined) el.min=f.min; if(f.max!==undefined) el.max=f.max; el.value=eff??''; el.oninput=()=>{ setDirty(el.value==='' ? UNSET : Number(el.value)); }; }
