@@ -64,7 +64,10 @@ def talk(verbose: bool = typer.Option(False, "-v", "--verbose"), no_api: bool = 
         console.print(f"[{color}]{who}:[/{color}] {text}")
         bus.publish("transcript", who=who, text=text, source="voice")
 
-    va = VoiceAssistant(cfg, on_state=on_state, on_transcript=on_transcript)
+    def on_event(kind, **data):
+        bus.publish(kind, source="voice", **data)
+
+    va = VoiceAssistant(cfg, on_state=on_state, on_transcript=on_transcript, on_event=on_event)
 
     async def main():
         import signal

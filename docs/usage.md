@@ -64,7 +64,8 @@ only.
 appear as expandable chips above the answer with their arguments and results; the model's reasoning
 can be shown with the "Show reasoning" toggle. Destructive actions pause the reply with an
 **Allow / Deny** card. "Speak replies aloud" plays the answer through the speaker. Voice turns you
-say out loud appear in the same log (tagged *voice*), because GUI and microphone share one
+say out loud appear in the same log (tagged *voice*) and stream live, with their tool cards and any
+question asked aloud ("I am about to … Should I go ahead?"), because GUI and microphone share one
 conversation. The header shows the live state (idle, listening, thinking, speaking) and the LLM
 health. Next to the message box, **Listen** starts a voice turn (same as the hotkey); pressed while it is thinking or speaking, it cuts that reply off first. While a reply
 is running the **Send** button turns into **Interrupt**, which stops generation, skips pending tool

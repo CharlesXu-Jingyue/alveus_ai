@@ -20,7 +20,7 @@ another device, tunnel instead of exposing the port: `ssh -L 8765:127.0.0.1:8765
 | `POST /confirm` | `{"id": str, "ok": bool, "password"?: str}` | `{"resolved": bool}` | answer a `confirm` event from `/chat/stream` or `/events`; when the event has `sudo: true`, `password` is the sudo password for that one command |
 | `GET /history` | | `[{role, text, tools:[{name,args,result}]}]` | the shared conversation (voice and GUI turns) |
 | `POST /history/reset` | | `{"reset": true}` | clear the conversation |
-| `GET /events` | | SSE stream | live `state` (idle/listening/thinking/speaking), `transcript {who,text,source}`, `reset`, `config_saved`, `restarting`, `ping` |
+| `GET /events` | | SSE stream | live `state` (idle/listening/thinking/speaking), `transcript {who,text,source}`, `reset`, `config_saved`, `restarting`, `ping`; and the live progress of voice turns (`source: voice`): `assistant_start`, `assistant_delta {text}`, `tool_start {tool,args}`, `tool_result {tool,text}`, `voice_confirm {text}` (question asked aloud), `confirm {id,description,sudo}` (needs `POST /confirm`), then the final `transcript` |
 | `GET /config` | | `{effective, local, local_yaml, options, paths, env, managed_by_systemd, running_profile}` | merged configuration plus the machine overrides and option lists for the GUI |
 | `PUT /config` | `{"patch": {...}}` or `{"yaml": "..."}` | `{saved, local, local_yaml, restart_required}` | deep-merge into `config/local.yaml` (a `null` leaf stores an explicit null, e.g. auto-detect language; a leaf `{"$unset": true}` removes the override so the default applies) or replace the file; validated before writing |
 | `GET /persona` / `PUT /persona` | — / `{"text": str}` | `{text}` / `{saved}` | read/write `config/persona.md` |

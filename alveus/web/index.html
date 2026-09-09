@@ -273,9 +273,18 @@ function connectEvents(){
   es.onmessage = e => {
     const ev = JSON.parse(e.data);
     if (ev.type==='state' && health && health.voice) setState(ev.state);
-    else if (ev.type==='transcript' && ev.source!=='gui') addMessage(ev.who, ev.text, ev.source);
+    else if (ev.source==='gui') { /* our own turns are rendered by send() */ }
+    else if (ev.type==='transcript'){
+      if (ev.who==='assistant' && voice.msg){ voiceFinish(ev.text); }   // final text of the live voice reply
+      else { voice.msg=null; addMessage(ev.who, ev.text, ev.source); }
+    }
+    else if (ev.type==='assistant_start'){ voice.msg=null; voice.text=''; voice.tool=null; }
+    else if (ev.type==='assistant_delta'){ const m=voiceMsg(); voice.text+=ev.text; m.querySelector('.bubble').innerHTML=md(voice.text); m.dataset.text=voice.text; scrollBottom(); }
+    else if (ev.type==='tool_start'){ const m=voiceMsg(); voice.tool=toolCard(ev.tool, ev.args||{}); m.querySelector('.tools').appendChild(voice.tool); scrollBottom(); }
+    else if (ev.type==='tool_result'){ const m=voiceMsg(); const c=voice.tool||toolCard(ev.tool,{}); c.classList.remove('running'); c.querySelector('.st').textContent=/"error"/.test(ev.text)?'error':'done'; c.querySelector('pre').textContent=ev.text; if(!voice.tool) m.querySelector('.tools').appendChild(c); voice.tool=null; scrollBottom(); }
+    else if (ev.type==='voice_confirm'){ const m=voiceMsg(); const c=document.createElement('div'); c.className='confirm done'; c.innerHTML=`<div class="q"><b>Asked aloud:</b> ${esc(ev.text)} <small style="color:var(--muted)">(answer by voice: “yes”, “go ahead”…)</small></div>`; m.insertBefore(c, m.querySelector('.bubble')); scrollBottom(); }
     else if (ev.type==='confirm') { // a voice turn needs a typed sudo password: show the card here
-      const m = addMessage('assistant', '', 'voice'); confirmCard(ev, m, m.querySelector('.bubble')); }
+      const m = voiceMsg(); confirmCard(ev, m, m.querySelector('.bubble')); }
     else if (ev.type==='reset') { clearLog(); }
     else if (ev.type==='restarting') showOverlay('Restarting…');
   };
@@ -285,6 +294,23 @@ function connectEvents(){
 
 // ---------- chat log
 const log=$('log'), logCol=$('logCol');
+// a voice turn streams into one assistant message; if something else (e.g. your spoken "yes")
+// was added after it, the rest of the reply continues in a fresh bubble below
+const voice = {msg:null, text:'', tool:null};
+function voiceMsg(){
+  if (voice.msg && voice.msg === logCol.lastElementChild) return voice.msg;
+  voice.msg = addMessage('assistant', '', 'voice'); voice.text='';
+  const tools=document.createElement('div'); tools.className='tools'; voice.msg.insertBefore(tools, voice.msg.querySelector('.bubble'));
+  voice.msg.querySelector('.bubble').classList.add('cursor');
+  return voice.msg;
+}
+function voiceFinish(finalText){
+  const m=voice.msg; m.querySelector('.bubble').classList.remove('cursor');
+  // the live text is only the part shown in this bubble; keep it unless nothing streamed (older replies)
+  if (!voice.text && finalText){ m.querySelector('.bubble').innerHTML=md(finalText); m.dataset.text=finalText; }
+  else m.dataset.text = finalText || voice.text;
+  voice.msg=null; voice.text=''; voice.tool=null; scrollBottom();
+}
 function clearLog(){ [...logCol.children].forEach(c => { if(c.id!=='empty') c.remove(); }); $('empty').style.display=''; }
 function scrollBottom(){ log.scrollTop = log.scrollHeight; }
 function addMessage(who, text, source){

@@ -41,10 +41,14 @@ class State(StrEnum):
 
 class VoiceAssistant:
     def __init__(self, cfg: DotDict, *, on_state: Callable[[State], None] | None = None,
-                 on_transcript: Callable[[str, str], None] | None = None):
+                 on_transcript: Callable[[str, str], None] | None = None,
+                 on_event: Callable[..., None] | None = None):
         self.cfg = cfg
         self.on_state = on_state or (lambda s: None)
         self.on_transcript = on_transcript or (lambda who, text: None)
+        # live progress of a voice turn for the GUI: assistant_start / assistant_delta / tool_start /
+        # tool_result / voice_confirm (kind, **data)
+        self.on_event = on_event or (lambda kind, **data: None)
         self.state = State.IDLE
         self.trigger = Trigger()
         self.stop_flag = False
@@ -147,6 +151,11 @@ class VoiceAssistant:
         follow_up_until = 0.0
         try:
             while not self.stop_flag:
+                if self.agent is not None and self.agent.lock.locked():
+                    # a GUI/API turn is running: leave the microphone to it (spoken confirmations)
+                    # and do not treat its own speech as a wake name; the hotkey still interrupts
+                    await asyncio.sleep(0.1)
+                    continue
                 frame = await loop.run_in_executor(self._pool, self.audio_in.read, 0.2)
                 command: str | None = None
                 explicit = self.trigger.take()  # hotkey / API trigger
@@ -268,19 +277,26 @@ class VoiceAssistant:
                                 on_speaking=lambda: self._set(State.SPEAKING))
         speaker.start()
         self.speaker = speaker   # /stop aborts it
+        self.on_event("assistant_start")
         try:
             async with self.agent.lock:
                 async for ev in self.agent.run(text):
                     if ev.kind == "content":
                         reply_parts.append(ev.text)
+                        self.on_event("assistant_delta", text=ev.text)
                         await speaker.feed(ev.text)
+                    elif ev.kind == "tool_start":
+                        self.on_event("tool_start", tool=ev.tool, args=ev.args)
                     elif ev.kind == "tool_result":
                         log.info("tool %s -> %s", ev.tool, ev.text[:160].replace("\n", " "))
+                        self.on_event("tool_result", tool=ev.tool, text=ev.text)
                     elif ev.kind == "error":
                         reply_parts.append(" " + ev.text)
+                        self.on_event("assistant_delta", text=" " + ev.text)
                         await speaker.say(ev.text)
                     elif ev.kind == "interrupted":
                         speaker.abort()
+                        self.on_event("assistant_delta", text=" [interrupted]")
         finally:
             await speaker.finish()
             self.speaker = None
@@ -316,12 +332,14 @@ class VoiceAssistant:
         gui = getattr(self, "gui_confirm", None)
         if description.startswith("[sudo]") and gui is not None:
             note = "This needs your administrator password. Please allow it in the browser."
+            self.on_event("voice_confirm", text=note)
             audio = await loop.run_in_executor(self._pool, self.tts.synthesize, speakable(note))
             self._set(State.SPEAKING)
             self.audio_out.play(audio, self.tts.sample_rate)
             self._set(State.THINKING)
             return await gui(description)
         prompt = f"I am about to {description.removeprefix('[sudo] ')}. Should I go ahead?"
+        self.on_event("voice_confirm", text=prompt)
         audio = await loop.run_in_executor(self._pool, self.tts.synthesize, speakable(prompt))
         self._set(State.SPEAKING)
         self.audio_out.play(audio, self.tts.sample_rate)

@@ -237,13 +237,13 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
     async def chat(inp: ChatIn) -> dict[str, Any]:
         if inp.reset:
             assistant.agent.reset()
+        bus.publish("transcript", who="user", text=inp.text, source="api")
         if inp.speak and hasattr(assistant, "respond"):
-            reply = await assistant.respond(inp.text)
+            reply = await assistant.respond(inp.text)   # same path as a spoken request; publishes live events
         else:
             async with assistant.agent.lock:
                 reply = await assistant.agent.ask(inp.text)
-        bus.publish("transcript", who="user", text=inp.text, source="api")
-        bus.publish("transcript", who="assistant", text=reply, source="api")
+            bus.publish("transcript", who="assistant", text=reply, source="api")
         return {"reply": reply}
 
     @app.post("/chat/stream")
