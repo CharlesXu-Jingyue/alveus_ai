@@ -88,25 +88,32 @@ class ConfirmBroker:
         self.pending: dict[str, asyncio.Future] = {}
 
     def make_confirmer(self, emit: Callable[[dict[str, Any]], Awaitable[None]], timeout: float = 120.0):
-        async def confirm(description: str) -> bool:
+        async def confirm(description: str) -> dict[str, Any]:
             cid = uuid.uuid4().hex[:10]
             fut: asyncio.Future = asyncio.get_running_loop().create_future()
             self.pending[cid] = fut
-            await emit({"type": "confirm", "id": cid, "description": description})
+            needs_password = description.startswith("[sudo]")
+            await emit({"type": "confirm", "id": cid, "description": description, "sudo": needs_password})
             try:
-                return bool(await asyncio.wait_for(fut, timeout))
+                return await asyncio.wait_for(fut, timeout)
             except TimeoutError:
-                return False
+                return {"ok": False}
             finally:
                 self.pending.pop(cid, None)
         return confirm
 
-    def resolve(self, cid: str, ok: bool) -> bool:
+    def resolve(self, cid: str, ok: bool, password: str | None = None) -> bool:
         fut = self.pending.get(cid)
         if fut is None or fut.done():
             return False
-        fut.set_result(ok)
+        # the password lives only in this future until the tool call consumes it; never logged
+        fut.set_result({"ok": ok, "sudo_password": password or ""})
         return True
+
+    def cancel_all(self) -> None:
+        for fut in list(self.pending.values()):
+            if not fut.done():
+                fut.set_result({"ok": False})
 
 
 def _sse(ev: dict[str, Any]) -> str:
@@ -129,6 +136,7 @@ class SpeakIn(BaseModel):
 class ConfirmIn(BaseModel):
     id: str
     ok: bool
+    password: str | None = None   # sudo password for an "allow once"; used for that one command only
 
 
 class ConfigIn(BaseModel):
@@ -159,6 +167,11 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
     @app.on_event("startup")
     async def _bind() -> None:
         bus.bind(asyncio.get_running_loop())
+
+    # voice turns that need a sudo password cannot take it by ear: the voice loop asks the browser instead
+    async def _bus_emit(ev: dict[str, Any]) -> None:
+        bus.publish("confirm", **{k: v for k, v in ev.items() if k != "type"})
+    assistant.gui_confirm = broker.make_confirmer(_bus_emit)
 
     # ---- GUI
     @app.get("/", include_in_schema=False)
@@ -276,6 +289,10 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                         elif ev.kind == "error":
                             parts.append(" " + ev.text)
                             await emit({"type": "error", "text": ev.text})
+                        elif ev.kind == "interrupted":
+                            if speaker:
+                                speaker.abort()
+                            await emit({"type": "interrupted"})
                 reply = "".join(parts).strip()
                 bus.publish("transcript", who="assistant", text=reply, source="gui")
                 if speaker:
@@ -307,7 +324,17 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
 
     @app.post("/confirm")
     async def confirm(inp: ConfirmIn) -> dict[str, bool]:
-        return {"resolved": broker.resolve(inp.id, inp.ok)}
+        return {"resolved": broker.resolve(inp.id, inp.ok, inp.password)}
+
+    @app.post("/interrupt")
+    async def interrupt() -> dict[str, bool]:
+        """Abort the current turn: stop generating, skip pending tool calls, cut speech, deny open confirmations."""
+        if assistant.agent is not None:
+            assistant.agent.interrupt()
+        broker.cancel_all()
+        if has_voice:
+            assistant.audio_out.stop()
+        return {"interrupted": True}
 
     # ---- speech
     @app.post("/speak")

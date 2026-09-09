@@ -18,7 +18,8 @@ from .mcp_client import ToolHub
 
 log = logging.getLogger(__name__)
 
-ConfirmFn = Callable[[str], Awaitable[bool]]
+# confirm(description) -> bool, or {"ok": bool, "sudo_password": str} when the action needs sudo
+ConfirmFn = Callable[[str], Awaitable[Any]]
 
 
 def voice_is_female(cfg) -> bool:
@@ -65,6 +66,8 @@ class AgentEvent:
     data: dict[str, Any] = field(default_factory=dict)
 
 
+# any command that escalates privileges is confirmed by the user ("allow once")
+_SUDO = re.compile(r"(^|[;&|(]\s*)sudo\s", re.IGNORECASE)
 _DESTRUCTIVE_SHELL = re.compile(
     r"(^|[;&|]\s*)(sudo\s+)?(rm\s|rmdir\s|shred\s|mkfs|dd\s|kill(all)?\s|pkill\s|shutdown|reboot|poweroff|"
     r"systemctl\s+(stop|disable|poweroff|reboot|halt)|git\s+(push\s+--force|reset\s+--hard|clean\s+-f)|"
@@ -95,6 +98,11 @@ class Agent:
         self.system_prompt = self._build_system_prompt()
         # one conversation at a time (voice loop, GUI and API share the history)
         self.lock = asyncio.Lock()
+        self._interrupted = False
+
+    def interrupt(self) -> None:
+        """Stop the current turn as soon as possible (checked between chunks and tool calls)."""
+        self._interrupted = True
 
     # ------------------------------------------------------------------ prompt
     def _build_system_prompt(self) -> str:
@@ -142,6 +150,7 @@ class Agent:
         """Stream events for one user turn. ``confirm`` overrides the default confirmer."""
         confirm = confirm or self.confirm
         self._declined_this_turn = False
+        self._interrupted = False
         self.history.append({"role": "user", "content": user_text})
         self._trim()
         tools = self.hub.openai_tools() if self.hub else None
@@ -152,7 +161,11 @@ class Agent:
             content_parts: list[str] = []
             tool_calls: list[dict[str, Any]] = []
             try:
-                async for ev in self.llm.stream(messages, tools, thinking=th):
+                stream = self.llm.stream(messages, tools, thinking=th)
+                async for ev in stream:
+                    if self._interrupted:
+                        await stream.aclose()
+                        break
                     if ev.kind == "content":
                         content_parts.append(ev.text)
                         yield AgentEvent("content", text=ev.text)
@@ -169,6 +182,10 @@ class Agent:
                 return
 
             content = "".join(content_parts)
+            if self._interrupted:
+                self.history.append({"role": "assistant", "content": content + " [interrupted by the user]"})
+                yield AgentEvent("interrupted", text="Interrupted.")
+                return
             if not tool_calls:
                 self.history.append({"role": "assistant", "content": content})
                 return
@@ -193,9 +210,15 @@ class Agent:
                 except json.JSONDecodeError:
                     shown_args = {"_raw": tc["arguments"]}
                 yield AgentEvent("tool_start", tool=tc["name"], args=shown_args if isinstance(shown_args, dict) else {})
-                result = await self._execute(tc, confirm)
+                if self._interrupted:
+                    result = json.dumps({"cancelled": True, "message": "Interrupted by the user before running."})
+                else:
+                    result = await self._execute(tc, confirm)
                 self.history.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
                 yield AgentEvent("tool_result", tool=tc["name"], text=result[:2000])
+            if self._interrupted:
+                yield AgentEvent("interrupted", text="Interrupted.")
+                return
 
     async def _execute(self, tc: dict[str, Any], confirm: ConfirmFn | None) -> str:
         name, raw_args = tc["name"], tc["arguments"]
@@ -209,20 +232,34 @@ class Agent:
         if info is None:
             return json.dumps({"error": f"unknown tool {name}"})
 
-        if self.confirm_destructive and self._is_destructive(info, args):
+        # credentials only ever come from the user's confirmation, never from the model
+        args.pop("sudo_password", None)
+        sudo = self._needs_sudo(info, args)
+        if sudo or (self.confirm_destructive and self._is_destructive(info, args)):
             if confirm is None:
-                return json.dumps({"cancelled": True, "message": "Destructive action needs user confirmation, "
+                return json.dumps({"cancelled": True, "message": "This action needs user confirmation, "
                                    "but no confirmation channel is available here."})
             if getattr(self, "_declined_this_turn", False):
-                return json.dumps({"cancelled": True, "message": "The user already declined a destructive action "
+                return json.dumps({"cancelled": True, "message": "The user already declined an action "
                                    "in this request. Do not retry or work around it; report that it was cancelled."})
             desc = f"{info.name.replace('_', ' ')} with {json.dumps(args)[:200]}"
-            ok = await confirm(desc)
+            if sudo:
+                desc = "[sudo] " + desc
+            ans = await confirm(desc)
+            ok = ans.get("ok") if isinstance(ans, dict) else bool(ans)
             if not ok:
                 self._declined_this_turn = True
                 return json.dumps({"cancelled": True, "message": "The user declined this action. Do not retry it "
                                    "or attempt it another way; tell the user it was cancelled."})
+            if sudo and isinstance(ans, dict) and ans.get("sudo_password"):
+                args["sudo_password"] = ans["sudo_password"]
         return await self.hub.call(name, args)
+
+    @staticmethod
+    def _needs_sudo(info, args: dict[str, Any]) -> bool:
+        if info.name in ("run_command", "shell", "bash"):
+            return bool(_SUDO.search(str(args.get("command") or args.get("cmd") or "")))
+        return False
 
     @staticmethod
     def _is_destructive(info, args: dict[str, Any]) -> bool:

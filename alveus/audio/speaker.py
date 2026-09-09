@@ -37,6 +37,7 @@ class StreamSpeaker:
         self._t0 = time.monotonic()
         self.first_audio_s: float | None = None
         self.sentences = 0
+        self._aborted = False
 
     # ---------------------------------------------------------------- lifecycle
     def start(self) -> None:
@@ -50,6 +51,17 @@ class StreamSpeaker:
             for s in self._sb.feed(text):
                 await self._q.put(s)
 
+    def abort(self) -> None:
+        """Interrupted: drop what has not been spoken yet and cut playback."""
+        self._aborted = True
+        self._sb = SentenceBuffer()
+        while not self._q.empty():
+            try:
+                self._q.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        self.audio_out.stop()
+
     async def say(self, text: str) -> None:
         """Speak an out-of-band sentence (e.g. an error) right away."""
         await self._q.put(text)
@@ -58,7 +70,9 @@ class StreamSpeaker:
         """Generation is over: flush the rest and wait until everything has been synthesized
         and handed to the player (playback itself may still be running)."""
         gen_s = time.monotonic() - self._t0
-        if self.streaming:
+        if self._aborted:
+            pass
+        elif self.streaming:
             for s in self._sb.flush():
                 await self._q.put(s)
         else:
@@ -79,7 +93,7 @@ class StreamSpeaker:
             if s is None:
                 return
             s = speakable(s)
-            if not s:
+            if not s or self._aborted:
                 continue
             try:
                 audio = await loop.run_in_executor(self.pool, self.tts.synthesize, s)

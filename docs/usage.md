@@ -65,8 +65,18 @@ appear as expandable chips above the answer with their arguments and results; th
 can be shown with the "Show reasoning" toggle. Destructive actions pause the reply with an
 **Allow / Deny** card. "Speak replies aloud" plays the answer through the speaker. Voice turns you
 say out loud appear in the same log (tagged *voice*), because GUI and microphone share one
-conversation. The header shows the live state (idle, listening, thinking, speaking), the LLM
-health, a **Listen** button (same as the hotkey) and **Stop** (interrupt speech).
+conversation. The header shows the live state (idle, listening, thinking, speaking) and the LLM
+health. Next to the message box, **Listen** starts a voice turn (same as the hotkey). While a reply
+is running the **Send** button turns into **Interrupt**, which stops generation, skips pending tool
+calls, cuts speech and denies any open confirmation. Under each answer: **Copy**, **Speak** (say it
+again), **Stop** (stop speaking) and **Retry** (ask the same question again).
+
+**Commands that need sudo.** Any shell command using `sudo` is held until you allow it. The
+confirmation card shows a password field: enter your password and press **Allow once**. The
+password is handed to that one `sudo` on its standard input and is neither stored nor logged (it
+travels only over the local loopback connection to the assistant process). Leave the field empty
+if your account has passwordless sudo. A voice request that needs sudo says so aloud and shows the
+same card in the browser, since a password cannot be spoken.
 
 **Settings tab.** A form over every commonly changed option (names, model profile, speech engines and
 voice, activation mode and names, hotkey, VAD timing, chimes, tool safety, log level). Each row shows

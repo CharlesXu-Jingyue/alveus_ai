@@ -177,8 +177,6 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
   <div class="tabs" role="tablist"><button id="tabChat" class="active" role="tab" aria-selected="true">Chat</button><button id="tabSettings" role="tab" aria-selected="false">Settings</button></div>
   <div class="actions">
     <span class="llm" id="llm"><span class="dot"></span><span id="llmText">LLM</span></span>
-    <button class="btn" id="btnListen" title="Start listening now (same as the hotkey)">● Listen</button>
-    <button class="btn" id="btnStop" title="Stop speaking">■ Stop</button>
   </div>
 </header>
 
@@ -192,6 +190,7 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
     <div class="composer"><div class="col">
       <div class="box">
         <textarea id="input" rows="1" placeholder="Ask anything, or tell it what to do… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <button class="btn" id="btnListen" title="Start listening now (same as the hotkey)">● Listen</button>
         <button class="btn primary" id="send">Send</button>
       </div>
       <div class="row">
@@ -255,7 +254,7 @@ async function refreshHealth(){
     $('llmText').title = health.ok ? health.llm : (health.llm_service?.last_error || health.llm);
     $('toolCount').textContent = `${health.tools} tools`;
     if (health.tts_warning && !window._ttsWarned){ window._ttsWarned=true; toast(health.tts_warning, true); }
-    $('btnListen').disabled = !health.voice; $('btnStop').disabled = !health.voice;
+    $('btnListen').disabled = !health.voice;
     if (!health.voice) setState('text-only');
     return true;
   }catch(e){ setState('offline'); return false; }
@@ -273,6 +272,8 @@ function connectEvents(){
     const ev = JSON.parse(e.data);
     if (ev.type==='state' && health && health.voice) setState(ev.state);
     else if (ev.type==='transcript' && ev.source!=='gui') addMessage(ev.who, ev.text, ev.source);
+    else if (ev.type==='confirm') { // a voice turn needs a typed sudo password: show the card here
+      const m = addMessage('assistant', '', 'voice'); confirmCard(ev, m, m.querySelector('.bubble')); }
     else if (ev.type==='reset') { clearLog(); }
     else if (ev.type==='restarting') showOverlay('Restarting…');
   };
@@ -293,11 +294,13 @@ function addMessage(who, text, source){
 }
 function actionBar(m){
   const bar=document.createElement('div'); bar.className='acts';
-  bar.innerHTML = `<button data-a="copy" title="Copy reply text">⧉ Copy</button><button data-a="speak" title="Say this reply again" ${health&&!health.voice?'disabled':''}>▶ Speak</button><button data-a="retry" title="Ask the same question again">↻ Retry</button>`;
+  const nv = health&&!health.voice ? 'disabled' : '';
+  bar.innerHTML = `<button data-a="copy" title="Copy reply text">⧉ Copy</button><button data-a="speak" title="Say this reply again" ${nv}>▶ Speak</button><button data-a="stop" title="Stop speaking" ${nv}>■ Stop</button><button data-a="retry" title="Ask the same question again">↻ Retry</button>`;
   bar.onclick = async e => {
     const b=e.target.closest('button'); if(!b) return; const a=b.dataset.a; const text=m.dataset.text||'';
     if (a==='copy'){ try{ await navigator.clipboard.writeText(text); toast('Copied'); }catch{ toast('Copy failed (clipboard blocked)', true);} }
     else if (a==='speak'){ if(!text) return; b.disabled=true; try{ await j('/speak',{method:'POST', body:JSON.stringify({text, play:true})}); }catch(err){ toast(err.message,true);} b.disabled=false; }
+    else if (a==='stop'){ try{ await j('/stop',{method:'POST'}); }catch(err){ toast(err.message,true);} }
     else if (a==='retry'){ if(busy) return; retryLast(m); }
   };
   return bar;
@@ -334,7 +337,7 @@ async function loadHistory(){
 let busy=false;
 async function send(text, opts={}){
   text = (text||'').trim(); if((!text && !opts.retry)||busy) return;
-  busy=true; $('send').disabled=true; $('input').value=''; autosize();
+  busy=true; setSendMode(true); $('input').value=''; autosize();
   let userMsg = opts.retry ? addMessage('user', '…') : addMessage('user', text);
   const m = addMessage('assistant', ''); const bubble=m.querySelector('.bubble'); bubble.classList.add('cursor');
   const tools=document.createElement('div'); tools.className='tools'; m.insertBefore(tools, bubble);
@@ -357,29 +360,36 @@ async function send(text, opts={}){
         else if (ev.type==='tool_result'){ const c = pendingTool || toolCard(ev.tool,{}); c.classList.remove('running'); c.querySelector('.st').textContent = /"error"/.test(ev.text)?'error':'done'; c.querySelector('pre').textContent = ev.text; if(!pendingTool) tools.appendChild(c); pendingTool=null; }
         else if (ev.type==='confirm'){ confirmCard(ev, m, bubble); }
         else if (ev.type==='error'){ const e=document.createElement('div'); e.className='err'; e.textContent=ev.text; m.insertBefore(e, bubble); }
+        else if (ev.type==='interrupted'){ full += (full?' ':'') ; bubble.innerHTML = md(full) + '<div style="color:var(--muted);font-size:12.5px;margin-top:4px">■ interrupted</div>'; }
         else if (ev.type==='done'){ if(!full && !ev.reply) bubble.innerHTML='<span style="color:var(--muted)">(no reply)</span>'; m.dataset.text = ev.reply || full; }
         scrollBottom();
       }
     }
   }catch(e){ const el=document.createElement('div'); el.className='err'; el.textContent='Request failed: '+e.message; m.insertBefore(el,bubble); }
-  bubble.classList.remove('cursor'); busy=false; $('send').disabled=false; $('input').focus();
+  bubble.classList.remove('cursor'); busy=false; setSendMode(false); $('input').focus();
 }
+// while a reply is running the Send button becomes Interrupt
+function setSendMode(running){ const b=$('send'); b.textContent = running ? '■ Interrupt' : 'Send'; b.classList.toggle('primary', !running); b.classList.toggle('danger', running); b.title = running ? 'Stop this reply: stop generating, skip pending actions, cut speech' : ''; }
+async function interrupt(){ try{ await j('/interrupt',{method:'POST'}); }catch(e){ toast(e.message,true);} }
 function confirmCard(ev, m, bubble){
   const c=document.createElement('div'); c.className='confirm';
-  c.innerHTML = `<div class="q"><b>Confirm:</b> ${name} wants to <code>${esc(ev.description)}</code></div><button class="btn danger">Allow</button><button class="btn">Deny</button>`;
-  const [allow, deny] = c.querySelectorAll('button');
-  const answer = ok => { j('/confirm',{method:'POST', body:JSON.stringify({id:ev.id, ok})}); c.classList.add('done'); allow.disabled=deny.disabled=true; c.querySelector('.q').innerHTML += ok?' — <b>allowed</b>':' — denied'; };
+  const desc = String(ev.description||'').replace(/^\[sudo\]\s*/, '');
+  c.innerHTML = ev.sudo
+    ? `<div class="q"><b>Administrator rights:</b> ${name} wants to <code>${esc(desc)}</code><br><small style="color:var(--muted)">This runs with sudo. Enter your password to allow it once; it is used for this command only and never stored. Leave it empty if your account has passwordless sudo.</small></div><input type="password" autocomplete="current-password" placeholder="sudo password" style="min-width:160px"><button class="btn danger">Allow once</button><button class="btn">Deny</button>`
+    : `<div class="q"><b>Confirm:</b> ${name} wants to <code>${esc(desc)}</code></div><button class="btn danger">Allow</button><button class="btn">Deny</button>`;
+  const [allow, deny] = c.querySelectorAll('button'); const pw = c.querySelector('input');
+  const answer = ok => { const body={id:ev.id, ok}; if (ok && pw) body.password = pw.value; if (pw) pw.value=''; j('/confirm',{method:'POST', body:JSON.stringify(body)}); c.classList.add('done'); allow.disabled=deny.disabled=true; if(pw) pw.disabled=true; c.querySelector('.q').innerHTML += ok?' — <b>allowed</b>':' — denied'; };
   allow.onclick=()=>answer(true); deny.onclick=()=>answer(false);
+  if (pw){ pw.addEventListener('keydown', e => { if(e.key==='Enter') answer(true); }); setTimeout(()=>pw.focus(), 50); }
   m.insertBefore(c, bubble); scrollBottom();
 }
 const input=$('input');
 function autosize(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,180)+'px'; }
 input.addEventListener('input', autosize);
 input.addEventListener('keydown', e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(input.value); } });
-$('send').onclick = () => send(input.value);
+$('send').onclick = () => busy ? interrupt() : send(input.value);
 $('resetChat').onclick = async e => { e.preventDefault(); await j('/history/reset',{method:'POST'}); clearLog(); toast('Conversation cleared'); };
 $('btnListen').onclick = async () => { try{ await j('/trigger',{method:'POST'}); toast('Listening…'); }catch(e){ toast(e.message,true);} };
-$('btnStop').onclick = async () => { try{ await j('/stop',{method:'POST'}); }catch(e){ toast(e.message,true);} };
 const EXAMPLES = ["What's my GPU temperature?", "How much disk space is left?", "What's the weather in Boston?", "Set the volume to 40 percent", "List the files in my repo folder", "Open Firefox"];
 $('examples').innerHTML = EXAMPLES.map(x=>`<button>${esc(x)}</button>`).join('');
 $('examples').querySelectorAll('button').forEach(b => b.onclick = () => send(b.textContent));

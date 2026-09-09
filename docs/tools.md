@@ -8,6 +8,11 @@ servers are also supported). Tools are shown to the model as `server__tool` and 
 `alveus tools` prints the live list. Destructive tools (marked **!** below) require confirmation
 when `tools.confirm_destructive` is on. `run_command` is additionally screened by a regex for
 dangerous shell commands (`rm`, `kill`, `shutdown`, `dd`, `mkfs`, `git push --force`, …).
+Any `run_command` that uses `sudo` always asks (regardless of `confirm_destructive`): the GUI card
+takes the password for an "allow once", passes it to the tool as `sudo_password`, and the tool
+rewrites the first `sudo` to `sudo -S -p ''` fed from stdin. The model cannot supply that argument
+itself (it is stripped before the confirmation) and the password never enters the conversation
+history or logs.
 
 ## `files` — `mcp_servers/files_shell.py`
 

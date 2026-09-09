@@ -14,9 +14,10 @@ another device, tunnel instead of exposing the port: `ssh -L 8765:127.0.0.1:8765
 | `POST /transcribe` | multipart `file=@audio.wav` | `{"text": str}` | any sample rate/channels; resampled to 16 kHz mono |
 | `POST /trigger` | | `{"triggered": bool}` | start listening now (equivalent to the hotkey); `false` in `alveus api` mode |
 | `POST /stop` | | `{"stopped": true}` | stop current speech output and drop the queue |
+| `POST /interrupt` | | `{"interrupted": true}` | abort the running turn (voice or GUI): stop generating, skip pending tool calls, cut speech, deny open confirmations; the stream then emits `interrupted` and `done` |
 | `GET /` | | HTML | the browser GUI (chat + settings) |
-| `POST /chat/stream` | `{"text": str, "speak": bool=false, "reset": bool=false}` | SSE stream | events: `reasoning`, `content`, `tool_start {tool,args}`, `tool_result {tool,text}`, `confirm {id,description}`, `error`, `done {reply}`. Destructive tools wait for `POST /confirm` (120 s, then denied) |
-| `POST /confirm` | `{"id": str, "ok": bool}` | `{"resolved": bool}` | answer a `confirm` event from `/chat/stream` |
+| `POST /chat/stream` | `{"text": str, "speak": bool=false, "reset": bool=false}` | SSE stream | events: `reasoning`, `content`, `tool_start {tool,args}`, `tool_result {tool,text}`, `confirm {id,description,sudo}`, `interrupted`, `error`, `done {reply}`. Destructive and sudo tools wait for `POST /confirm` (120 s, then denied) |
+| `POST /confirm` | `{"id": str, "ok": bool, "password"?: str}` | `{"resolved": bool}` | answer a `confirm` event from `/chat/stream` or `/events`; when the event has `sudo: true`, `password` is the sudo password for that one command |
 | `GET /history` | | `[{role, text, tools:[{name,args,result}]}]` | the shared conversation (voice and GUI turns) |
 | `POST /history/reset` | | `{"reset": true}` | clear the conversation |
 | `GET /events` | | SSE stream | live `state` (idle/listening/thinking/speaking), `transcript {who,text,source}`, `reset`, `config_saved`, `restarting`, `ping` |

@@ -256,6 +256,8 @@ class VoiceAssistant:
                     elif ev.kind == "error":
                         reply_parts.append(" " + ev.text)
                         await speaker.say(ev.text)
+                    elif ev.kind == "interrupted":
+                        speaker.abort()
         finally:
             await speaker.finish()
         reply = "".join(reply_parts).strip()
@@ -282,10 +284,19 @@ class VoiceAssistant:
                 self.trigger.fire()
                 break
 
-    async def _confirm(self, description: str) -> bool:
-        """Spoken confirmation for destructive tool calls."""
+    async def _confirm(self, description: str):
+        """Spoken confirmation for destructive tool calls. A sudo command needs a typed password, so it
+        is handed to the browser GUI (set by the API layer) and the user is told to look there."""
         loop = asyncio.get_running_loop()
-        prompt = f"I am about to {description}. Should I go ahead?"
+        gui = getattr(self, "gui_confirm", None)
+        if description.startswith("[sudo]") and gui is not None:
+            note = "This needs your administrator password. Please allow it in the browser."
+            audio = await loop.run_in_executor(self._pool, self.tts.synthesize, speakable(note))
+            self._set(State.SPEAKING)
+            self.audio_out.play(audio, self.tts.sample_rate)
+            self._set(State.THINKING)
+            return await gui(description)
+        prompt = f"I am about to {description.removeprefix('[sudo] ')}. Should I go ahead?"
         audio = await loop.run_in_executor(self._pool, self.tts.synthesize, speakable(prompt))
         self._set(State.SPEAKING)
         self.audio_out.play(audio, self.tts.sample_rate)

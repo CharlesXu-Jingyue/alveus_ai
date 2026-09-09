@@ -13,6 +13,17 @@ ROOTS = [Path(os.path.expanduser(p)).resolve() for p in os.environ.get("ALVEUS_F
 MAX_READ = 60_000
 
 
+_SUDO_FIRST = re.compile(r"(^|[;&|(]\s*)sudo\s+(?!-S\b)")
+
+
+def with_sudo_password(command: str, password: str) -> tuple[str, str | None]:
+    """Make the first sudo in ``command`` read the password from stdin (``sudo -S -p ''``).
+    Later sudo calls in the same command line are covered by sudo's credential cache."""
+    if not password or not _SUDO_FIRST.search(command):
+        return command, None
+    return _SUDO_FIRST.sub(r"\1sudo -S -p '' ", command, count=1), password + "\n"
+
+
 def _safe(path: str) -> Path:
     p = Path(os.path.expanduser(path)).resolve()
     if not any(p == r or r in p.parents for r in ROOTS):
@@ -120,10 +131,15 @@ def delete_path(path: str) -> str:
 
 
 @mcp.tool()
-def run_command(command: str, cwd: str = "~", timeout_s: int = 60) -> str:
-    """Run a shell command (bash) and return its output. Destructive commands require confirmation."""
+def run_command(command: str, cwd: str = "~", timeout_s: int = 60, sudo_password: str = "") -> str:
+    """Run a shell command (bash) and return its output. Destructive commands require confirmation.
+    Commands may use sudo: the user is asked to allow it once and types the password themselves,
+    so never ask for a password in chat and always leave sudo_password empty."""
     c = _safe(cwd)
-    res = run(command, timeout=timeout_s, shell=True, cwd=str(c))
+    command, input_text = with_sudo_password(command, sudo_password)
+    res = run(command, timeout=timeout_s, shell=True, cwd=str(c), input_text=input_text)
+    if input_text and res.get("exit_code") not in (0, None) and "incorrect password" in (res.get("stderr") or "").lower():
+        res["error"] = "sudo rejected the password; ask the user to allow the action again"
     return j(res)
 
 
