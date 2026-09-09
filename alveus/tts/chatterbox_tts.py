@@ -50,6 +50,22 @@ class ChatterboxTTS:
 
     def synthesize(self, text: str) -> np.ndarray:
         self.load()
+        if self.variant == "multilingual" and self.language == "auto":
+            # Mixed-language text: voice each sentence in its own language.
+            from ..agent.sentences import SentenceBuffer
+
+            sb = SentenceBuffer(min_chars=1)
+            parts = sb.feed(text) + sb.flush()
+            if len(parts) > 1:
+                gap = np.zeros(int(0.12 * self.sample_rate), dtype=np.float32)
+                clips: list[np.ndarray] = []
+                for part in parts:
+                    clips.append(self._synth_one(part))
+                    clips.append(gap)
+                return np.concatenate(clips[:-1]) if clips else np.zeros(0, dtype=np.float32)
+        return self._synth_one(text)
+
+    def _synth_one(self, text: str) -> np.ndarray:
         kw: dict = {}
         if self.voice_ref:
             kw["audio_prompt_path"] = self.voice_ref
