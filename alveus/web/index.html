@@ -177,6 +177,7 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
   <div class="tabs" role="tablist"><button id="tabChat" class="active" role="tab" aria-selected="true">Chat</button><button id="tabSettings" role="tab" aria-selected="false">Settings</button></div>
   <div class="actions">
     <span class="llm" id="llm"><span class="dot"></span><span id="llmText">LLM</span></span>
+    <button class="btn" id="btnStop" title="Stop speaking">■ Stop</button>
     <button class="btn" id="btnRestart" title="Restart the assistant service (models reload, conversation is cleared; the LLM server keeps running)" hidden>↻ Restart</button>
   </div>
 </header>
@@ -255,7 +256,7 @@ async function refreshHealth(){
     $('llmText').title = health.ok ? health.llm : (health.llm_service?.last_error || health.llm);
     $('toolCount').textContent = `${health.tools} tools`;
     if (health.tts_warning && !window._ttsWarned){ window._ttsWarned=true; toast(health.tts_warning, true); }
-    $('btnListen').disabled = !health.voice; $('btnRestart').hidden = !health.managed_by_systemd;
+    $('btnListen').disabled = !health.voice; $('btnStop').disabled = !health.voice; $('btnRestart').hidden = !health.managed_by_systemd;
     if (!health.voice) setState('text-only');
     return true;
   }catch(e){ setState('offline'); return false; }
@@ -591,6 +592,7 @@ async function doRestart(what){
   showOverlay(what==='both'?'Restarting LLM server and assistant…':'Restarting assistant…');
 }
 $('restartA').onclick=()=>doRestart('assistant'); $('restartB').onclick=()=>doRestart('both');
+$('btnStop').onclick = async () => { try{ await j('/stop',{method:'POST'}); }catch(e){ toast(e.message,true);} };
 $('btnRestart').onclick=()=>{ if (confirm('Restart the assistant now? Speech models reload (about 20 s) and the current conversation is cleared.')) doRestart('assistant'); };
 function showOverlay(title){ $('ovTitle').textContent=title; $('overlay').classList.add('show'); restartKind=null; if(es) es.close();
   let tries=0; const poll = async () => { tries++; try{ const h = await j('/health'); if (h && h.tools!==undefined){
