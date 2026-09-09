@@ -22,16 +22,28 @@ ConfirmFn = Callable[[str], Awaitable[bool]]
 
 
 def voice_is_female(cfg) -> bool:
+    """Infer the voice's gender from config.
+
+    auto:  kokoro     -> voice name prefix (af_/bf_ female, am_/bm_ male)
+           chatterbox -> the cloned sample's file name must start with f_ or m_
+                         (e.g. f_charles_demo.wav); no sample / other name -> not female
+           openai_http-> Kokoro-style voice name prefix if present
+    """
     g = str(cfg.tts.get("voice_gender", "auto")).lower()
     if g in ("female", "f"):
         return True
     if g in ("male", "m"):
         return False
     backend = cfg.tts.get("backend", "kokoro")
+    female_prefixes = ("af_", "bf_", "ef_", "ff_", "hf_", "if_", "jf_", "pf_", "zf_")
     if backend == "kokoro":
-        return str((cfg.tts.get("kokoro") or {}).get("voice", "af_heart")).lower().startswith(("af_", "bf_", "ef_", "ff_", "hf_", "if_", "jf_", "pf_", "zf_"))
+        return str((cfg.tts.get("kokoro") or {}).get("voice", "af_heart")).lower().startswith(female_prefixes)
+    if backend == "chatterbox":
+        ref = (cfg.tts.get("chatterbox") or {}).get("voice_ref") or ""
+        stem = Path(str(ref)).name.lower()
+        return stem.startswith("f_")
     if backend == "openai_http":
-        return str((cfg.tts.get("openai_http") or {}).get("voice", "")).lower().startswith(("af_", "bf_"))
+        return str((cfg.tts.get("openai_http") or {}).get("voice", "")).lower().startswith(female_prefixes)
     return False
 
 

@@ -78,7 +78,8 @@ stt:
 tts:
   backend: kokoro                # kokoro | chatterbox | openai_http
   device: cuda
-  # auto = infer from the Kokoro voice prefix (af_/bf_ female, am_/bm_ male); or female | male
+  # auto = infer from the voice: Kokoro voice prefix (af_/bf_ female, am_/bm_ male) or, for
+  # chatterbox, the cloned sample's file name starting with f_ / m_. Or force: female | male
   voice_gender: auto
   kokoro:
     voice: af_heart              # see: alveus tts voices
@@ -87,7 +88,7 @@ tts:
   chatterbox:
     model: turbo                 # turbo (English, fastest) | standard (English, expressive) |
                                  # multilingual (23 languages incl. zh/ja/ko/de/fr/es, auto-detected per sentence)
-    voice_ref: null              # path to a wav for voice cloning (optional)
+    voice_ref: null              # path to a wav for voice cloning (optional); name it f_*.wav / m_*.wav
     language: auto               # multilingual only: auto = detect per sentence, or a fixed code like zh
     fallback_language: en        # used when auto-detection is unsure
     exaggeration: 0.5

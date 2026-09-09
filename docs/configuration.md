@@ -85,12 +85,12 @@ sampling `--temp 0.7 --top-p 0.95 --top-k 20` as recommended by the model card.
 |---|---|---|
 | `backend` | `kokoro` | `kokoro` \| `chatterbox` \| `openai_http` (override: `ALVEUS_TTS_BACKEND`) |
 | `device` | `cuda` | |
-| `voice_gender` | `auto` | `auto` infers from the Kokoro voice prefix (`af_`/`bf_` female, `am_`/`bm_` male); or `female`/`male`. Decides Alveus vs Aurea |
+| `voice_gender` | `auto` | `auto` infers from the voice: Kokoro voice prefix (`af_`/`bf_` female, `am_`/`bm_` male), or for Chatterbox the cloned sample's file name (`f_*.wav` / `m_*.wav`); or `female`/`male`. Decides Alveus vs Aurea |
 | `kokoro.voice` | `af_heart` | see `alveus tts voices` (28 English voices) |
 | `kokoro.speed` | `1.0` | |
 | `kokoro.lang_code` | `a` | `a` American, `b` British English |
 | `chatterbox.model` | `turbo` | `turbo` or `standard` |
-| `chatterbox.voice_ref` | `null` | path to a 5–15 s WAV to clone a voice |
+| `chatterbox.voice_ref` | `null` | path to a 5–15 s WAV to clone a voice; name it `f_…wav` or `m_…wav` so the gender (and name) is inferred |
 | `chatterbox.exaggeration`, `.cfg_weight` | `0.5`, `0.5` | standard model only |
 | `openai_http.base_url`, `.model`, `.voice` | | any `/v1/audio/speech` server (e.g. Kokoro-FastAPI on :8880) |
 
