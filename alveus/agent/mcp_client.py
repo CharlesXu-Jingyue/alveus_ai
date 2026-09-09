@@ -43,6 +43,20 @@ class ToolInfo:
         }
 
 
+def hub_env(cfg) -> dict[str, str]:
+    """Environment handed to every stdio MCP server: where Alveus lives and which LLM it runs."""
+    from ..config import llm_profile
+    env = {"ALVEUS_HOME": cfg._env["ALVEUS_HOME"]}
+    try:
+        prof = llm_profile(cfg)
+        env["ALVEUS_LLM_PROFILE"] = str(prof.get("name", ""))
+        env["ALVEUS_LLM_MODEL"] = str(prof.get("model", ""))
+        env["ALVEUS_LLM_BASE_URL"] = str(prof.get("base_url", ""))
+    except KeyError:
+        pass
+    return env
+
+
 class ToolHub:
     SEP = "__"
 

@@ -373,6 +373,7 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "hotkey_modes": ["toggle", "hold"],
                 "log_levels": ["DEBUG", "INFO", "WARNING"],
                 "audio_backends": ["auto", "pipewire", "sounddevice"],
+                "opencode_models": ["auto", "opencode-default", *_opencode_models()],
             },
             "paths": {"local_yaml": str(REPO_ROOT / "config" / "local.yaml"), "persona": str(PERSONA),
                       "defaults": str(REPO_ROOT / "config" / "alveus.yaml")},
@@ -499,6 +500,27 @@ def _probe_model(server_bin: str, model_path: str, timeout: float = 180.0) -> di
                 proc.kill()
 
 
+_opencode_cache: tuple[float, list[str]] = (0.0, [])
+
+
+def _opencode_models() -> list[str]:
+    """provider/model ids opencode can use right now (`opencode models`), cached for a minute."""
+    global _opencode_cache
+    ts, cached = _opencode_cache
+    if time.time() - ts < 60:
+        return cached
+    models: list[str] = []
+    try:
+        import shutil
+        exe = shutil.which("opencode") or os.path.expanduser("~/.opencode/bin/opencode")
+        p = subprocess.run([exe, "models"], capture_output=True, text=True, timeout=15)
+        models = [ln.strip() for ln in p.stdout.splitlines() if "/" in ln and " " not in ln.strip()]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    _opencode_cache = (time.time(), models)
+    return models
+
+
 def _list_voices(voices_dir: str | None) -> list[str]:
     if not voices_dir:
         return []
@@ -573,7 +595,7 @@ class HeadlessAssistant:
     """Agent + STT + TTS without microphone loop (for `alveus api` / `alveus chat`)."""
 
     def __init__(self, cfg, *, load_speech: bool = True):
-        from .agent import Agent, ToolHub
+        from .agent import Agent, ToolHub, hub_env
         from .config import llm_profile
         from .llm import make_llm
         from .stt import make_stt
@@ -587,11 +609,11 @@ class HeadlessAssistant:
         self.load_speech = load_speech
         self.hub: ToolHub | None = None
         self.agent: Agent | None = None
-        self._Agent, self._ToolHub = Agent, ToolHub
+        self._Agent, self._ToolHub, self._hub_env = Agent, ToolHub, hub_env
 
     async def start(self, confirm=None) -> None:
         self.hub = self._ToolHub(self.cfg.tools.get("servers") or {}, self.cfg._env["ALVEUS_HOME"],
-                                 env_extra={"ALVEUS_HOME": self.cfg._env["ALVEUS_HOME"]})
+                                 env_extra=self._hub_env(self.cfg))
         await self.hub.connect_all()
         self.agent = self._Agent(self.llm, self.hub, self.cfg, confirm=confirm, thinking=self.prof.get("thinking"))
         if self.load_speech:

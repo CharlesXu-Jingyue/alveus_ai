@@ -161,6 +161,14 @@ tools:
     coder:
       command: [python, -m, mcp_servers.coder]   # delegates coding tasks to opencode
       enabled: true
+      env:
+        # Which model opencode uses for delegated coding work:
+        #   auto             -> the same local Bonsai model the assistant runs (follows llm.profile)
+        #   opencode-default -> the default set in ~/.config/opencode/opencode.jsonc
+        #   provider/model   -> e.g. deepseek/deepseek-v4-flash (cloud; needs `opencode auth login`)
+        ALVEUS_OPENCODE_MODEL: auto
+        # Project folder used when you do not name one in the request.
+        ALVEUS_CODE_DIR: "~"
     # Example third-party server (disabled):
     # home-assistant:
     #   url: http://homeassistant.local:8123/mcp_server/sse

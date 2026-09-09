@@ -139,7 +139,9 @@ sampling `--temp 0.7 --top-p 0.95 --top-k 20` as recommended by the model card.
 | `servers.<name>.timeout_s` | `60` | startup timeout |
 
 Built-in servers: `files`, `desktop`, `system`, `web`, `coder`. The coder server honours
-`ALVEUS_OPENCODE_MODEL` (e.g. `bonsai/bonsai-27b-1bit`) to pick opencode's model.
+`ALVEUS_OPENCODE_MODEL` (`auto` = the assistant's own local model, `opencode-default`, or a
+`provider/model` id such as `deepseek/deepseek-v4-flash`) and `ALVEUS_CODE_DIR` (default project folder).
+Every stdio server also receives `ALVEUS_HOME`, `ALVEUS_LLM_PROFILE`, `ALVEUS_LLM_MODEL`, `ALVEUS_LLM_BASE_URL`.
 
 ## `api`
 

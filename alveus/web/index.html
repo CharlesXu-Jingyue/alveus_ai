@@ -449,6 +449,8 @@ const FIELDS = [
  {p:'tools.servers.desktop.enabled', l:'Desktop tools', h:'Let it operate the desktop: open apps and files, manage windows, type and press keys, set volume, control music, use the clipboard, take screenshots, show notifications, toggle dark mode and Do Not Disturb, lock the screen.', t:'bool'},
  {p:'tools.servers.web.enabled', l:'Web tools', h:'Let it search the web, read web pages, and check the weather. These are the only tools that send anything over the internet.', t:'bool'},
  {p:'tools.servers.coder.enabled', l:'Coding tool (opencode)', h:'Let it hand programming tasks to the opencode agent, which can read, edit, and run code in a project folder you name.', t:'bool'},
+ {p:'tools.servers.coder.env.ALVEUS_OPENCODE_MODEL', l:'Coding model', h:'Which model opencode uses for the delegated coding work. auto: the same local Bonsai model the assistant runs, so it follows the model profile above. opencode-default: whatever you set as default in opencode itself. Or pick any model opencode is signed in to (e.g. deepseek/deepseek-v4-flash) — cloud models are stronger at long coding tasks, but the task text and the project files then leave this computer.', t:'combo', o:'opencode_models', when:{p:'tools.servers.coder.enabled', v:[true]}},
+ {p:'tools.servers.coder.env.ALVEUS_CODE_DIR', l:'Default coding folder', h:'The project folder opencode works in when you do not name one in your request, e.g. ~/projects/scratch.', t:'text', when:{p:'tools.servers.coder.enabled', v:[true]}},
  {p:'logging.level', l:'Log detail', h:'How much is written to the log (journalctl / logs/alveus.log). WARNING: problems only. INFO: normal activity such as what it heard and which tools it used. DEBUG: everything, including speech it ignored — use when troubleshooting.', t:'select', o:'log_levels'},
 ];
 let cfg=null, dirty={}, persona='', personaDirty=false, yamlDirty=false;
@@ -527,6 +529,7 @@ function fieldRow(f){
     el.onchange=()=>{ if(el.value==='__custom__'){ const v=prompt('Path to a WAV file:', cur||''); if(v){ const o=document.createElement('option'); o.value=v; o.textContent=v; el.appendChild(o); el.value=v; setDirty(v);} else el.value=cur; return; } setDirty(el.value===''?null:el.value); };
     el.dataset.refill='1'; el._fill = fill;
   }
+  else if (f.t==='combo'){ el=document.createElement('input'); el.type='text'; el.value=eff??''; const dl=document.createElement('datalist'); dl.id='dl-'+f.p.replace(/\W+/g,'-'); dl.innerHTML=(cfg.options[f.o]||[]).map(o=>`<option value="${esc(o)}">`).join(''); el.setAttribute('list', dl.id); ctl.appendChild(dl); el.oninput=()=>setDirty(el.value==='' ? UNSET : el.value.trim()); }
   else if (f.t==='list'){ el=document.createElement('input'); el.type='text'; el.value=Array.isArray(eff)?eff.join(', '):(eff||''); el.oninput=()=>setDirty(el.value.split(',').map(s=>s.trim()).filter(Boolean)); }
   else if (f.t==='number'){ el=document.createElement('input'); el.type='number'; if(f.step) el.step=f.step; if(f.min!==undefined) el.min=f.min; if(f.max!==undefined) el.max=f.max; el.value=eff??''; el.oninput=()=>{ setDirty(el.value==='' ? UNSET : Number(el.value)); }; }
   else { el=document.createElement('input'); el.type='text'; el.value=eff??''; if(f.nullable) el.placeholder='(empty)'; el.oninput=()=>setDirty(el.value==='' ? (f.nullable ? null : UNSET) : el.value); }

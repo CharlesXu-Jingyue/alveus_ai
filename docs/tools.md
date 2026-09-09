@@ -77,9 +77,19 @@ These are the only tools that contact the internet.
 
 ## `coder` — `mcp_servers/coder.py`
 
-Delegates programming work to **opencode** (`opencode run --format json`), which itself uses the
-local Bonsai model through `~/.config/opencode/opencode.jsonc`. Set `ALVEUS_OPENCODE_MODEL`
-(e.g. `bonsai/bonsai-27b-1bit`) in the server's `env` to pin the model.
+Delegates programming work to **opencode** (`opencode run --format json`, headless; the desktop app
+is not involved, but it shares opencode's config and credentials). Which model opencode uses is set by
+`tools.servers.coder.env.ALVEUS_OPENCODE_MODEL` (GUI: Tools & safety → Coding model):
+`auto` (default) requests the same local Bonsai model the assistant is running, via the `bonsai`
+provider in `~/.config/opencode/opencode.jsonc`, so it follows `llm.profile`; `opencode-default` leaves
+the choice to opencode; any `provider/model` id from `opencode models` (e.g. `deepseek/deepseek-v4-flash`)
+sends the work to that model instead. `ALVEUS_CODE_DIR` is the project folder used when the request
+names none.
+
+Note on the local server: llama-server loads one model and answers to whatever model id a client
+sends, so a client that asks for `bonsai-27b-1bit` while the ternary profile is running silently gets
+the ternary model under the wrong label. `auto` avoids this for the coder by always requesting the
+running profile's id.
 
 | tool | parameters | does |
 |---|---|---|

@@ -237,10 +237,10 @@ def tools():
     """List tools exposed by all configured MCP servers."""
     cfg = load_config()
     _setup_logging(cfg)
-    from .agent import ToolHub
+    from .agent import ToolHub, hub_env
 
     async def main():
-        async with ToolHub(cfg.tools.get("servers") or {}, cfg._env["ALVEUS_HOME"]) as hub:
+        async with ToolHub(cfg.tools.get("servers") or {}, cfg._env["ALVEUS_HOME"], env_extra=hub_env(cfg)) as hub:
             t = Table(title=f"{len(hub.tools)} tools")
             t.add_column("tool", style="cyan")
             t.add_column("destructive")

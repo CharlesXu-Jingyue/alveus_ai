@@ -10,7 +10,7 @@ from enum import StrEnum
 
 import numpy as np
 
-from .agent import Agent, ToolHub
+from .agent import Agent, ToolHub, hub_env
 from .agent.loop import active_names
 from .agent.sentences import SentenceBuffer, speakable
 from .audio import make_audio_in, make_audio_out
@@ -85,7 +85,7 @@ class VoiceAssistant:
         ok, msg = await llm.health()
         log.info("LLM %s: %s", "OK" if ok else "NOT READY", msg)
         self.hub = ToolHub(self.cfg.tools.get("servers") or {}, self.cfg._env["ALVEUS_HOME"],
-                           env_extra={"ALVEUS_HOME": self.cfg._env["ALVEUS_HOME"]})
+                           env_extra=hub_env(self.cfg))
         await self.hub.connect_all()
         for k, v in self.hub.errors.items():
             log.warning("tool server '%s' unavailable: %s", k, v)
