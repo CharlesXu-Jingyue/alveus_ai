@@ -20,3 +20,9 @@ def test_decimal_not_split():
 def test_speakable_strips_markdown():
     assert speakable("**Bold** and `code` and [link](http://x.y) here") == "Bold and code and link here"
     assert "code omitted" in speakable("run ```bash\nls\n``` now")
+
+
+def test_speakable_drops_emoji_and_empty():
+    assert speakable("希望你今天过得开心！ 😊") == "希望你今天过得开心！"
+    assert speakable("😊") == ""
+    assert speakable("Great job! 🎉🎉") == "Great job!"

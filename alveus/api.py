@@ -258,10 +258,14 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 if inp.speak and has_voice and reply:
                     from .agent.sentences import speakable
                     loop = asyncio.get_running_loop()
-                    audio = await loop.run_in_executor(None, assistant.tts.synthesize, speakable(reply))
-                    bus.publish("state", state="speaking")
-                    assistant.audio_out.play(audio, assistant.tts.sample_rate)
-                    await loop.run_in_executor(None, assistant.audio_out.wait)
+                    try:
+                        audio = await loop.run_in_executor(None, assistant.tts.synthesize, speakable(reply))
+                        bus.publish("state", state="speaking")
+                        assistant.audio_out.play(audio, assistant.tts.sample_rate)
+                        await loop.run_in_executor(None, assistant.audio_out.wait)
+                    except Exception as e:  # noqa: BLE001
+                        log.exception("speech output failed")
+                        await emit({"type": "error", "text": f"Speech output failed: {type(e).__name__}: {e}"})
                 if has_voice:
                     bus.publish("state", state="idle")
                 await emit({"type": "done", "reply": reply})

@@ -57,11 +57,20 @@ _MD = [
     (re.compile(r"^\s*[-*•]\s+", re.MULTILINE), ""),
     (re.compile(r"\[([^\]]+)\]\([^)]+\)"), r"\1"),
     (re.compile(r"https?://\S+"), "a link"),
+    # emoji, pictographs, dingbats, symbols and variation selectors: TTS engines choke on them
+    (re.compile("[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F900-\U0001F9FF\uFE0F\u200D\u2B50\u2B55\u231A-\u23FF]"), ""),
 ]
+_HAS_WORD = re.compile(r"[\w\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]")
+
+
+def has_speech(text: str) -> bool:
+    """True if there is anything a TTS engine can pronounce (letters, digits, ideographs)."""
+    return bool(_HAS_WORD.search(text or ""))
 
 
 def speakable(text: str) -> str:
     """Strip markdown/code so TTS reads naturally."""
     for rx, rep in _MD:
         text = rx.sub(rep, text)
-    return re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
+    return text if has_speech(text) else ""

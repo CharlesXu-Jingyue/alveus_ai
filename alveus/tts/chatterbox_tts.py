@@ -50,20 +50,24 @@ class ChatterboxTTS:
 
     def synthesize(self, text: str) -> np.ndarray:
         self.load()
+        from ..agent.sentences import SentenceBuffer, has_speech
+
+        if not has_speech(text):
+            return np.zeros(0, dtype=np.float32)
+        parts = [text]
         if self.variant == "multilingual" and self.language == "auto":
             # Mixed-language text: voice each sentence in its own language.
-            from ..agent.sentences import SentenceBuffer
-
             sb = SentenceBuffer(min_chars=1)
-            parts = sb.feed(text) + sb.flush()
-            if len(parts) > 1:
-                gap = np.zeros(int(0.12 * self.sample_rate), dtype=np.float32)
-                clips: list[np.ndarray] = []
-                for part in parts:
-                    clips.append(self._synth_one(part))
-                    clips.append(gap)
-                return np.concatenate(clips[:-1]) if clips else np.zeros(0, dtype=np.float32)
-        return self._synth_one(text)
+            parts = [p for p in sb.feed(text) + sb.flush() if has_speech(p)]
+        gap = np.zeros(int(0.12 * self.sample_rate), dtype=np.float32)
+        clips: list[np.ndarray] = []
+        for part in parts:
+            try:
+                clips.append(self._synth_one(part))
+                clips.append(gap)
+            except Exception as e:  # noqa: BLE001  (one bad sentence must not silence the reply)
+                log.warning("chatterbox could not voice %r: %s", part[:60], e)
+        return np.concatenate(clips[:-1]) if clips else np.zeros(0, dtype=np.float32)
 
     def _synth_one(self, text: str) -> np.ndarray:
         kw: dict = {}
