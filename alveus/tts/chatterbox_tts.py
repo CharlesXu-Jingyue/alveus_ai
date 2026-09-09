@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+from pathlib import Path
 
 import numpy as np
 
@@ -27,6 +29,14 @@ class ChatterboxTTS:
         self.fallback_language = (opts.get("fallback_language") or "en").lower()
         self.device = device
         self._model = None
+        self.warning: str | None = None
+        if self.voice_ref and not Path(os.path.expanduser(self.voice_ref)).exists():
+            self.warning = (f"voice sample not found: {self.voice_ref} — using the built-in voice. "
+                            "Fix the path in Settings → Speech → Voice sample to clone.")
+            log.error(self.warning)
+            self.voice_ref = None
+        elif self.voice_ref:
+            self.voice_ref = os.path.expanduser(self.voice_ref)
 
     def load(self) -> None:
         if self._model is not None:

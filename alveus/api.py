@@ -115,9 +115,10 @@ def _sse(ev: dict[str, Any]) -> str:
 
 # ----------------------------------------------------------------------------- models
 class ChatIn(BaseModel):
-    text: str
+    text: str = ""
     speak: bool = False
     reset: bool = False
+    retry: bool = False      # re-run the last user message (drops the previous answer)
 
 
 class SpeakIn(BaseModel):
@@ -182,6 +183,7 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "tools": len(assistant.hub.tools) if assistant.hub else 0,
                 "stt": assistant.stt.name, "tts": assistant.tts.name, "name": name, "other_name": other,
                 "voice": has_voice, "version": __version__, "profile": assistant.cfg.llm.profile,
+                "tts_warning": getattr(assistant.tts, "warning", None),
                 "managed_by_systemd": bool(os.environ.get("INVOCATION_ID")),
                 "llm_service": _unit_status("alveus-llm.service") if os.environ.get("INVOCATION_ID") else None}
 
@@ -236,11 +238,20 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
             try:
                 if inp.reset:
                     assistant.agent.reset()
-                bus.publish("transcript", who="user", text=inp.text, source="gui")
+                text = inp.text
                 async with assistant.agent.lock:
+                    if inp.retry:
+                        text = assistant.agent.pop_last_turn() or text
+                        if not text:
+                            await emit({"type": "error", "text": "Nothing to retry."})
+                            await emit({"type": "done", "reply": ""})
+                            return
+                        await emit({"type": "retry", "text": text})
+                    else:
+                        bus.publish("transcript", who="user", text=text, source="gui")
                     if has_voice:
                         bus.publish("state", state="thinking")
-                    async for ev in assistant.agent.run(inp.text, confirm=confirm):
+                    async for ev in assistant.agent.run(text, confirm=confirm):
                         if ev.kind == "content":
                             parts.append(ev.text)
                             await emit({"type": "content", "text": ev.text})
@@ -337,6 +348,13 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         local_text = read_local_yaml()
         local = yaml.safe_load(local_text) or {} if local_text.strip() else {}
         from .tts.kokoro_tts import KOKORO_VOICES
+        # voice samples for cloning: the current sample's folder plus the usual places
+        sample_dirs = {Path(REPO_ROOT / "voices"), Path.home() / "local/data/alveus-ai/voices",
+                       Path(cfg._env["ALVEUS_MODELS"]) / "voices"}
+        cur_ref = (cfg.tts.get("chatterbox") or {}).get("voice_ref")
+        if cur_ref:
+            sample_dirs.add(Path(os.path.expanduser(str(cur_ref))).parent)
+        voice_samples = sorted({str(f) for d in sample_dirs if d.is_dir() for f in d.glob("*.wav")})
         ww_dir = Path(cfg._env["ALVEUS_MODELS"]) / "wakeword"
         custom_oww = sorted(p.stem for p in ww_dir.glob("*.onnx")) if ww_dir.is_dir() else []
         defaults = yaml.safe_load((REPO_ROOT / "config" / "alveus.yaml").read_text()) or {}
@@ -353,6 +371,7 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "chatterbox_models": ["turbo", "standard", "multilingual"],
                 "chatterbox_languages": ["auto", *__import__("alveus.tts.chatterbox_tts", fromlist=["x"]).MULTILINGUAL_LANGS],
                 "voice_genders": ["auto", "female", "male"],
+                "voice_samples": voice_samples,
                 "parakeet_models": ["nemo-parakeet-tdt-0.6b-v3", "nemo-parakeet-tdt-0.6b-v2", "nemo-parakeet-ctc-0.6b"],
                 "whisper_models": ["large-v3-turbo", "large-v3", "distil-large-v3", "medium", "small", "base"],
                 "oww_models": OWW_PRETRAINED + custom_oww,

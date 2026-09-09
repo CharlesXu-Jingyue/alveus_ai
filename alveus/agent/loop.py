@@ -120,6 +120,15 @@ class Agent:
     def reset(self) -> None:
         self.history.clear()
 
+    def pop_last_turn(self) -> str | None:
+        """Remove the last user message and everything after it; return that message's text."""
+        idx = [i for i, m in enumerate(self.history) if m["role"] == "user"]
+        if not idx:
+            return None
+        text = self.history[idx[-1]].get("content") or ""
+        del self.history[idx[-1]:]
+        return text
+
     def _trim(self) -> None:
         # keep the last N user turns (and everything after them)
         idx = [i for i, m in enumerate(self.history) if m["role"] == "user"]

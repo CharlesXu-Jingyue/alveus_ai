@@ -99,6 +99,11 @@ details.think .t{white-space:pre-wrap;border-left:2px solid var(--rule-2);paddin
 .confirm code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;font-size:.9em}
 .confirm.done{opacity:.6}
 .err{color:var(--danger);font-size:13.5px;border-left:3px solid var(--danger);padding:4px 10px;margin:4px 0}
+.acts{display:flex;gap:4px;margin-top:4px;opacity:0;transition:opacity .15s}
+.msg:hover .acts,.msg:focus-within .acts{opacity:1}
+.acts button{border:1px solid transparent;background:none;color:var(--muted);font-size:12px;padding:2px 8px;border-radius:6px;display:inline-flex;gap:5px;align-items:center}
+.acts button:hover{border-color:var(--rule-2);color:var(--ink);background:var(--surface)}
+.acts button:disabled{opacity:.5}
 .empty{color:var(--muted);text-align:center;padding:60px 0 30px;font-size:14px}
 .empty b{display:block;font-family:"Chakra Petch",sans-serif;font-size:26px;color:var(--ink);font-weight:700;margin-bottom:8px;letter-spacing:.01em}
 .empty .ex{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
@@ -249,6 +254,7 @@ async function refreshHealth(){
     $('llm').className = 'llm' + (health.ok?' ok':''); $('llmText').textContent = health.ok ? 'LLM ready' : (health.llm_service && health.llm_service.active!=='active' ? 'LLM service '+health.llm_service.active : 'LLM down');
     $('llmText').title = health.ok ? health.llm : (health.llm_service?.last_error || health.llm);
     $('toolCount').textContent = `${health.tools} tools`;
+    if (health.tts_warning && !window._ttsWarned){ window._ttsWarned=true; toast(health.tts_warning, true); }
     $('btnListen').disabled = !health.voice; $('btnStop').disabled = !health.voice;
     if (!health.voice) setState('text-only');
     return true;
@@ -280,9 +286,26 @@ function clearLog(){ [...logCol.children].forEach(c => { if(c.id!=='empty') c.re
 function scrollBottom(){ log.scrollTop = log.scrollHeight; }
 function addMessage(who, text, source){
   $('empty').style.display='none';
-  const d=document.createElement('div'); d.className='msg '+who;
+  const d=document.createElement('div'); d.className='msg '+who; d.dataset.text = text||'';
   d.innerHTML = `<div class="who">${who==='user'?'You':esc(name)}${source&&source!=='gui'?`<span class="src">${esc(source)}</span>`:''}</div><div class="bubble">${who==='user'?esc(text).replace(/\n/g,'<br>'):md(text)}</div>`;
+  if (who==='assistant') d.appendChild(actionBar(d));
   logCol.appendChild(d); scrollBottom(); return d;
+}
+function actionBar(m){
+  const bar=document.createElement('div'); bar.className='acts';
+  bar.innerHTML = `<button data-a="copy" title="Copy reply text">⧉ Copy</button><button data-a="speak" title="Say this reply again" ${health&&!health.voice?'disabled':''}>▶ Speak</button><button data-a="retry" title="Ask the same question again">↻ Retry</button>`;
+  bar.onclick = async e => {
+    const b=e.target.closest('button'); if(!b) return; const a=b.dataset.a; const text=m.dataset.text||'';
+    if (a==='copy'){ try{ await navigator.clipboard.writeText(text); toast('Copied'); }catch{ toast('Copy failed (clipboard blocked)', true);} }
+    else if (a==='speak'){ if(!text) return; b.disabled=true; try{ await j('/speak',{method:'POST', body:JSON.stringify({text, play:true})}); }catch(err){ toast(err.message,true);} b.disabled=false; }
+    else if (a==='retry'){ if(busy) return; retryLast(m); }
+  };
+  return bar;
+}
+async function retryLast(m){
+  // remove this answer (and the user message above it) from the view; server drops them from history
+  const prev = m.previousElementSibling; if (prev && prev.classList.contains('user')) prev.remove(); m.remove();
+  await send('', {retry:true});
 }
 function toolCard(name, args){
   const det=document.createElement('details'); det.className='tool running';
@@ -309,15 +332,15 @@ async function loadHistory(){
 
 // ---------- sending
 let busy=false;
-async function send(text){
-  text = (text||'').trim(); if(!text||busy) return;
+async function send(text, opts={}){
+  text = (text||'').trim(); if((!text && !opts.retry)||busy) return;
   busy=true; $('send').disabled=true; $('input').value=''; autosize();
-  addMessage('user', text);
+  let userMsg = opts.retry ? addMessage('user', '…') : addMessage('user', text);
   const m = addMessage('assistant', ''); const bubble=m.querySelector('.bubble'); bubble.classList.add('cursor');
   const tools=document.createElement('div'); tools.className='tools'; m.insertBefore(tools, bubble);
   let think=null, full='', pendingTool=null;
   try{
-    const r = await fetch('/chat/stream', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({text, speak: $('speakReplies').checked})});
+    const r = await fetch('/chat/stream', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({text, speak: $('speakReplies').checked, retry: !!opts.retry})});
     if(!r.ok) throw new Error(r.status+' '+r.statusText);
     const reader = r.body.getReader(); const dec=new TextDecoder(); let buf='';
     while(true){
@@ -327,13 +350,14 @@ async function send(text){
         const chunk=buf.slice(0,idx); buf=buf.slice(idx+2);
         const line = chunk.split('\n').find(l=>l.startsWith('data:')); if(!line) continue;
         const ev = JSON.parse(line.slice(5));
-        if (ev.type==='content'){ full+=ev.text; bubble.innerHTML = md(full); }
+        if (ev.type==='retry'){ userMsg.dataset.text=ev.text; userMsg.querySelector('.bubble').innerHTML=esc(ev.text).replace(/\n/g,'<br>'); }
+        else if (ev.type==='content'){ full+=ev.text; bubble.innerHTML = md(full); m.dataset.text = full; }
         else if (ev.type==='reasoning'){ if(!think){ think=document.createElement('details'); think.className='think'; think.open=$('showThinking').checked; think.innerHTML='<summary>reasoning</summary><div class="t"></div>'; m.insertBefore(think, tools); } think.querySelector('.t').textContent += ev.text; }
         else if (ev.type==='tool_start'){ pendingTool = toolCard(ev.tool, ev.args); tools.appendChild(pendingTool); }
         else if (ev.type==='tool_result'){ const c = pendingTool || toolCard(ev.tool,{}); c.classList.remove('running'); c.querySelector('.st').textContent = /"error"/.test(ev.text)?'error':'done'; c.querySelector('pre').textContent = ev.text; if(!pendingTool) tools.appendChild(c); pendingTool=null; }
         else if (ev.type==='confirm'){ confirmCard(ev, m, bubble); }
         else if (ev.type==='error'){ const e=document.createElement('div'); e.className='err'; e.textContent=ev.text; m.insertBefore(e, bubble); }
-        else if (ev.type==='done'){ if(!full && !ev.reply) bubble.innerHTML='<span style="color:var(--muted)">(no reply)</span>'; }
+        else if (ev.type==='done'){ if(!full && !ev.reply) bubble.innerHTML='<span style="color:var(--muted)">(no reply)</span>'; m.dataset.text = ev.reply || full; }
         scrollBottom();
       }
     }
@@ -395,7 +419,7 @@ const FIELDS = [
  {p:'tts.chatterbox.model', l:'Chatterbox model', h:'turbo: English, fastest. standard: English, adds an expressiveness control. multilingual: 23 languages including Chinese, Japanese, Korean, German, French, Spanish; picks the language of each sentence automatically.', t:'select', o:'chatterbox_models', when:{p:'tts.backend', v:['chatterbox']}},
  {p:'tts.chatterbox.language', l:'Spoken output language', h:'auto: detect from each sentence (Chinese characters, kana, Cyrillic… are recognised directly; Latin-script text is identified statistically). Or fix one language code, e.g. zh.', t:'select', o:'chatterbox_languages', when:{p:'tts.chatterbox.model', v:['multilingual']}},
  {p:'tts.chatterbox.fallback_language', l:'Fallback language', h:'Used when a sentence is too short or ambiguous to identify (numbers, names, single words).', t:'select', o:'chatterbox_languages', when:{p:'tts.chatterbox.model', v:['multilingual']}},
- {p:'tts.chatterbox.voice_ref', l:'Voice sample to clone', h:'Chatterbox has no preset voices; to change the voice, give it a clean 5–15 second WAV recording of the speaker to imitate. Name the file f_… or m_… (e.g. f_anna.wav) so the voice gender — and therefore the name it uses — is picked up automatically. Leave empty for the built-in voice.', t:'text', nullable:true, when:{p:'tts.backend', v:['chatterbox']}},
+ {p:'tts.chatterbox.voice_ref', l:'Voice sample to clone', h:'Chatterbox has no preset voices; to change the voice, give it a clean 5–15 second WAV recording of the speaker to imitate. Files found in the voices folders are listed; name them f_… or m_… (e.g. m_demo_charles.wav) so the voice gender — and the name it uses — is picked up automatically. Choose “built-in voice” for none.', t:'file', o:'voice_samples', nullable:true, when:{p:'tts.backend', v:['chatterbox']}},
  {p:'tts.chatterbox.exaggeration', l:'Expressiveness', h:'0 = flat, 0.5 = natural, 1 = dramatic. Standard and multilingual models.', t:'number', step:0.05, min:0, max:1, when:{p:'tts.chatterbox.model', v:['standard','multilingual']}},
  {p:'tts.openai_http.base_url', l:'Speech server address', h:'Where the external text-to-speech server is, e.g. http://127.0.0.1:8880/v1 for Kokoro-FastAPI.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
  {p:'tts.openai_http.model', l:'Speech model name', h:'The model identifier that server expects in requests, e.g. kokoro or tts-1. Passed through unchanged.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
@@ -481,6 +505,13 @@ function fieldRow(f){
   const setDirty = v => { dirty[f.p]=v; row.classList.add('dirty'); updateSavebar(); refreshVisibility(); };
   if (f.t==='bool'){ el=document.createElement('button'); el.className='switch'; el.setAttribute('role','switch'); el.setAttribute('aria-checked', String(!!eff)); el.onclick=()=>{ const v=el.getAttribute('aria-checked')!=='true'; el.setAttribute('aria-checked',String(v)); setDirty(v); }; }
   else if (f.t==='select'){ el=document.createElement('select'); const opts=cfg.options[f.o]||[]; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur); el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o)}</option>`).join(''); el.onchange=()=>setDirty(el.value); }
+  else if (f.t==='file'){
+    el=document.createElement('select'); const files=(cfg.options[f.o]||[]).slice(); const cur=eff||'';
+    const missing = cur && !files.includes(cur);
+    el.innerHTML = `<option value="">built-in voice (no sample)</option>` + files.map(x=>`<option value="${esc(x)}"${x===cur?' selected':''}>${esc(x.split('/').pop())} <span>— ${esc(x)}</span></option>`).join('') + (missing?`<option value="${esc(cur)}" selected>${esc(cur.split('/').pop())} — FILE NOT FOUND</option>`:'') + `<option value="__custom__">other path…</option>`;
+    el.onchange=()=>{ if(el.value==='__custom__'){ const v=prompt('Path to a WAV file:', cur||''); if(v){ const o=document.createElement('option'); o.value=v; o.textContent=v; el.appendChild(o); el.value=v; setDirty(v);} else el.value=cur; return; } setDirty(el.value===''?null:el.value); };
+    if (missing) row.classList.add('dirty');
+  }
   else if (f.t==='list'){ el=document.createElement('input'); el.type='text'; el.value=Array.isArray(eff)?eff.join(', '):(eff||''); el.oninput=()=>setDirty(el.value.split(',').map(s=>s.trim()).filter(Boolean)); }
   else if (f.t==='number'){ el=document.createElement('input'); el.type='number'; if(f.step) el.step=f.step; if(f.min!==undefined) el.min=f.min; if(f.max!==undefined) el.max=f.max; el.value=eff??''; el.oninput=()=>{ setDirty(el.value==='' ? UNSET : Number(el.value)); }; }
   else { el=document.createElement('input'); el.type='text'; el.value=eff??''; if(f.nullable) el.placeholder='(empty)'; el.oninput=()=>setDirty(el.value==='' ? (f.nullable ? null : UNSET) : el.value); }
