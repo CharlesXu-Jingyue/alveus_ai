@@ -125,7 +125,7 @@ it spawns over stdio).
 
 ## Prompting and model interface
 
-- The system prompt is `config/persona.md` rendered with `{name}`, `{other_name}`,
+- The system prompt is `config/persona.md` rendered with `{name}`, `{other_name}`, `{voice_gender}`,
   `{user_name}`, `{date}`, `{hostname}`, `{os}`, plus a line listing available tool groups.
 - Tools are presented in OpenAI function-calling format, names namespaced `server__tool`
   (`system__gpu_status`). llama-server's `--jinja` renders Bonsai's Qwen3.6 chat template, which

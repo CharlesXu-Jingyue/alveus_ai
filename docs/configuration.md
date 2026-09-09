@@ -36,7 +36,7 @@ Changes take effect on the next start (`systemctl --user restart alveus`).
 | `female_name` | `Aurea` | name used when the voice is female (see `tts.voice_gender`) |
 | `user_name` | `Charles` | how the assistant addresses you; injected into the persona |
 | `language` | `en` | informational (STT language is set per backend) |
-| `persona_file` | `${ALVEUS_HOME}/config/persona.md` | system prompt template; placeholders `{name} {other_name} {user_name} {date} {hostname} {os}` |
+| `persona_file` | `${ALVEUS_HOME}/config/persona.md` | system prompt template; placeholders `{name} {other_name} {voice_gender} {user_name} {date} {hostname} {os}` |
 | `max_history_turns` | `30` | user turns kept in the conversation |
 | `streaming_tts` | `true` | speak sentence by sentence while generating; `false` waits for the full reply |
 

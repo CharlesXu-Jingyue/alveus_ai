@@ -107,6 +107,7 @@ class Agent:
         text = persona.format(
             name=name,
             other_name=other,
+            voice_gender="female" if voice_is_female(self.cfg) else "male",
             user_name=a.get("user_name", "the user"),
             date=dt.date.today().strftime("%A, %B %d, %Y"),
             hostname=socket.gethostname(),

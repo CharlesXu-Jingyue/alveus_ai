@@ -492,7 +492,7 @@ function renderSettings(){
     <textarea class="editor" id="yamlEd" spellcheck="false"></textarea>
     <div class="adv-row"><span>Saving here replaces the whole file. Changes in the form above are merged into it when you save them.</span><button class="btn" id="saveYaml">Save settings file</button></div>
     <h3 style="font-size:15px;margin:22px 0 4px">Personality and instructions</h3>
-    <p class="desc" style="margin-bottom:8px">The instructions the assistant reads before every conversation (<code class="mono">config/persona.md</code>): who it is, how it should talk, when to use tools, what to ask before doing. Edit it in plain language. The words in braces are filled in automatically: {name} and {other_name} are its names, {user_name} is you, {date}, {hostname} and {os} describe today and this computer.</p>
+    <p class="desc" style="margin-bottom:8px">The instructions the assistant reads before every conversation (<code class="mono">config/persona.md</code>): who it is, how it should talk, when to use tools, what to ask before doing. Edit it in plain language. The words in braces are filled in automatically: {name} is its name for the current voice, {other_name} the alternative it also answers to, {voice_gender} is male or female, {user_name} is you, {date}, {hostname} and {os} describe today and this computer.</p>
     <textarea class="editor" id="personaEd" spellcheck="false"></textarea>
     <div class="adv-row"><span>Takes effect after the assistant restarts.</span><button class="btn" id="savePersona">Save instructions</button></div>`;
   form.appendChild(sec);
