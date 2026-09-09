@@ -47,6 +47,8 @@ def hub_env(cfg) -> dict[str, str]:
     """Environment handed to every stdio MCP server: where Alveus lives and which LLM it runs."""
     from ..config import llm_profile
     env = {"ALVEUS_HOME": cfg._env["ALVEUS_HOME"]}
+    api = cfg.get("api") or {}
+    env["ALVEUS_API_URL"] = f"http://{api.get('host', '127.0.0.1')}:{api.get('port', 8765)}"
     try:
         prof = llm_profile(cfg)
         env["ALVEUS_LLM_PROFILE"] = str(prof.get("name", ""))

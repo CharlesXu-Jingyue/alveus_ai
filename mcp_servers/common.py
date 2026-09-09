@@ -1,15 +1,48 @@
 from __future__ import annotations
 
+import functools
+import inspect
 import json
 import shutil
 import subprocess
 from typing import Any
 
 try:  # mcp >= 2.0
-    from mcp.server.mcpserver import MCPServer as FastMCP
+    from mcp.server.mcpserver import MCPServer as _BaseMCP
 except ImportError:  # mcp 1.x
-    from mcp.server.fastmcp import FastMCP  # type: ignore  # noqa: F401
+    from mcp.server.fastmcp import FastMCP as _BaseMCP  # type: ignore
 from mcp.types import ToolAnnotations
+
+
+class FastMCP(_BaseMCP):
+    """MCPServer whose tools return the real error text.
+
+    The SDK turns an exception inside a tool into the bare message "Error executing tool X", which
+    tells the model nothing and makes it retry the same call. Every tool registered through this
+    class is wrapped so an exception comes back as {"error": "ExceptionType: message"} instead.
+    """
+
+    def tool(self, *args, **kwargs):
+        deco = super().tool(*args, **kwargs)
+
+        def register(fn):
+            if inspect.iscoroutinefunction(fn):
+                @functools.wraps(fn)
+                async def safe(*a, **kw):
+                    try:
+                        return await fn(*a, **kw)
+                    except Exception as e:  # noqa: BLE001
+                        return j({"error": f"{type(e).__name__}: {e}"})
+            else:
+                @functools.wraps(fn)
+                def safe(*a, **kw):
+                    try:
+                        return fn(*a, **kw)
+                    except Exception as e:  # noqa: BLE001
+                        return j({"error": f"{type(e).__name__}: {e}"})
+            return deco(safe)
+
+        return register
 
 
 def annot(read_only: bool = False, destructive: bool = False) -> ToolAnnotations:
