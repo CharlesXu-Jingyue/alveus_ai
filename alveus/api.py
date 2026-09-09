@@ -187,11 +187,21 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         return FileResponse(path, media_type="text/html")
 
     # ---- status
+    def _settle_state() -> None:
+        """Publish idle when nothing is generating or playing (clears a stale 'speaking'/'thinking')."""
+        if not has_voice:
+            return
+        turn_running = assistant.agent is not None and assistant.agent.lock.locked()
+        if not turn_running and not assistant.audio_out.busy and bus.state != "listening":
+            bus.publish("state", state="idle")
+
     @app.get("/health")
     async def health() -> dict[str, Any]:
         from .agent.loop import active_names
         ok, msg = await assistant.agent.llm.health() if assistant.agent else (False, "agent not ready")
         name, other = active_names(assistant.cfg)
+        if bus.state in ("speaking", "thinking"):
+            _settle_state()
         return {"ok": ok, "llm": msg, "state": bus.state if has_voice else "text-only",
                 "tools": len(assistant.hub.tools) if assistant.hub else 0,
                 "stt": assistant.stt.name, "tts": assistant.tts.name, "name": name, "other_name": other,
@@ -349,6 +359,8 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         if sp is not None:
             sp.abort()
         broker.cancel_all()
+        await asyncio.sleep(0.2)   # let the interrupted turn wind down before settling the state
+        _settle_state()
         return {"interrupted": True}
 
     # ---- speech
@@ -390,6 +402,7 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
             sp.abort()
         if has_voice:
             assistant.audio_out.stop()
+        _settle_state()
         return {"stopped": True}
 
     # ---- configuration

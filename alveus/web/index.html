@@ -89,6 +89,10 @@ details.tool summary .a{color:var(--muted);white-space:nowrap;overflow:hidden;te
 details.tool summary .st{font-size:11px;color:var(--muted)}
 details.tool.running summary .st{color:var(--warm)}
 details.tool pre{margin:0;border:0;border-top:1px solid var(--rule);border-radius:0;max-height:260px;overflow:auto;font-size:12px}
+/* the command itself stays visible without expanding the card */
+details.tool .cmd{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;padding:6px 10px 8px;color:var(--ink);white-space:pre-wrap;word-break:break-word;border-top:1px dashed var(--rule)}
+details.tool .cmd .ps{color:var(--accent-ink);font-weight:600}
+.confirm code.cmd{display:block;margin-top:6px;padding:8px 10px;background:var(--surface);border:1px solid var(--rule);border-radius:6px;white-space:pre-wrap;word-break:break-word;font-size:12.5px}
 details.think{font-size:12.5px;color:var(--muted);margin:0 0 6px}
 details.think summary{cursor:pointer;list-style:none;display:inline-flex;gap:6px;align-items:center}
 details.think summary::-webkit-details-marker{display:none}
@@ -282,7 +286,10 @@ function connectEvents(){
     else if (ev.type==='assistant_delta'){ const m=voiceMsg(); voice.text+=ev.text; m.querySelector('.bubble').innerHTML=md(voice.text); m.dataset.text=voice.text; scrollBottom(); }
     else if (ev.type==='tool_start'){ const m=voiceMsg(); voice.tool=toolCard(ev.tool, ev.args||{}); m.querySelector('.tools').appendChild(voice.tool); scrollBottom(); }
     else if (ev.type==='tool_result'){ const m=voiceMsg(); const c=voice.tool||toolCard(ev.tool,{}); c.classList.remove('running'); c.querySelector('.st').textContent=/"error"/.test(ev.text)?'error':'done'; c.querySelector('pre').textContent=ev.text; if(!voice.tool) m.querySelector('.tools').appendChild(c); voice.tool=null; scrollBottom(); }
-    else if (ev.type==='voice_confirm'){ const m=voiceMsg(); const c=document.createElement('div'); c.className='confirm done'; c.innerHTML=`<div class="q"><b>Asked aloud:</b> ${esc(ev.text)} <small style="color:var(--muted)">(answer by voice: “yes”, “go ahead”…)</small></div>`; m.insertBefore(c, m.querySelector('.bubble')); scrollBottom(); }
+    else if (ev.type==='voice_confirm'){ const m=voiceMsg(); const c=document.createElement('div'); c.className='confirm done';
+      let txt=esc(ev.text), block=''; const mm=String(ev.text).match(/^I am about to (.*?) with (\{.*\})\. Should I go ahead\?$/s);
+      if (mm){ try{ const cmd=toolCommand(mm[1], JSON.parse(mm[2])); if(cmd){ txt=`I am about to ${esc(mm[1])}. Should I go ahead?`; block=`<code class="cmd">${/run command|shell|bash/.test(mm[1])?'$ ':''}${esc(cmd)}</code>`; } }catch{} }
+      c.innerHTML=`<div class="q"><b>Asked aloud:</b> ${txt}${block}<small style="color:var(--muted)">(answer by voice: “yes”, “go ahead”…)</small></div>`; m.insertBefore(c, m.querySelector('.bubble')); scrollBottom(); }
     else if (ev.type==='confirm') { // a voice turn needs a typed sudo password: show the card here
       const m = voiceMsg(); confirmCard(ev, m, m.querySelector('.bubble')); }
     else if (ev.type==='reset') { clearLog(); }
@@ -338,9 +345,17 @@ async function retryLast(m){
   const prev = m.previousElementSibling; if (prev && prev.classList.contains('user')) prev.remove(); m.remove();
   await send('', {retry:true});
 }
+// the command a tool is about to run, if it has one (shell, opencode task, app launch…)
+function toolCommand(name, args){
+  args = args||{};
+  const c = args.command || args.cmd || args.task || args.question || args.query || args.app || args.url || args.path;
+  return c ? String(c) : '';
+}
 function toolCard(name, args){
   const det=document.createElement('details'); det.className='tool running';
-  det.innerHTML = `<summary><span class="n">${esc(name.replace('__',' · '))}</span><span class="a">${esc(JSON.stringify(args))}</span><span class="st">running…</span></summary><pre></pre>`;
+  const cmd = toolCommand(name, args); const isShell = /run_command|shell|bash/.test(name);
+  det.innerHTML = `<summary><span class="n">${esc(name.replace('__',' · '))}</span><span class="a">${esc(JSON.stringify(args))}</span><span class="st">running…</span></summary>`
+    + (cmd ? `<div class="cmd">${isShell?'<span class="ps">$</span> ':''}${esc(cmd)}</div>` : '') + `<pre></pre>`;
   return det;
 }
 async function loadHistory(){
@@ -402,9 +417,13 @@ async function interrupt(){ try{ await j('/interrupt',{method:'POST'}); }catch(e
 function confirmCard(ev, m, bubble){
   const c=document.createElement('div'); c.className='confirm';
   const desc = String(ev.description||'').replace(/^\[sudo\]\s*/, '');
+  // "run command with {"command": "..."}" → show the command itself as a block
+  let head = esc(desc), cmdBlock = '';
+  const mt = desc.match(/^(.*?) with (\{.*\})$/s);
+  if (mt){ try{ const cmd = toolCommand(mt[1], JSON.parse(mt[2])); if (cmd){ head = esc(mt[1]); cmdBlock = `<code class="cmd">${/run command|shell|bash/.test(mt[1])?'$ ':''}${esc(cmd)}</code>`; } }catch{} }
   c.innerHTML = ev.sudo
-    ? `<div class="q"><b>Administrator rights:</b> ${name} wants to <code>${esc(desc)}</code><br><small style="color:var(--muted)">This runs with sudo. Enter your password to allow it once; it is used for this command only and never stored. Leave it empty if your account has passwordless sudo.</small></div><input type="password" autocomplete="current-password" placeholder="sudo password" style="min-width:160px"><button class="btn danger">Allow once</button><button class="btn">Deny</button>`
-    : `<div class="q"><b>Confirm:</b> ${name} wants to <code>${esc(desc)}</code></div><button class="btn danger">Allow</button><button class="btn">Deny</button>`;
+    ? `<div class="q"><b>Administrator rights:</b> ${name} wants to ${head}${cmdBlock}<br><small style="color:var(--muted)">This runs with sudo. Enter your password to allow it once; it is used for this command only and never stored. Leave it empty if your account has passwordless sudo.</small></div><input type="password" autocomplete="current-password" placeholder="sudo password" style="min-width:160px"><button class="btn danger">Allow once</button><button class="btn">Deny</button>`
+    : `<div class="q"><b>Confirm:</b> ${name} wants to ${head}${cmdBlock}</div><button class="btn danger">Allow</button><button class="btn">Deny</button>`;
   const [allow, deny] = c.querySelectorAll('button'); const pw = c.querySelector('input');
   const answer = ok => { const body={id:ev.id, ok}; if (ok && pw) body.password = pw.value; if (pw) pw.value=''; j('/confirm',{method:'POST', body:JSON.stringify(body)}); c.classList.add('done'); allow.disabled=deny.disabled=true; if(pw) pw.disabled=true; c.querySelector('.q').innerHTML += ok?' — <b>allowed</b>':' — denied'; };
   allow.onclick=()=>answer(true); deny.onclick=()=>answer(false);

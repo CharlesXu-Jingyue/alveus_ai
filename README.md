@@ -104,11 +104,15 @@ add your own. Mark risky tools with `annotations=annot(destructive=True)` to get
 
 ## Browser GUI and HTTP API (from `alveus talk` or `alveus api`)
 
-`http://127.0.0.1:8765/` serves a GUI: chat by typing with streamed replies, tool activity and
-Allow/Deny cards for destructive actions, a live view of voice turns, and a Settings tab that edits
-`config/local.yaml` and restarts the services. Local machine only; use an SSH tunnel from elsewhere.
-API: `POST /chat`, `POST /chat/stream` (SSE), `POST /speak`, `POST /transcribe`, `POST /trigger`,
-`POST /stop`, `GET /history`, `GET /events`, `GET/PUT /config`, `POST /restart`, docs at `/docs`.
+`http://127.0.0.1:8765/` serves a GUI: chat by typing with streamed replies, tool cards that show
+the command being run, Allow/Deny cards for destructive actions and an "allow once" password card
+for `sudo`, Listen / Stop / Interrupt / Restart buttons, Copy / Speak / Retry under each answer, a
+live view of voice turns (including questions asked aloud), and a Settings tab that edits
+`config/local.yaml` (model profile, speech engines and voices, coding model for opencode, activation,
+audio, tool safety) and restarts the services. Local machine only; use an SSH tunnel from elsewhere.
+API: `POST /chat`, `POST /chat/stream` (SSE), `POST /confirm`, `POST /interrupt`, `POST /speak`,
+`POST /transcribe`, `POST /trigger`, `POST /stop`, `GET /history`, `GET /events`, `GET/PUT /config`,
+`POST /restart`, `GET /debug/tasks`, docs at `/docs`.
 
 ## Layout
 
@@ -120,5 +124,17 @@ scripts/           build_llama.sh, download_models.sh, pip_install_env.sh, insta
 systemd/           user unit templates
 docs/              wake-words.md and more
 ```
+
+## Next items
+
+1. **Chat scrolling**: while a reply is generating, the log forces itself to the bottom. Let the user
+   scroll up and read; resume following the generation head when they scroll back to the bottom.
+2. **Wake words**: name activation misses too often, probably because "Alveus" and "Aurea" are
+   uncommon words for the recognizer. Train custom openWakeWord models for both names
+   (`scripts/train_wakeword.sh`, [docs/wake-words.md](docs/wake-words.md)) and use `mode: both`.
+3. **Conversations and memory**: store conversations, let the user browse and resume them, and give
+   the assistant a memory that persists across restarts (facts, preferences, summaries).
+4. **Image and video models**: vision input (Bonsai ships an `mmproj` tower; screenshots and camera
+   frames), image generation, and video understanding/generation as further pluggable backends.
 
 New here (human or AI agent)? Start with [AGENTS.md](AGENTS.md). Full documentation: [docs/README.md](docs/README.md), or open `docs/handbook.html` offline in a browser (`alveus handbook`; served at `/handbook` by the GUI) (overview, architecture, installation, configuration reference, usage, tools, backends, API, wake words, troubleshooting, development).

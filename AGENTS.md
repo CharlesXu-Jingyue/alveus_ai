@@ -122,8 +122,21 @@ rather than hosted artifacts; the assistant must be installable on another Linux
 `./install.sh`. They test by talking to it and by using the GUI, and report symptoms rather than
 causes — check `journalctl --user -u alveus` first.
 
-## Ideas not yet built
+## Next items (agreed with the owner on 2026-09-09, in priority order)
 
-Persistent memory across restarts / summarization of long conversations; voice barge-in in names
-mode; custom "Alveus"/"Aurea" wake-word models (`scripts/train_wakeword.sh` exists, untested end to
-end); timers/reminders; Home Assistant; vision via Bonsai's mmproj; multiple wake-word models.
+1. **Chat scrolling in the GUI**: generation forces the log to the bottom (`scrollBottom()` on every
+   event in `alveus/web/index.html`). Only auto-scroll while the user is already at the bottom; when
+   they scroll up, stop following; when they scroll back down to the bottom, follow again.
+2. **Custom wake-word models for "Alveus" and "Aurea"**: names mode has too many false negatives
+   (uncommon words for Whisper). Train openWakeWord models with `scripts/train_wakeword.sh`
+   (livekit-wakeword in its own env; docs/wake-words.md), put them under `$ALVEUS_MODELS/wakeword/`,
+   support a list of models in `alveus/audio/wakeword.py`, run `activation.wake_word.mode: both`,
+   tune with `alveus wakeword-test`.
+3. **Conversations and memory**: persist conversations (list, resume, search), summarize long ones,
+   and a memory store the agent can read and write across restarts (facts, preferences). Likely an
+   MCP server plus a sidebar in the GUI; today history lives only in `Agent.history` in memory.
+4. **Image and video models**: vision input (Bonsai `mmproj` via llama-server `--mmproj`,
+   screenshots, camera), image generation, video understanding and generation, each a pluggable
+   backend like STT/TTS.
+
+Other ideas: voice barge-in in names mode; timers/reminders; Home Assistant; speaker identification.

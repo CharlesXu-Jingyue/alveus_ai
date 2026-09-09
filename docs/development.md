@@ -38,6 +38,17 @@ install.sh         end-to-end installer for a new machine
 requirements-lock.txt   versions verified together on 2026-09-04
 ```
 
+## Roadmap (next items, in order)
+
+1. **GUI chat scrolling** – stop forcing the log to the bottom during generation; follow the
+   generation head only while the user is at the bottom, and resume following when they return there.
+2. **Custom wake words** – train openWakeWord models for "Alveus" and "Aurea" (names mode has too
+   many false negatives with these uncommon words), support several models, use `mode: both`.
+3. **Conversations and memory** – stored, browsable, resumable conversations plus a persistent
+   memory the assistant can consult and update across restarts.
+4. **Image and video models** – vision input (Bonsai `mmproj`, screenshots, camera), image
+   generation, video understanding and generation as pluggable backends.
+
 ## Extension points and ideas
 
 - **Streaming STT** for lower latency (Whisper streaming, Parakeet streaming via sherpa-onnx).
