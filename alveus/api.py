@@ -235,6 +235,7 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
 
         async def worker() -> None:
             parts: list[str] = []
+            speech_errors: list[str] = []
             try:
                 if inp.reset:
                     assistant.agent.reset()
@@ -251,9 +252,20 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                         bus.publish("transcript", who="user", text=text, source="gui")
                     if has_voice:
                         bus.publish("state", state="thinking")
+                    speaker = None
+                    if inp.speak and has_voice:
+                        from .audio.speaker import StreamSpeaker
+                        speaker = StreamSpeaker(
+                            assistant.tts, assistant.audio_out,
+                            streaming=bool(assistant.cfg.assistant.get("streaming_tts", True)),
+                            on_speaking=lambda: bus.publish("state", state="speaking"),
+                            on_error=lambda m: speech_errors.append(m))
+                        speaker.start()
                     async for ev in assistant.agent.run(text, confirm=confirm):
                         if ev.kind == "content":
                             parts.append(ev.text)
+                            if speaker:
+                                await speaker.feed(ev.text)
                             await emit({"type": "content", "text": ev.text})
                         elif ev.kind == "reasoning":
                             await emit({"type": "reasoning", "text": ev.text})
@@ -266,17 +278,11 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                             await emit({"type": "error", "text": ev.text})
                 reply = "".join(parts).strip()
                 bus.publish("transcript", who="assistant", text=reply, source="gui")
-                if inp.speak and has_voice and reply:
-                    from .agent.sentences import speakable
-                    loop = asyncio.get_running_loop()
-                    try:
-                        audio = await loop.run_in_executor(None, assistant.tts.synthesize, speakable(reply))
-                        bus.publish("state", state="speaking")
-                        assistant.audio_out.play(audio, assistant.tts.sample_rate)
-                        await loop.run_in_executor(None, assistant.audio_out.wait)
-                    except Exception as e:  # noqa: BLE001
-                        log.exception("speech output failed")
-                        await emit({"type": "error", "text": f"Speech output failed: {type(e).__name__}: {e}"})
+                if speaker:
+                    await speaker.finish()
+                    for m in speech_errors:
+                        await emit({"type": "error", "text": f"Speech output failed: {m}"})
+                    await asyncio.get_running_loop().run_in_executor(None, assistant.audio_out.wait)
                 if has_voice:
                     bus.publish("state", state="idle")
                 await emit({"type": "done", "reply": reply})

@@ -12,7 +12,8 @@ import numpy as np
 
 from .agent import Agent, ToolHub, hub_env
 from .agent.loop import active_names
-from .agent.sentences import SentenceBuffer, speakable
+from .agent.sentences import speakable
+from .audio.speaker import StreamSpeaker
 from .audio import make_audio_in, make_audio_out
 from .audio.chimes import SR as CHIME_SR
 from .audio.chimes import error_chime, listen_chime
@@ -238,50 +239,25 @@ class VoiceAssistant:
     async def respond(self, text: str) -> str:
         """Run the agent on ``text`` and speak the reply as it streams. Returns the full reply."""
         assert self.agent is not None
-        loop = asyncio.get_running_loop()
         self._set(State.THINKING)
-        sb = SentenceBuffer()
         reply_parts: list[str] = []
-        speak_q: asyncio.Queue[str | None] = asyncio.Queue()
-
-        async def speaker() -> None:
-            while True:
-                s = await speak_q.get()
-                if s is None:
-                    return
-                s = speakable(s)
-                if not s:
-                    continue
-                try:
-                    audio = await loop.run_in_executor(self._pool, self.tts.synthesize, s)
-                    self._set(State.SPEAKING)
-                    self.audio_out.play(audio, self.tts.sample_rate)
-                except Exception as e:  # noqa: BLE001
-                    log.error("TTS failed: %s", e)
-
-        speaker_task = asyncio.create_task(speaker())
-        streaming = bool(self.cfg.assistant.get("streaming_tts", True))
+        speaker = StreamSpeaker(self.tts, self.audio_out, pool=self._pool,
+                                streaming=bool(self.cfg.assistant.get("streaming_tts", True)),
+                                on_speaking=lambda: self._set(State.SPEAKING))
+        speaker.start()
         try:
-          async with self.agent.lock:
-            async for ev in self.agent.run(text):
-                  if ev.kind == "content":
-                      reply_parts.append(ev.text)
-                      if streaming:
-                          for s in sb.feed(ev.text):
-                              await speak_q.put(s)
-                  elif ev.kind == "tool_result":
-                      log.info("tool %s -> %s", ev.tool, ev.text[:160].replace("\n", " "))
-                  elif ev.kind == "error":
-                      reply_parts.append(" " + ev.text)
-                      await speak_q.put(ev.text)
-            if streaming:
-                for s in sb.flush():
-                    await speak_q.put(s)
-            else:
-                await speak_q.put("".join(reply_parts))
+            async with self.agent.lock:
+                async for ev in self.agent.run(text):
+                    if ev.kind == "content":
+                        reply_parts.append(ev.text)
+                        await speaker.feed(ev.text)
+                    elif ev.kind == "tool_result":
+                        log.info("tool %s -> %s", ev.tool, ev.text[:160].replace("\n", " "))
+                    elif ev.kind == "error":
+                        reply_parts.append(" " + ev.text)
+                        await speaker.say(ev.text)
         finally:
-            await speak_q.put(None)
-            await speaker_task
+            await speaker.finish()
         reply = "".join(reply_parts).strip()
         self.on_transcript("assistant", reply)
         await self._wait_playback()
