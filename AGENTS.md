@@ -41,9 +41,14 @@ change with a descriptive message (see `git log` for the style).
 | GUI + API | http://127.0.0.1:8765/ (served by the `alveus` service), API docs at `/docs`, handbook at `/handbook` |
 | LLM server | http://127.0.0.1:8080/v1 (OpenAI-compatible) |
 | opencode config (coder tool) | `~/.config/opencode/opencode.jsonc`, provider `bonsai` |
+| ComfyUI (image generation, not yet wired to Alveus) | checkout `~/local/lib/ComfyUI`, conda env `comfy` (torch cu130), user unit `comfyui.service` on http://127.0.0.1:8188, `RequiresMountsFor=/mnt/data` |
+| ComfyUI models | `/mnt/data/comfy/models/{checkpoints,diffusion_models,text_encoders,vae,loras}` via `extra_model_paths.yaml`; `/mnt/data` is the NTFS "Data" drive (fstab by label, `ntfs3`, uid 1000) |
+| generated images | `~/local/data/alveus-ai/images` (ComfyUI `--output-directory`) |
+| exported workflows (API format) | `config/comfy/*.json` (`z_image_turbo_demo.json` so far) |
 
 Hardware: RTX 4090 24 GB, i9-13900K, 62 GB RAM, Ubuntu 24.04, GNOME on X11, PipeWire audio
-(motherboard USB audio + Panasonic SC-GN01 speaker/mic).
+(motherboard USB audio + Panasonic SC-GN01 speaker/mic). Root partition is only 195 GB (keep big
+downloads on `/mnt/data`); device names (`nvmeXn1`) change between boots, so fstab uses labels.
 
 ## Current configuration (check `config/local.yaml`, it may have moved on)
 
@@ -147,10 +152,23 @@ with their own voice via `alveus wakeword-test`; the assistant's Kokoro voice sc
 1. **Conversations and memory**: persist conversations (list, resume, search), summarize long ones,
    and a memory store the agent can read and write across restarts (facts, preferences). Likely an
    MCP server plus a sidebar in the GUI; today history lives only in `Agent.history` in memory.
-2. **Image and video models**: vision input (Bonsai `mmproj` via llama-server `--mmproj`,
-   screenshots, camera), image generation, video understanding and generation, each a pluggable
-   backend like STT/TTS.
-3. **Interrupt by speech** (agreed 2026-09-09): (1) PipeWire echo cancellation (`module-echo-cancel`)
+2. **Image generation through ComfyUI** (installed 2026-09-10, not yet integrated). ComfyUI runs as
+   `comfyui.service` on :8188 with SDXL, FLUX.1 dev (fp8), Z-Image Turbo and FLUX.2 klein 9B on
+   `/mnt/data`; the owner keeps using its browser GUI. Agreed design: an MCP server
+   `mcp_servers/comfy.py` that exposes each exported workflow in `config/comfy/` as one tool with a few
+   parameters (prompt, size, seed, steps), driven by a small manifest mapping parameters to node
+   inputs (node ids in the export look like `57:27`; titles are set: 'CLIP Text Encode (Prompt)',
+   'KSampler', 'EmptySD3LatentImage', 'Save Image'). It POSTs `/prompt`, polls `/history/<id>`,
+   fetches the image via `/view`, saves under `~/local/data/alveus-ai/images` and opens it with the
+   desktop tool. VRAM is the constraint: measured 2026-09-10 with everything idle after a Z-Image render:
+   llama-server 9.8 GB, the assistant (Whisper + Chatterbox) 7 GB, ComfyUI 3.3 GB of 24 GB. A Z-Image
+   or SDXL render fits; FLUX.1 dev fp8 / klein 9B (12–18 GB while rendering) do not, so the tool must
+   free ComfyUI's memory after a job (`POST /free`) and, for those, stop `alveus-llm` for the render
+   (then restart it) or fail with a clear message. Later:
+   `scripts/install_comfy.sh` for other machines, image-to-image, and showing the image in the GUI.
+3. **Vision input and video**: Bonsai `mmproj` via llama-server `--mmproj` (screenshots, camera),
+   video understanding and generation, each a pluggable backend like STT/TTS.
+4. **Interrupt by speech** (agreed 2026-09-09): (1) PipeWire echo cancellation (`module-echo-cancel`)
 so the mic no longer hears the assistant's own voice; select the cancelled source as
 `audio.input_device`; verify by recording while it speaks. (2) Name-triggered barge-in: while
 speaking, run VAD on the cleaned mic, transcribe short segments with the loaded STT, and treat a

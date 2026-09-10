@@ -129,9 +129,11 @@ docs/              wake-words.md and more
 
 1. **Conversations and memory**: store conversations, let the user browse and resume them, and give
    the assistant a memory that persists across restarts (facts, preferences, summaries).
-2. **Image and video models**: vision input (Bonsai ships an `mmproj` tower; screenshots and camera
-   frames), image generation, and video understanding/generation as further pluggable backends.
-3. **Interrupt by speech**: step 1 is PipeWire echo cancellation so the microphone no longer hears
+2. **Image generation**: ComfyUI is installed alongside (SDXL, FLUX.1 dev, Z-Image Turbo, FLUX.2 klein);
+   next is an MCP server that exposes exported workflows in `config/comfy/` as tools.
+3. **Vision and video**: vision input (Bonsai ships an `mmproj` tower; screenshots and camera frames)
+   and video understanding/generation as further pluggable backends.
+4. **Interrupt by speech**: step 1 is PipeWire echo cancellation so the microphone no longer hears
    the assistant's own voice; then name-triggered barge-in ("Aurea…" while it speaks cuts it off and
    listens); later the custom wake-word models make that instant.
 

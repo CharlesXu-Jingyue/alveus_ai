@@ -28,7 +28,7 @@ Integration checks that need the running stack: `alveus doctor --warm`, `alveus 
 ```
 alveus/            core package (see architecture.md)
 mcp_servers/       built-in MCP servers
-config/            alveus.yaml (defaults), persona.md, local.yaml (git-ignored)
+config/            alveus.yaml (defaults), persona.md, local.yaml (git-ignored), comfy/ (exported ComfyUI workflows)
 scripts/           installer pieces: pip_install_env.sh, build_llama.sh, download_models.sh,
                    install_services.sh, train_wakeword.sh
 systemd/           *.service.in templates rendered by install_services.sh
@@ -44,9 +44,11 @@ requirements-lock.txt   versions verified together on 2026-09-04
 
 1. **Conversations and memory** – stored, browsable, resumable conversations plus a persistent
    memory the assistant can consult and update across restarts.
-2. **Image and video models** – vision input (Bonsai `mmproj`, screenshots, camera), image
-   generation, video understanding and generation as pluggable backends.
-3. **Interrupt by speech** – (1) PipeWire echo cancellation so the mic does not hear the assistant;
+2. **Image generation via ComfyUI** – ComfyUI runs next to Alveus (see AGENTS.md for the layout);
+   write `mcp_servers/comfy.py` exposing the workflows in `config/comfy/` as tools, with VRAM handling.
+3. **Vision and video** – vision input (Bonsai `mmproj`, screenshots, camera), video understanding
+   and generation as pluggable backends.
+4. **Interrupt by speech** – (1) PipeWire echo cancellation so the mic does not hear the assistant;
    (2) name-triggered barge-in while it speaks (VAD + STT on the cleaned signal, name match acts like
    the Listen button); (3) custom wake-word models make the trigger instant.
 
