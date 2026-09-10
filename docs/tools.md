@@ -88,8 +88,10 @@ is not involved, but it shares opencode's config and credentials). Which model o
 `auto` (default) requests the same local Bonsai model the assistant is running, via the `bonsai`
 provider in `~/.config/opencode/opencode.jsonc`, so it follows `llm.profile`; `opencode-default` leaves
 the choice to opencode; any `provider/model` id from `opencode models` (e.g. `deepseek/deepseek-v4-flash`)
-sends the work to that model instead. `ALVEUS_CODE_DIR` is the project folder used when the request
-names none.
+sends the work to that model instead. `ALVEUS_CODE_DIR` is the coding folder: the tools' descriptions quote it so the model knows it, and
+`directory` is resolved against it: empty, `~`, `.` or `default` mean the folder itself; a bare name
+(`repo`, `repo/foo`) is looked up inside it (then under `~`); absolute and `~/…` paths are used as given.
+An unknown name returns an error listing the folder's subdirectories so the model can pick one.
 
 Note on the local server: llama-server loads one model and answers to whatever model id a client
 sends, so a client that asks for `bonsai-27b-1bit` while the ternary profile is running silently gets
@@ -98,9 +100,9 @@ running profile's id.
 
 | tool | parameters | does |
 |---|---|---|
-| `code_task` | `task`, `directory="~"`, `continue_last=false`, `timeout_s=900` | full agentic coding run in that directory (reads, edits, runs); returns opencode's final message, tools used, session id. `continue_last` resumes the previous session in the same directory |
-| `code_question` | `question`, `directory="~"`, `timeout_s=300` | read-only analysis with opencode's `plan` agent |
-| `git_status` | `directory="."` | `git status --short --branch` + last 5 commits |
+| `code_task` | `task`, `directory=""`, `continue_last=false`, `timeout_s=900` | full agentic coding run in that directory (reads, edits, runs); returns opencode's final message, tools used, session id. `continue_last` resumes the previous session in the same directory |
+| `code_question` | `question`, `directory=""`, `timeout_s=300` | read-only analysis with opencode's `plan` agent |
+| `git_status` | `directory=""` | `git status --short --branch` + last 5 commits |
 
 ## Adding third-party MCP servers
 

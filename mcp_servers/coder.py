@@ -12,8 +12,33 @@ from .common import FastMCP, annot, j
 mcp = FastMCP("coder")
 OPENCODE = shutil.which("opencode") or os.path.expanduser("~/.opencode/bin/opencode")
 LOCAL_PROVIDER = os.environ.get("ALVEUS_OPENCODE_LOCAL_PROVIDER", "bonsai")  # provider id in opencode.jsonc
-DEFAULT_DIR = os.environ.get("ALVEUS_CODE_DIR") or "~"
+DEFAULT_DIR = os.path.expanduser(os.environ.get("ALVEUS_CODE_DIR") or "~")
 _last_session: dict[str, str] = {}
+_DIR_DOC = (f"directory: absolute path of the project. Leave it empty for the configured coding folder "
+            f"{DEFAULT_DIR}; a bare name like 'repo' is looked up inside that folder.")
+
+
+def resolve_dir(directory: str) -> str:
+    """Map what the model tends to send to a real folder: '', '~', '.', 'default' → the configured
+    coding folder; a relative name → inside that folder (or the home folder); '~/x' and absolute
+    paths as given. Raises NotADirectoryError with a hint listing the coding folder's contents."""
+    d = (directory or "").strip()
+    if d in ("", "~", "~/", ".", "./", "default"):
+        return DEFAULT_DIR
+    d = os.path.expanduser(d)
+    if os.path.isabs(d):
+        cand = [d]
+    else:
+        cand = [os.path.join(DEFAULT_DIR, d), os.path.expanduser(os.path.join("~", d))]
+    for c in cand:
+        if Path(c).is_dir():
+            return os.path.normpath(c)
+    try:
+        listing = ", ".join(sorted(e.name for e in os.scandir(DEFAULT_DIR) if e.is_dir() and not e.name.startswith("."))[:30])
+    except OSError:
+        listing = ""
+    raise NotADirectoryError(f"{directory!r} is not a directory. The coding folder is {DEFAULT_DIR}"
+                             + (f", containing: {listing}" if listing else ""))
 
 
 def _model() -> str:
@@ -46,14 +71,13 @@ def _run(args: list[str], cwd: str, timeout: int) -> dict:
         return {"exit_code": -1, "error": "opencode is not installed (https://opencode.ai)"}
 
 
-@mcp.tool()
+@mcp.tool(description="Delegate a coding task to the opencode agent in a project directory (it can read, write "
+          "and run code there). Returns opencode's final summary. Use continue_last to follow up. " + _DIR_DOC)
 def code_task(task: str, directory: str = "", continue_last: bool = False, timeout_s: int = 900) -> str:
-    """Delegate a coding task to the opencode agent in a project directory (it can read, write
-    and run code there). Returns opencode's final summary. Use continue_last to follow up.
-    directory defaults to the configured coding folder."""
-    cwd = os.path.expanduser(directory or DEFAULT_DIR)
-    if not Path(cwd).is_dir():
-        return j({"error": f"{cwd} is not a directory"})
+    try:
+        cwd = resolve_dir(directory)
+    except NotADirectoryError as e:
+        return j({"error": str(e)})
     args = ["run", "--format", "json"]
     if MODEL:
         args += ["--model", MODEL]
@@ -83,11 +107,13 @@ def code_task(task: str, directory: str = "", continue_last: bool = False, timeo
               "session": session_id, "stderr": res.get("stderr", "")[-800:] if res.get("exit_code") else ""})
 
 
-@mcp.tool(annotations=annot(read_only=True))
+@mcp.tool(annotations=annot(read_only=True),
+          description="Ask opencode a read-only question about a codebase (explain, find, review). " + _DIR_DOC)
 def code_question(question: str, directory: str = "", timeout_s: int = 300) -> str:
-    """Ask opencode a read-only question about a codebase (explain, find, review).
-    directory defaults to the configured coding folder."""
-    cwd = os.path.expanduser(directory or DEFAULT_DIR)
+    try:
+        cwd = resolve_dir(directory)
+    except NotADirectoryError as e:
+        return j({"error": str(e)})
     args = ["run", "--format", "json", "--agent", "plan"]
     if MODEL:
         args += ["--model", MODEL]
@@ -105,10 +131,12 @@ def code_question(question: str, directory: str = "", timeout_s: int = 300) -> s
     return j({"answer": texts[-1] if texts else res.get("stdout", "")[-3000:], "exit_code": res.get("exit_code")})
 
 
-@mcp.tool(annotations=annot(read_only=True))
-def git_status(directory: str = ".") -> str:
-    """Short git status + last 5 commits for a repo."""
-    cwd = os.path.expanduser(directory)
+@mcp.tool(annotations=annot(read_only=True), description="Short git status + last 5 commits for a repo. " + _DIR_DOC)
+def git_status(directory: str = "") -> str:
+    try:
+        cwd = resolve_dir(directory)
+    except NotADirectoryError as e:
+        return j({"error": str(e)})
     st = subprocess.run(["git", "status", "--short", "--branch"], cwd=cwd, capture_output=True, text=True)
     lg = subprocess.run(["git", "log", "--oneline", "-5"], cwd=cwd, capture_output=True, text=True)
     return j({"status": st.stdout or st.stderr, "log": lg.stdout})
