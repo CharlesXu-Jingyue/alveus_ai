@@ -72,6 +72,10 @@ is running the **Send** button turns into **Interrupt**, which stops generation,
 calls, cuts speech and denies any open confirmation. Under each answer: **Copy**, **Speak** (say it
 again), **Stop** (stop speaking) and **Retry** (ask the same question again).
 
+While a reply streams in, the log follows the newest text only as long as you are at the bottom. Scroll up to read
+earlier parts and it stops following; a **↓ newer messages** button appears and takes you back, or scroll to
+the bottom yourself. Your own messages and confirmation questions always scroll into view.
+
 **Commands that need sudo.** Any shell command using `sudo` is held until you allow it. The
 confirmation card shows a password field: enter your password and press **Allow once**. The
 password is handed to that one `sudo` on its standard input and is neither stored nor logged (it

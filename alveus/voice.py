@@ -109,7 +109,7 @@ class VoiceAssistant:
         if self.ww_mode in ("names", "both"):
             how.append(f"say '{self.name}' or '{self.other_name}'")
         if self.wake:
-            how.append(f"say '{self.wake.model_name.replace('_', ' ')}'")
+            how.append(f"say {self.wake.phrases()}")
         if self.hotkey:
             how.append(f"press {self.hotkey.combo}")
         log.info("%s is ready: %s.", self.name, " / ".join(how) or "no activation configured")
@@ -262,7 +262,7 @@ class VoiceAssistant:
                 continue
             frames.append(f)
             if watch_wake and self.wake is not None and self.wake.detected(f):
-                log.info("wake word '%s' detected", self.wake.model_name)
+                log.info("wake word '%s' detected", self.wake.last_model)
                 self.wake.reset()
                 self._wake_hit = True
                 return None
@@ -334,7 +334,7 @@ class VoiceAssistant:
                 self.trigger.fire()
                 break
             if barge and self.wake is not None and frame is not None and self.wake.detected(frame):
-                log.info("barge-in (wake word): stopping playback")
+                log.info("barge-in (wake word '%s'): stopping playback", self.wake.last_model)
                 self.wake.reset()
                 self.interrupt()
                 self.trigger.fire()

@@ -155,6 +155,9 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
 .field .lbl{font-weight:500}
 .field .lbl small{display:block;font-weight:400;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.4}
 .field .ctl input[type=text],.field .ctl input[type=number],.field .ctl select,.field .ctl textarea{width:100%;background:var(--bg);border:1px solid var(--rule-2);border-radius:8px;padding:7px 10px;font-size:14px}
+.multi{display:flex;flex-wrap:wrap;gap:6px 14px;padding:6px 0}
+.multi label{display:flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer}
+.multi input{accent-color:var(--accent)}
 .field .ctl textarea{min-height:64px;resize:vertical;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px}
 .field .ctl input:focus,.field .ctl select:focus,.field .ctl textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .field.dirty .ctl input,.field.dirty .ctl select,.field.dirty .ctl textarea{border-color:var(--warm)}
@@ -537,7 +540,7 @@ const FIELDS = [
  {p:'activation.wake_word.mode', l:'Wake mode', h:'names: say one of its names in your sentence (“Aurea, what time is it?”), no training needed. oww: a trained wake-word model listens for a fixed phrase, reacts faster. both: either works.', t:'select', o:'activation_modes'},
  {p:'activation.wake_word.names', l:'Names', h:'Words that count as addressing the assistant. Comma-separated.', t:'list'},
  {p:'activation.wake_word.name_aliases', l:'Name aliases', h:'Ways the speech recognizer tends to misspell the names (e.g. “Aria” for Aurea). Also accepted as a wake name. Comma-separated.', t:'list'},
- {p:'activation.wake_word.oww_model', l:'Wake-word model', h:'The phrase the wake-word model listens for. Built-in: hey_jarvis, alexa, hey_mycroft… Custom models trained with scripts/train_wakeword.sh appear here too. Only used in oww or both mode.', t:'select', o:'oww_models', when:{p:'activation.wake_word.mode', v:['oww','both']}},
+ {p:'activation.wake_word.oww_model', l:'Wake-word models', h:'The phrases the wake-word models listen for; tick several to listen for all of them at once (e.g. alveus and aurea). Built-in: hey_jarvis, alexa, hey_mycroft… Custom models trained with scripts/train_wakeword.sh appear here too. Only used in oww or both mode.', t:'multi', o:'oww_models', when:{p:'activation.wake_word.mode', v:['oww','both']}},
  {p:'activation.wake_word.threshold', l:'Wake-word sensitivity threshold', h:'How sure the wake-word model must be before it triggers, from 0 to 1. Lower = wakes more easily but more false alarms; higher = you may need to repeat yourself. 0.5 is a good start; tune with: alveus wakeword-test.', t:'number', step:0.05, min:0.1, max:0.95, when:{p:'activation.wake_word.mode', v:['oww','both']}},
  {p:'activation.wake_word.follow_up_window_s', l:'Follow-up window (seconds)', h:'After it answers, you can keep talking without saying its name for this long. 0 turns the feature off.', t:'number', min:0, max:60},
  {p:'activation.hotkey.enabled', l:'Keyboard shortcut', h:'A global key combination that makes it listen, like pressing a talk button.', t:'bool'},
@@ -642,6 +645,14 @@ function fieldRow(f){
     el=document.createElement('select'); const opts=[...(cfg.options[f.o]||[])]; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur);
     el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o)}</option>`).join('') + `<option value="__custom__">type another…</option>`;
     el.onchange=()=>{ if(el.value==='__custom__'){ const v=prompt('Value (e.g. provider/model):', cur||''); if(v && v.trim()){ const o=document.createElement('option'); o.value=v.trim(); o.textContent=v.trim(); el.insertBefore(o, el.lastElementChild); el.value=v.trim(); setDirty(v.trim()); } else el.value=cur; return; } setDirty(el.value); };
+  }
+  else if (f.t==='multi'){
+    // checkboxes over the option list (plus any configured value the list does not know); saved as a YAML list
+    el=document.createElement('div'); el.className='multi'; const opts=[...(cfg.options[f.o]||[])];
+    const cur = Array.isArray(eff) ? eff.map(String) : String(eff??'').split(',').map(s=>s.trim()).filter(Boolean);
+    for (const c of cur) if(!opts.includes(c)) opts.push(c);
+    el.innerHTML = opts.map(o=>`<label><input type="checkbox" value="${esc(o)}"${cur.includes(o)?' checked':''}> ${esc(o)}</label>`).join('');
+    el.querySelectorAll('input').forEach(i => i.onchange = () => setDirty([...el.querySelectorAll('input:checked')].map(x=>x.value)));
   }
   else if (f.t==='list'){ el=document.createElement('input'); el.type='text'; el.value=Array.isArray(eff)?eff.join(', '):(eff||''); el.oninput=()=>setDirty(el.value.split(',').map(s=>s.trim()).filter(Boolean)); }
   else if (f.t==='number'){ el=document.createElement('input'); el.type='number'; if(f.step) el.step=f.step; if(f.min!==undefined) el.min=f.min; if(f.max!==undefined) el.max=f.max; el.value=eff??''; el.oninput=()=>{ setDirty(el.value==='' ? UNSET : Number(el.value)); }; }

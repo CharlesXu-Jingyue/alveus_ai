@@ -117,7 +117,7 @@ sampling `--temp 0.7 --top-p 0.95 --top-k 20` as recommended by the model card.
 | `wake_word.mode` | `names` | `names` (transcript-based), `oww` (openWakeWord), `both` |
 | `wake_word.names` | `[Alveus, Aurea]` | names that address the assistant |
 | `wake_word.name_aliases` | `[alvius, …, aria, oria, …]` | STT misspellings that also count |
-| `wake_word.oww_model` | `hey_jarvis` | pretrained id or the stem of a custom `.onnx` in `${ALVEUS_MODELS}/wakeword/` |
+| `wake_word.oww_model` | `hey_jarvis` | one model, or a list (`[alveus, aurea]` / `"alveus, aurea"`) that all listen at once: pretrained ids or the stem of a custom `.onnx` in `${ALVEUS_MODELS}/wakeword/` |
 | `wake_word.threshold` | `0.5` | openWakeWord score threshold |
 | `wake_word.name_segment_s` | `12` | max length of a speech segment checked for a name |
 | `wake_word.follow_up_window_s` | `8` | seconds after a reply during which no name is needed (`0` disables) |

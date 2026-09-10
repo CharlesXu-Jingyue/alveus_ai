@@ -477,7 +477,7 @@ def wakeword_test(seconds: float = 15.0):
                   models_dir=f"{cfg._env['ALVEUS_MODELS']}/wakeword")
     mic = make_audio_in(cfg)
     mic.start()
-    console.print(f"say '{ww.model_name.replace('_', ' ')}' ... ({seconds}s, threshold {ww.threshold})")
+    console.print(f"say {ww.phrases()} ... ({seconds}s, threshold {ww.threshold})")
     t0 = time.time()
     while time.time() - t0 < seconds:
         f = mic.read(1.0)
@@ -485,7 +485,7 @@ def wakeword_test(seconds: float = 15.0):
             continue
         s = ww.feed(f)
         if s > 0.1:
-            console.print(f"score {s:.2f}" + ("  [green]DETECTED[/green]" if s >= ww.threshold else ""))
+            console.print(f"{ww.last_model}: score {s:.2f}" + ("  [green]DETECTED[/green]" if s >= ww.threshold else ""))
     mic.stop()
 
 
