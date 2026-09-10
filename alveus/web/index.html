@@ -67,6 +67,9 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
 
 /* ---------- chat */
 #log{flex:1;overflow:auto;padding:26px 0 12px;scroll-behavior:smooth}
+/* shown when new content arrives while the reader has scrolled up */
+#jump{position:sticky;bottom:10px;display:flex;justify-content:center;pointer-events:none;margin-top:-30px}
+#jump button{pointer-events:auto;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.06em;box-shadow:0 4px 18px rgba(0,0,0,.25)}
 .col{width:min(860px,calc(100% - 40px));margin:0 auto}
 .msg{display:flex;flex-direction:column;gap:6px;margin:0 0 20px}
 .msg .who{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center}
@@ -204,7 +207,7 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
     <div id="log"><div class="col" id="logCol">
       <div class="empty" id="empty"><b id="emptyName">Alveus</b>Type below, or say the name out loud. Voice turns show up here too.
         <div class="ex" id="examples"></div></div>
-    </div></div>
+    </div><div id="jump" hidden><button class="btn primary" title="Scroll to the newest message and follow the reply again">↓ newer messages</button></div></div>
     <div class="composer"><div class="col">
       <div class="box">
         <textarea id="input" rows="1" placeholder="Ask anything, or tell it what to do… (Enter to send, Shift+Enter for a new line)"></textarea>
@@ -346,14 +349,28 @@ function voiceFinish(finalText){
   else m.dataset.text = finalText || voice.text;
   voice.msg=null; voice.text=''; voice.tool=null; scrollBottom();
 }
-function clearLog(){ [...logCol.children].forEach(c => { if(c.id!=='empty') c.remove(); }); $('empty').style.display=''; }
-function scrollBottom(){ log.scrollTop = log.scrollHeight; }
+function clearLog(){ [...logCol.children].forEach(c => { if(c.id!=='empty') c.remove(); }); $('empty').style.display=''; follow=true; $('jump').hidden=true; }
+// Auto-scroll follows the newest content only while the reader is at (or near) the bottom of the log.
+// Scrolling up stops the following, so a long reply can be read while it is still being generated;
+// scrolling back down (or the "newer messages" button) resumes it. force=true always jumps (own messages, history load).
+let follow=true, autoTop=0;   // autoTop: where the last auto-scroll left the log
+const nearBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight <= 48;
+log.addEventListener('scroll', () => { follow = nearBottom(); if (follow){ $('jump').hidden = true; autoTop = log.scrollTop; } }, {passive:true});
+function scrollBottom(force){
+  if (force) follow = true;
+  // Streamed deltas arrive faster than the browser dispatches scroll events, so a wheel movement can
+  // be undone by the next delta before the listener runs: detect the reader moving up right here.
+  else if (follow && log.scrollTop < autoTop - 4) follow = false;
+  if (follow){ log.scrollTo({top: log.scrollHeight, behavior: 'instant'}); autoTop = log.scrollTop; }   // instant: a smooth animation would look like the user scrolling
+  else $('jump').hidden = false;
+}
+$('jump').querySelector('button').onclick = () => scrollBottom(true);
 function addMessage(who, text, source){
   $('empty').style.display='none';
   const d=document.createElement('div'); d.className='msg '+who; d.dataset.text = text||'';
   d.innerHTML = `<div class="who">${who==='user'?'You':esc(name)}${source&&source!=='gui'?`<span class="src">${esc(source)}</span>`:''}</div><div class="bubble">${who==='user'?esc(text).replace(/\n/g,'<br>'):md(text)}</div>`;
   if (who==='assistant') d.appendChild(actionBar(d));
-  logCol.appendChild(d); scrollBottom(); return d;
+  logCol.appendChild(d); scrollBottom(who==='user'); return d;
 }
 function actionBar(m){
   const bar=document.createElement('div'); bar.className='acts';
@@ -405,7 +422,7 @@ async function loadHistory(){
         }
       }
     }
-    scrollBottom();
+    scrollBottom(true);
   }catch(e){ /* offline */ }
 }
 
@@ -461,7 +478,7 @@ function confirmCard(ev, m, bubble){
   const answer = ok => { const body={id:ev.id, ok}; if (ok && pw) body.password = pw.value; if (pw) pw.value=''; j('/confirm',{method:'POST', body:JSON.stringify(body)}); c.classList.add('done'); allow.disabled=deny.disabled=true; if(pw) pw.disabled=true; c.querySelector('.q').innerHTML += ok?' — <b>allowed</b>':' — denied'; };
   allow.onclick=()=>answer(true); deny.onclick=()=>answer(false);
   if (pw){ pw.addEventListener('keydown', e => { if(e.key==='Enter') answer(true); }); setTimeout(()=>pw.focus(), 50); }
-  m.insertBefore(c, bubble); scrollBottom();
+  m.insertBefore(c, bubble); scrollBottom(true);   // a question needs to be seen
 }
 const input=$('input');
 function autosize(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,180)+'px'; }

@@ -13,3 +13,5 @@ logs/
 .pytest_cache/
 .ruff_cache/
 voices/
+.wakeword-train/
+data/
