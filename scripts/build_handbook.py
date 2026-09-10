@@ -34,6 +34,7 @@ ORDER = [
     ("wake-words", "Wake words", "wake-words", "Use"),
     ("troubleshooting", "Troubleshooting", "troubleshooting", "Maintain"),
     ("development", "Development", "development", "Maintain"),
+    ("devlog", "Dev log & plans", "devlog", "Maintain"),
 ]
 SLUGS = {f.lower(): s for f, _, s, _ in ORDER}
 LINK_RE = re.compile(r'href="([a-zA-Z0-9-]+)\.md(#[^"]*)?"')

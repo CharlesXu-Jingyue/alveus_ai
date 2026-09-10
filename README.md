@@ -127,14 +127,7 @@ docs/              wake-words.md and more
 
 ## Next items
 
-1. **Conversations and memory**: store conversations, let the user browse and resume them, and give
-   the assistant a memory that persists across restarts (facts, preferences, summaries).
-2. **Image generation**: ComfyUI is installed alongside (SDXL, FLUX.1 dev, Z-Image Turbo, FLUX.2 klein);
-   next is an MCP server that exposes exported workflows in `config/comfy/` as tools.
-3. **Vision and video**: vision input (Bonsai ships an `mmproj` tower; screenshots and camera frames)
-   and video understanding/generation as further pluggable backends.
-4. **Interrupt by speech**: step 1 is PipeWire echo cancellation so the microphone no longer hears
-   the assistant's own voice; then name-triggered barge-in ("Aurea…" while it speaks cuts it off and
-   listens); later the custom wake-word models make that instant.
+Conversations and memory; image generation through ComfyUI (installed, MCP integration next); vision
+input and video; interrupt by speech; wake-word tuning. Details and history: [docs/devlog.md](docs/devlog.md).
 
 New here (human or AI agent)? Start with [AGENTS.md](AGENTS.md). Full documentation: [docs/README.md](docs/README.md), or open `docs/handbook.html` offline in a browser (`alveus handbook`; served at `/handbook` by the GUI) (overview, architecture, installation, configuration reference, usage, tools, backends, API, wake words, troubleshooting, development).

@@ -141,39 +141,10 @@ rather than hosted artifacts; the assistant must be installable on another Linux
 `./install.sh`. They test by talking to it and by using the GUI, and report symptoms rather than
 causes — check `journalctl --user -u alveus` first.
 
-## Next items (agreed with the owner on 2026-09-09, in priority order)
+## Next items
 
-Done on 2026-09-09: GUI chat scrolling (follows only at the bottom, "newer messages" button) and custom
-openWakeWord models for both names (`$ALVEUS_MODELS/wakeword/{alveus,aurea}.onnx`, trained with
-`scripts/train_wakeword.sh`; eval recall 99.2 % / 99.6 %, 0 false positives per hour on the synthetic
-validation set; `oww_model` takes a list; `mode: both`, threshold 0.5 — the owner still has to tune
-with their own voice via `alveus wakeword-test`; the assistant's Kokoro voice scores 0.90 / 0.66).
-
-1. **Conversations and memory**: persist conversations (list, resume, search), summarize long ones,
-   and a memory store the agent can read and write across restarts (facts, preferences). Likely an
-   MCP server plus a sidebar in the GUI; today history lives only in `Agent.history` in memory.
-2. **Image generation through ComfyUI** (installed 2026-09-10, not yet integrated). ComfyUI runs as
-   `comfyui.service` on :8188 with SDXL, FLUX.1 dev (fp8), Z-Image Turbo and FLUX.2 klein 9B on
-   `/mnt/data`; the owner keeps using its browser GUI. Agreed design: an MCP server
-   `mcp_servers/comfy.py` that exposes each exported workflow in `config/comfy/` as one tool with a few
-   parameters (prompt, size, seed, steps), driven by a small manifest mapping parameters to node
-   inputs (node ids in the export look like `57:27`; titles are set: 'CLIP Text Encode (Prompt)',
-   'KSampler', 'EmptySD3LatentImage', 'Save Image'). It POSTs `/prompt`, polls `/history/<id>`,
-   fetches the image via `/view`, saves under `~/local/data/alveus-ai/images` and opens it with the
-   desktop tool. VRAM is the constraint: measured 2026-09-10 with everything idle after a Z-Image render:
-   llama-server 9.8 GB, the assistant (Whisper + Chatterbox) 7 GB, ComfyUI 3.3 GB of 24 GB. A Z-Image
-   or SDXL render fits; FLUX.1 dev fp8 / klein 9B (12–18 GB while rendering) do not, so the tool must
-   free ComfyUI's memory after a job (`POST /free`) and, for those, stop `alveus-llm` for the render
-   (then restart it) or fail with a clear message. Later:
-   `scripts/install_comfy.sh` for other machines, image-to-image, and showing the image in the GUI.
-3. **Vision input and video**: Bonsai `mmproj` via llama-server `--mmproj` (screenshots, camera),
-   video understanding and generation, each a pluggable backend like STT/TTS.
-4. **Interrupt by speech** (agreed 2026-09-09): (1) PipeWire echo cancellation (`module-echo-cancel`)
-so the mic no longer hears the assistant's own voice; select the cancelled source as
-`audio.input_device`; verify by recording while it speaks. (2) Name-triggered barge-in: while
-speaking, run VAD on the cleaned mic, transcribe short segments with the loaded STT, and treat a
-name match like the Listen button (interrupt, then listen). (3) Replace the transcription step with
-the custom wake-word models once trained; optionally allow any-speech interruption.
-
-Other ideas: timers/reminders (GNOME Clocks is not scriptable; use `systemd-run --user --on-active`
-or an in-process timer that also calls `/speak`); Home Assistant; speaker identification.
+The roadmap and the history live in **`docs/devlog.md`** (Plans section at the top; add an entry
+there for every working session, newest first). Current order: (1) conversations and memory,
+(2) image generation through ComfyUI (installed, not integrated — MCP server over `config/comfy/`
+workflows, VRAM rule), (3) vision input and video, (4) interrupt by speech (echo cancellation first),
+(5) wake-word tuning for the owner's voice. Update the dev log, not this file, when priorities change.

@@ -14,6 +14,7 @@ Browsable offline version: `docs/handbook.html` (open it directly, run `alveus h
 | [api.md](api.md) | The browser GUI and local HTTP API (streaming chat, confirmations, config, restart) |
 | [wake-words.md](wake-words.md) | Activation modes, pretrained wake words, training custom "Alveus" / "Aurea" models |
 | [troubleshooting.md](troubleshooting.md) | Known issues and their fixes, diagnostic commands |
-| [development.md](development.md) | Repository conventions, tests, lint, extension points, roadmap ideas |
+| [development.md](development.md) | Repository conventions, tests, lint, extension points |
+| [devlog.md](devlog.md) | Development log: what was done and learned, day by day, and the roadmap |
 
 Quick start: `conda activate alveus && alveus doctor --warm && alveus chat`, then say **"Aurea, …"** with `alveus talk` or the `alveus` systemd service — and open the GUI at http://127.0.0.1:8765/ (`alveus ui`).

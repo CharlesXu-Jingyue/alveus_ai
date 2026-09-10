@@ -3,7 +3,7 @@
     "inputs": {
       "filename_prefix": "z-image-turbo",
       "images": [
-        "57:8",
+        "8",
         0
       ]
     },
@@ -12,7 +12,7 @@
       "title": "Save Image"
     }
   },
-  "57:30": {
+  "30": {
     "inputs": {
       "clip_name": "qwen_3_4b.safetensors",
       "type": "lumina2",
@@ -23,7 +23,7 @@
       "title": "Load CLIP"
     }
   },
-  "57:29": {
+  "29": {
     "inputs": {
       "vae_name": "ae.safetensors"
     },
@@ -32,10 +32,10 @@
       "title": "Load VAE"
     }
   },
-  "57:33": {
+  "33": {
     "inputs": {
       "conditioning": [
-        "57:27",
+        "27",
         0
       ]
     },
@@ -44,14 +44,14 @@
       "title": "Conditioning Zero Out"
     }
   },
-  "57:8": {
+  "8": {
     "inputs": {
       "samples": [
-        "57:3",
+        "3",
         0
       ],
       "vae": [
-        "57:29",
+        "29",
         0
       ]
     },
@@ -60,7 +60,7 @@
       "title": "VAE Decode"
     }
   },
-  "57:28": {
+  "28": {
     "inputs": {
       "unet_name": "z_image_turbo_bf16.safetensors",
       "weight_dtype": "default"
@@ -70,11 +70,11 @@
       "title": "Load Diffusion Model"
     }
   },
-  "57:27": {
+  "27": {
     "inputs": {
       "text": " beautiful Asian woman with elegant features, soft glowing skin, and long dark hair cascading over her shoulders. She has almond-shaped eyes with a gentle smile, wearing subtle traditional-inspired makeup with rosy cheeks and a soft lip tint. She's dressed in a flowing kimono-style gown in muted pastel tones, surrounded by cherry blossom petals drifting in a soft breeze. Golden hour lighting, cinematic composition, photorealistic style, 8K detail, soft bokeh background.",
       "clip": [
-        "57:30",
+        "30",
         0
       ]
     },
@@ -83,7 +83,7 @@
       "title": "CLIP Text Encode (Prompt)"
     }
   },
-  "57:13": {
+  "13": {
     "inputs": {
       "width": 1024,
       "height": 1024,
@@ -94,11 +94,11 @@
       "title": "EmptySD3LatentImage"
     }
   },
-  "57:11": {
+  "11": {
     "inputs": {
       "shift": 3,
       "model": [
-        "57:28",
+        "28",
         0
       ]
     },
@@ -107,7 +107,7 @@
       "title": "ModelSamplingAuraFlow"
     }
   },
-  "57:3": {
+  "3": {
     "inputs": {
       "seed": 98062586784511,
       "steps": 8,
@@ -116,19 +116,19 @@
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "57:11",
+        "11",
         0
       ],
       "positive": [
-        "57:27",
+        "27",
         0
       ],
       "negative": [
-        "57:33",
+        "33",
         0
       ],
       "latent_image": [
-        "57:13",
+        "13",
         0
       ]
     },

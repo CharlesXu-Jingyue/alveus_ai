@@ -38,19 +38,9 @@ install.sh         end-to-end installer for a new machine
 requirements-lock.txt   versions verified together on 2026-09-04
 ```
 
-## Roadmap (next items, in order)
+## Roadmap
 
-(GUI chat scrolling and the custom wake-word models for both names were done on 2026-09-09.)
-
-1. **Conversations and memory** – stored, browsable, resumable conversations plus a persistent
-   memory the assistant can consult and update across restarts.
-2. **Image generation via ComfyUI** – ComfyUI runs next to Alveus (see AGENTS.md for the layout);
-   write `mcp_servers/comfy.py` exposing the workflows in `config/comfy/` as tools, with VRAM handling.
-3. **Vision and video** – vision input (Bonsai `mmproj`, screenshots, camera), video understanding
-   and generation as pluggable backends.
-4. **Interrupt by speech** – (1) PipeWire echo cancellation so the mic does not hear the assistant;
-   (2) name-triggered barge-in while it speaks (VAD + STT on the cleaned signal, name match acts like
-   the Listen button); (3) custom wake-word models make the trigger instant.
+See [devlog.md](devlog.md): the Plans section is the roadmap, the dated entries are the history.
 
 ## Extension points and ideas
 
