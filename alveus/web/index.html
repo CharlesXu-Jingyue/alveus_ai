@@ -146,6 +146,10 @@ details.think .t{white-space:pre-wrap;border-left:2px solid var(--rule-2);paddin
 .snav a:hover{background:var(--surface-2)}
 .snav .note{font-size:12px;color:var(--muted);padding:12px 10px 0;line-height:1.5}
 .snav .note code{font-size:11px}
+.snav .find{margin:0 0 8px}
+.snav .find input{width:100%;box-sizing:border-box;font:inherit;font-size:13.5px;padding:7px 10px;border:1px solid var(--rule-2);border-radius:8px;background:var(--surface);color:var(--ink)}
+.snav .find small{display:block;color:var(--muted);font-size:12px;padding:4px 2px 0}
+.field.nomatch{display:none}
 section.grp{margin:0 0 34px}
 section.grp h2{font-family:"Chakra Petch","IBM Plex Sans",sans-serif;font-size:20px;font-weight:700;letter-spacing:.01em;margin:0 0 4px;scroll-margin-top:20px}
 section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
@@ -220,8 +224,8 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
       </div>
       <div class="row">
         <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <label><input type="checkbox" id="speakReplies"> Speak replies aloud</label>
-          <label><input type="checkbox" id="showThinking"> Show reasoning</label>
+          <label><input type="checkbox" id="speakReplies" checked> Speak replies aloud</label>
+          <label><input type="checkbox" id="showThinking" checked> Show reasoning</label>
         </div>
         <span><span id="toolCount"></span> · <a href="#" id="resetChat">Reset conversation</a> · <a href="/handbook" target="_blank" rel="noopener">Handbook</a> · <a href="/docs" target="_blank" rel="noopener">API docs</a></span>
       </div>
@@ -581,6 +585,7 @@ function refreshVoices(dir){
 function refreshVisibility(){
   for (const f of FIELDS){ if(!f.when) continue; const row=document.querySelector(`.field[data-path="${f.p}"]`); if(!row) continue;
     const v = current(f.when.p); row.hidden = !f.when.v.some(x => String(x)===String(v)); }
+  if (searchQuery) applySearch();
 }
 function fmt(v){ if(v===undefined) return '—'; if(v===null) return 'empty'; if(Array.isArray(v)) return v.join(', '); return String(v); }
 
@@ -589,8 +594,24 @@ async function loadSettings(force){
   try{ cfg = await j('/config'); persona = (await j('/persona')).text; }catch(e){ toast('Could not load config: '+e.message, true); return; }
   dirty={}; personaDirty=false; yamlDirty=false; renderSettings(); updateSavebar();
 }
+let searchQuery='';
+// Filter the settings form: a row stays when its label, hint, current value or config path contains the text;
+// groups (and their nav links) with no remaining rows are hidden. Composes with the `when:` visibility.
+function applySearch(){
+  const q=searchQuery.trim().toLowerCase(); let n=0;
+  document.querySelectorAll('#form .field').forEach(row => { const hit = !q || (row.textContent+' '+row.dataset.path).toLowerCase().includes(q); row.classList.toggle('nomatch', !hit); if (hit && !row.hidden) n++; });
+  document.querySelectorAll('#form section.grp').forEach(sec => {
+    const rows=[...sec.querySelectorAll('.field')];
+    const show = !q || (rows.length ? rows.some(r => !r.classList.contains('nomatch') && !r.hidden) : sec.textContent.toLowerCase().includes(q));
+    sec.hidden = !show; const link=document.querySelector(`#snav a[href="#${sec.id}"]`); if (link) link.hidden = !show; });
+  const c=$('sfindN'); if (c) c.textContent = q ? `${n} setting${n===1?'':'s'} match` : '';
+}
 function renderSettings(){
   const form=$('form'), nav=$('snav'); form.innerHTML=''; nav.innerHTML='';
+  const find=document.createElement('div'); find.className='find';
+  find.innerHTML=`<input type="search" id="sfind" placeholder="Search settings…" aria-label="Search settings"><small id="sfindN"></small>`;
+  nav.appendChild(find); const sf=find.querySelector('input'); sf.value=searchQuery;
+  sf.oninput=()=>{ searchQuery=sf.value; applySearch(); }; sf.onkeydown=e=>{ if(e.key==='Escape'){ sf.value=''; searchQuery=''; applySearch(); } };
   let card=null;
   for (const f of FIELDS){
     if (f.g){ const sec=document.createElement('section'); sec.className='grp'; sec.id='g-'+f.g.replace(/\W+/g,'-'); sec.innerHTML=`<h2>${esc(f.g)}</h2><p class="desc">${esc(f.d||'')}</p>`; card=document.createElement('div'); card.className='card'; sec.appendChild(card); form.appendChild(sec);
@@ -612,7 +633,7 @@ function renderSettings(){
   const a=document.createElement('a'); a.href='#g-Advanced'; a.textContent='Advanced'; a.onclick=e=>{e.preventDefault(); sec.scrollIntoView({behavior:'smooth'});}; nav.appendChild(a);
   const note=document.createElement('div'); note.className='note'; note.innerHTML=`Running: <b>${esc(cfg.running_profile)}</b><br>${cfg.managed_by_systemd?'Managed by systemd — restarts work from here.':'Not under systemd — restart <code>alveus talk</code> yourself after saving.'}<br><br>Models: <code>${esc(cfg.env.ALVEUS_MODELS)}</code>`; nav.appendChild(note);
   $('yamlEd').value = cfg.local_yaml; $('personaEd').value = persona;
-  refreshVisibility();
+  refreshVisibility(); applySearch();
   $('yamlEd').oninput=()=>{yamlDirty=true; updateSavebar();}; $('personaEd').oninput=()=>{personaDirty=true; updateSavebar();};
   $('saveYaml').onclick = async () => { try{ const r=await j('/config',{method:'PUT', body:JSON.stringify({yaml:$('yamlEd').value})}); toast('local.yaml saved'); yamlDirty=false; await loadSettings(true); needRestart('assistant'); }catch(e){ toast(e.message,true);} };
   $('savePersona').onclick = async () => { try{ await j('/persona',{method:'PUT', body:JSON.stringify({text:$('personaEd').value})}); toast('Persona saved'); personaDirty=false; needRestart('assistant'); updateSavebar(); }catch(e){ toast(e.message,true);} };

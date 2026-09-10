@@ -83,7 +83,8 @@ travels only over the local loopback connection to the assistant process). Leave
 if your account has passwordless sudo. A voice request that needs sudo says so aloud and shows the
 same card in the browser, since a password cannot be spoken.
 
-**Settings tab.** A form over every commonly changed option (names, model profile, speech engines and
+**Settings tab.** A search box at the top of the side navigation filters the form by label, hint,
+value or config key (Escape clears it). Below it, a form over every commonly changed option (names, model profile, speech engines and
 voice, activation mode and names, hotkey, VAD timing, chimes, tool safety, log level). Each row shows
 whether the value is overridden on this machine and offers *reset to default*. **Save** writes the
 changes to `config/local.yaml`; nothing is applied until you press **Restart assistant** (or
