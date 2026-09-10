@@ -75,7 +75,7 @@ sampling `--temp 0.7 --top-p 0.95 --top-k 20` as recommended by the model card.
 | `faster_whisper.model` | `large-v3-turbo` | any faster-whisper model id or local CTranslate2 dir (`distil-large-v3`, `medium`, `small`) |
 | `faster_whisper.compute_type` | `float16` | `int8_float16` halves VRAM |
 | `faster_whisper.beam_size` | `1` | greedy is fastest; 5 for tougher audio |
-| `faster_whisper.language` | `en` | `null` = auto-detect (slower, needed for multilingual) |
+| `faster_whisper.language` | `en` | `null` = auto-detect per utterance (needed to speak other languages; a fixed language makes Whisper *translate* into it) |
 | `parakeet.model` | `nemo-parakeet-tdt-0.6b-v3` | onnx-asr model id |
 | `openai_http.base_url`, `.model`, `.language` | | any `/v1/audio/transcriptions` server |
 

@@ -33,7 +33,8 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 | Doesn't react to "Aurea" | Whisper hears "Aria/Oria/Area" | check with `alveus stt test`; add the spelling to `activation.wake_word.name_aliases` |
 | Reacts when nobody said the name | fuzzy match too loose | remove short aliases; raise `NameMatcher` cutoff (0.78) in `alveus/audio/names.py` |
 | Transcript "Thank you." from silence | Whisper hallucination on near-silence | filtered (`JUNK` set in `voice.py`); extend the set if you see others |
-| Non-English speech misrecognised | `stt.faster_whisper.language: en` | set to `null` for auto-detect |
+| Speech in another language (e.g. Chinese) arrives translated into English | `stt.faster_whisper.language: en` makes Whisper translate | set it to `null` (GUI: Speech → STT language empty) so each utterance is transcribed in the language spoken; the model then answers as it sees fit |
+| Reply in Chinese/Japanese/… is spoken as "Chinese letter, Chinese letter" | Kokoro is English-only (its G2P has no CJK) | switch `tts.backend` to `chatterbox` with `model: multilingual` (23 languages, per-sentence auto-detect); verified 2026-09-09 |
 
 ## Model / tools
 
