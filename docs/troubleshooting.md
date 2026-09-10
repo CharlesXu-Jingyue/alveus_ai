@@ -19,6 +19,7 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 |---|---|---|
 | `PortAudioError: Invalid sample rate` / no devices | conda's PortAudio has no PipeWire/Pulse host API and PipeWire holds the ALSA devices | use `audio.backend: pipewire` (auto when `pw-record` exists) |
 | `pw-record exited unexpectedly` | no `XDG_RUNTIME_DIR`/PipeWire socket (e.g. run from ssh) | run inside the desktop session (`systemd --user` service does) |
+| Nothing reacts (no name, no wake word, no `addressed as:` in the journal), yet `wpctl` shows the mic at full volume | the microphone delivers silence: hardware mute button on the headset/speaker (the Panasonic SC-GN01 has one and exposes no software capture control), wrong default source, or device not re-enumerated after boot | `timeout 4 pw-record --rate 16000 --channels 1 --format s16 t.wav` while talking, then check the peak (`soundfile`); near 0.001 = dead input. Check the mute button/LED, `wpctl status` sources, replug the USB device |
 | Wrong mic / speaker | default PipeWire device | `wpctl status`, `wpctl set-default <id>`, or set `audio.input_device` to the node name |
 | Assistant hears itself / random triggers | speaker output reaching the mic | lower speaker volume, raise `activation.wake_word.threshold`, keep `mode: names` (needs a name), or use a headset |
 | Cuts you off mid-sentence | `end_silence_ms` too short | raise to 900–1200 |
@@ -28,6 +29,7 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 
 | symptom | cause | fix |
 |---|---|---|
+| openWakeWord phrase (`hey jarvis`, `alexa`, …) never fires in `mode: both`, works in `mode: oww` | before 2026-09-09 VAD started recording on the first speech frame and the recorder did not score frames with the wake model | fixed: the recorder keeps scoring while capturing; a detection acts like the hotkey. Tune with `alveus wakeword-test` (uses `oww_model` and `threshold` from the config) |
 | Doesn't react to "Aurea" | Whisper hears "Aria/Oria/Area" | check with `alveus stt test`; add the spelling to `activation.wake_word.name_aliases` |
 | Reacts when nobody said the name | fuzzy match too loose | remove short aliases; raise `NameMatcher` cutoff (0.78) in `alveus/audio/names.py` |
 | Transcript "Thank you." from silence | Whisper hallucination on near-silence | filtered (`JUNK` set in `voice.py`); extend the set if you see others |

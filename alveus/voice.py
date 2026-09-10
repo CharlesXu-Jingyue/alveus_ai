@@ -67,6 +67,7 @@ class VoiceAssistant:
         self.names = NameMatcher(list(ww.get("names") or [self.name, self.other_name]), list(ww.get("name_aliases") or []))
         self.name_segment_s = float(ww.get("name_segment_s", 12))
         self.wake = None
+        self._wake_hit = False
         if self.ww_mode in ("oww", "both"):
             from .audio.wakeword import WakeWord
             self.wake = WakeWord(ww.get("oww_model", "hey_jarvis"), float(ww.get("threshold", 0.5)),
@@ -168,13 +169,18 @@ class VoiceAssistant:
                     elif (in_follow_up or self.ww_mode in ("names", "both")) and self.vad.is_speech(frame):
                         # speech started: capture the segment and transcribe it
                         self._set(State.LISTENING if in_follow_up else State.IDLE)
-                        seg = await loop.run_in_executor(self._pool, self._record_utterance, [frame], self.name_segment_s)
-                        if seg is None:
+                        seg = await loop.run_in_executor(self._pool, self._record_utterance, [frame], self.name_segment_s, True)
+                        if seg is None and not self._wake_hit:
                             continue
-                        text = await loop.run_in_executor(self._pool, self._transcribe, seg)
-                        if not text:
+                        text = "" if seg is None else await loop.run_in_executor(self._pool, self._transcribe, seg)
+                        if self._wake_hit:
+                            # the wake-word model fired inside the segment ("hey jarvis" while VAD was
+                            # already recording): act like a trigger, drop whatever was transcribed
+                            self._wake_hit = False
+                            explicit = True
+                        elif not text:
                             continue
-                        if in_follow_up:
+                        elif in_follow_up:
                             addressed, rest = self.names.match(text)
                             command = rest if addressed else text
                             if addressed and not rest:
@@ -228,8 +234,12 @@ class VoiceAssistant:
             return ""
         return text
 
-    def _record_utterance(self, prefix: list[np.ndarray] | None, max_len: float | None) -> np.ndarray | None:
-        """Blocking: capture until end-of-speech silence. Returns float32 16 kHz or None."""
+    def _record_utterance(self, prefix: list[np.ndarray] | None, max_len: float | None,
+                          watch_wake: bool = False) -> np.ndarray | None:
+        """Blocking: capture until end-of-speech silence. Returns float32 16 kHz or None.
+        With ``watch_wake`` the frames are also scored by the openWakeWord model (mode ``both``: VAD
+        starts recording before the phrase is complete); a detection sets ``self._wake_hit`` and
+        returns None so the caller treats it like the hotkey."""
         v = self.cfg.audio.vad
         end_silence = float(v.get("end_silence_ms", 700)) / 1000
         min_speech = float(v.get("min_speech_ms", 250)) / 1000
@@ -251,6 +261,11 @@ class VoiceAssistant:
                     return None
                 continue
             frames.append(f)
+            if watch_wake and self.wake is not None and self.wake.detected(f):
+                log.info("wake word '%s' detected", self.wake.model_name)
+                self.wake.reset()
+                self._wake_hit = True
+                return None
             if self.vad.is_speech(f):
                 speech_started = True
                 speech_dur += len(f) / 16000

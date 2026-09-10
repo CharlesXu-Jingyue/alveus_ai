@@ -8,6 +8,9 @@ Alveus can be activated three ways (all configurable under `activation:` in `con
 | `oww` | an openWakeWord neural model listens for a fixed phrase, then Alveus chimes and records your request | ~0.2 s after the phrase | pretrained phrase, or train your own |
 | `both` | either of the above | | |
 
+In `both` mode the phrase is scored continuously, including while VAD is already recording a sentence, so
+"hey Jarvis, what's the weather?" works as one utterance (the phrase triggers the chime and the rest is recorded).
+
 Plus the global hotkey (`ctrl+alt+space` by default) and `POST /trigger` on the local API.
 
 ## Pretrained openWakeWord phrases

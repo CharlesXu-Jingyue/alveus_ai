@@ -472,10 +472,12 @@ def wakeword_test(seconds: float = 15.0):
     from .audio import make_audio_in
     from .audio.wakeword import WakeWord
 
-    ww = WakeWord(cfg.activation.wake_word.get("model", "hey_jarvis"), models_dir=f"{cfg._env['ALVEUS_MODELS']}/wakeword")
+    w = cfg.activation.wake_word
+    ww = WakeWord(w.get("oww_model", "hey_jarvis"), float(w.get("threshold", 0.5)),
+                  models_dir=f"{cfg._env['ALVEUS_MODELS']}/wakeword")
     mic = make_audio_in(cfg)
     mic.start()
-    console.print(f"say '{ww.model_name.replace('_', ' ')}' ... ({seconds}s)")
+    console.print(f"say '{ww.model_name.replace('_', ' ')}' ... ({seconds}s, threshold {ww.threshold})")
     t0 = time.time()
     while time.time() - t0 < seconds:
         f = mic.read(1.0)

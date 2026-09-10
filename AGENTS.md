@@ -108,6 +108,10 @@ curl -s localhost:8765/health | python -m json.tool
 - livekit-wakeword pins newer numpy/onnxruntime → keep it in its own env (`scripts/train_wakeword.sh`).
 - Never put `After=default.target` on a unit that is `WantedBy=default.target`: it is an ordering
   cycle and systemd silently drops the assistant's start job at login (fixed 2026-09-09).
+- In `mode: both`, every consumer of microphone frames must also feed the openWakeWord model
+  (`_record_utterance(watch_wake=True)`); a loop that swallows frames silently disables the wake word.
+- If nothing reacts at all, record from the mic first (`pw-record` + peak level); the SC-GN01 has a
+  hardware mute button and no software capture control, so `wpctl` looks fine while it delivers silence.
 - The `alveus.service` unit must not block on the LLM; the GUI has to stay reachable to fix things.
 - uvicorn captures SIGTERM for itself, so `systemctl stop` used to hang until SIGKILL (90 s);
   `cli.talk` now owns the signal handlers and `serve()` disables uvicorn's. `TimeoutStopSec=15`.
