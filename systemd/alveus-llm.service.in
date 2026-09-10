@@ -1,6 +1,5 @@
 [Unit]
 Description=Alveus LLM inference server (llama-server)
-After=default.target
 
 [Service]
 Type=simple

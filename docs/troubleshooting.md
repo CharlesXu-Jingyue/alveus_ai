@@ -6,6 +6,7 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 
 | symptom | cause | fix |
 |---|---|---|
+| After a reboot `alveus.service` is `inactive (dead)` while `alveus-llm` runs; journal shows `default.target: Found ordering cycle on alveus.service/start` | a unit both `WantedBy=default.target` and `After=default.target` is a cycle (a target is implicitly ordered after everything it wants); systemd broke it by dropping the assistant's start job | remove the `After=default.target` line (fixed in `systemd/alveus-llm.service.in`; rerun `scripts/install_services.sh`), `systemctl --user daemon-reload`, `systemctl --user start alveus` |
 | `alveus.service` restarts in a loop, log shows `ValueError: space` | hotkey combo uses a bare key name | use pynput names in angle brackets: `<ctrl>+<alt>+<space>` |
 | `hotkey disabled … Can't connect to display ":0"` | unit had a hard-coded `DISPLAY`; or the systemd user env lacks `DISPLAY`/`XAUTHORITY` | current unit inherits them; if still missing: `systemctl --user import-environment DISPLAY XAUTHORITY` then restart |
 | GUI header says "LLM service failed/activating" | llama-server not healthy on :8080 | `systemctl --user status alveus-llm`, `journalctl --user -u alveus-llm`; check weights path in `alveus llm profiles` |

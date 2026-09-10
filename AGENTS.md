@@ -106,6 +106,8 @@ curl -s localhost:8765/health | python -m json.tool
   `tts_warning` in `/health` and a red toast in the GUI.
 - `hf download --include "*.gguf"` on the Bonsai repos pulls 54 GB F16 files; use exact names.
 - livekit-wakeword pins newer numpy/onnxruntime → keep it in its own env (`scripts/train_wakeword.sh`).
+- Never put `After=default.target` on a unit that is `WantedBy=default.target`: it is an ordering
+  cycle and systemd silently drops the assistant's start job at login (fixed 2026-09-09).
 - The `alveus.service` unit must not block on the LLM; the GUI has to stay reachable to fix things.
 - uvicorn captures SIGTERM for itself, so `systemctl stop` used to hang until SIGKILL (90 s);
   `cli.talk` now owns the signal handlers and `serve()` disables uvicorn's. `TimeoutStopSec=15`.
@@ -138,7 +140,6 @@ causes — check `journalctl --user -u alveus` first.
 4. **Image and video models**: vision input (Bonsai `mmproj` via llama-server `--mmproj`,
    screenshots, camera), image generation, video understanding and generation, each a pluggable
    backend like STT/TTS.
-
 5. **Interrupt by speech** (agreed 2026-09-09): (1) PipeWire echo cancellation (`module-echo-cancel`)
 so the mic no longer hears the assistant's own voice; select the cancelled source as
 `audio.input_device`; verify by recording while it speaks. (2) Name-triggered barge-in: while
