@@ -50,8 +50,8 @@ Hardware: RTX 4090 24 GB, i9-13900K, 62 GB RAM, Ubuntu 24.04, GNOME on X11, Pipe
 LLM profile `bonsai-ternary` (Ternary-Bonsai-27B, ~89 tok/s). STT faster-whisper large-v3-turbo,
 language fixed to `en` unless the owner cleared it. TTS **Chatterbox multilingual** with the cloned
 sample `m_demo_charles.wav`; voice gender `auto` (inferred from the `m_`/`f_` file prefix) → the
-assistant currently calls itself Alveus. Activation: names mode ("Alveus"/"Aurea" in the sentence)
-plus hotkey ctrl+alt+space. Both services enabled at login.
+assistant currently calls itself Alveus. Activation: `mode: both` (names in the transcript plus the custom openWakeWord models
+`alveus`/`aurea`, threshold 0.5) plus hotkey ctrl+alt+space. STT language `null` (auto-detect). Both services enabled at login.
 
 ## How to work
 
@@ -108,6 +108,14 @@ curl -s localhost:8765/health | python -m json.tool
 - livekit-wakeword pins newer numpy/onnxruntime → keep it in its own env (`scripts/train_wakeword.sh`).
 - Never put `After=default.target` on a unit that is `WantedBy=default.target`: it is an ordering
   cycle and systemd silently drops the assistant's start job at login (fixed 2026-09-09).
+- `pkill -f PATTERN` killed this session's shell a third time (exit 144) even with a `[3]` regex trick:
+  the harness wraps commands in `bash -c '…'`, so the pattern is in the parent's cmdline too. Kill by
+  pid from `ps -eo pid,args | awk` filtered on the executable path.
+- Wake-word training (`scripts/train_wakeword.sh`) needs ~25 GB free the first time, and its trainer
+  shares the GPU with the running services (24 GB was 97 % full); Whisper OOMed in a side script
+  meanwhile. The SC-GN01 speaker→own-mic path records silence, so loopback tests do not work here;
+  the owner tests wake words by voice.
+- Kokoro is English-only: CJK text is spoken as "Chinese letter …". Chatterbox multilingual speaks it.
 - In `mode: both`, every consumer of microphone frames must also feed the openWakeWord model
   (`_record_utterance(watch_wake=True)`); a loop that swallows frames silently disables the wake word.
 - If nothing reacts at all, record from the mic first (`pw-record` + peak level); the SC-GN01 has a
@@ -130,21 +138,19 @@ causes — check `journalctl --user -u alveus` first.
 
 ## Next items (agreed with the owner on 2026-09-09, in priority order)
 
-1. **Chat scrolling in the GUI**: generation forces the log to the bottom (`scrollBottom()` on every
-   event in `alveus/web/index.html`). Only auto-scroll while the user is already at the bottom; when
-   they scroll up, stop following; when they scroll back down to the bottom, follow again.
-2. **Custom wake-word models for "Alveus" and "Aurea"**: names mode has too many false negatives
-   (uncommon words for Whisper). Train openWakeWord models with `scripts/train_wakeword.sh`
-   (livekit-wakeword in its own env; docs/wake-words.md), put them under `$ALVEUS_MODELS/wakeword/`,
-   support a list of models in `alveus/audio/wakeword.py`, run `activation.wake_word.mode: both`,
-   tune with `alveus wakeword-test`.
-3. **Conversations and memory**: persist conversations (list, resume, search), summarize long ones,
+Done on 2026-09-09: GUI chat scrolling (follows only at the bottom, "newer messages" button) and custom
+openWakeWord models for both names (`$ALVEUS_MODELS/wakeword/{alveus,aurea}.onnx`, trained with
+`scripts/train_wakeword.sh`; eval recall 99.2 % / 99.6 %, 0 false positives per hour on the synthetic
+validation set; `oww_model` takes a list; `mode: both`, threshold 0.5 — the owner still has to tune
+with their own voice via `alveus wakeword-test`; the assistant's Kokoro voice scores 0.90 / 0.66).
+
+1. **Conversations and memory**: persist conversations (list, resume, search), summarize long ones,
    and a memory store the agent can read and write across restarts (facts, preferences). Likely an
    MCP server plus a sidebar in the GUI; today history lives only in `Agent.history` in memory.
-4. **Image and video models**: vision input (Bonsai `mmproj` via llama-server `--mmproj`,
+2. **Image and video models**: vision input (Bonsai `mmproj` via llama-server `--mmproj`,
    screenshots, camera), image generation, video understanding and generation, each a pluggable
    backend like STT/TTS.
-5. **Interrupt by speech** (agreed 2026-09-09): (1) PipeWire echo cancellation (`module-echo-cancel`)
+3. **Interrupt by speech** (agreed 2026-09-09): (1) PipeWire echo cancellation (`module-echo-cancel`)
 so the mic no longer hears the assistant's own voice; select the cancelled source as
 `audio.input_device`; verify by recording while it speaks. (2) Name-triggered barge-in: while
 speaking, run VAD on the cleaned mic, transcribe short segments with the loaded STT, and treat a

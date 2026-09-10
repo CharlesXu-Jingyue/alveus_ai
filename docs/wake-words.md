@@ -75,6 +75,16 @@ Training takes on the order of 20–60 minutes per phrase on the RTX 4090. Tips 
 
 `notebooks/automatic_model_training.ipynb` in the openWakeWord repo (Colab or local Jupyter). Same idea (piper-sample-generator for positives, ~30k h of negative audio features), a bit more manual. Output `.onnx` goes in the same folder.
 
+### Results on this machine (2026-09-09)
+
+Both names trained in about 15 minutes each on the RTX 4090 while the assistant kept running. The
+trainer's own validation (2,000 synthetic positives, 32,000 negatives, 480,000 background clips):
+`alveus` recall 99.2 %, `aurea` 99.6 %, 0 false positives per hour for both. With the assistant's Kokoro
+voice, which the trainer never heard, the bare word scores 0.90 (`alveus`) and 0.66 (`aurea`); unrelated
+speech, Mandarin and the pretrained phrases stay below 0.15, and neither model reacts to the other name.
+"hey alveus" scores only 0.19: the models expect the bare name. Threshold 0.5 is the starting point; the
+owner's own voice decides the final value.
+
 ## Tuning
 
 - `alveus wakeword-test` prints live scores (per model) so you can set `activation.wake_word.threshold`.

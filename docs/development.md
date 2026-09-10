@@ -40,30 +40,25 @@ requirements-lock.txt   versions verified together on 2026-09-04
 
 ## Roadmap (next items, in order)
 
-1. **GUI chat scrolling** – stop forcing the log to the bottom during generation; follow the
-   generation head only while the user is at the bottom, and resume following when they return there.
-2. **Custom wake words** – train openWakeWord models for "Alveus" and "Aurea" (names mode has too
-   many false negatives with these uncommon words), support several models, use `mode: both`.
-3. **Conversations and memory** – stored, browsable, resumable conversations plus a persistent
+(GUI chat scrolling and the custom wake-word models for both names were done on 2026-09-09.)
+
+1. **Conversations and memory** – stored, browsable, resumable conversations plus a persistent
    memory the assistant can consult and update across restarts.
-4. **Image and video models** – vision input (Bonsai `mmproj`, screenshots, camera), image
+2. **Image and video models** – vision input (Bonsai `mmproj`, screenshots, camera), image
    generation, video understanding and generation as pluggable backends.
-5. **Interrupt by speech** – (1) PipeWire echo cancellation so the mic does not hear the assistant;
+3. **Interrupt by speech** – (1) PipeWire echo cancellation so the mic does not hear the assistant;
    (2) name-triggered barge-in while it speaks (VAD + STT on the cleaned signal, name match acts like
    the Listen button); (3) custom wake-word models make the trigger instant.
 
 ## Extension points and ideas
 
 - **Streaming STT** for lower latency (Whisper streaming, Parakeet streaming via sherpa-onnx).
-- **Voice barge-in in names mode** – run a tiny STT on speech during playback, or train the
-  custom wake-word models (`scripts/train_wakeword.sh`) and use `mode: both`.
 - **Memory** – a notes/vector store MCP server so the assistant remembers facts across sessions
   (history is currently per process).
 - **Timers/reminders** – an MCP server with a scheduler and `/speak` callbacks.
 - **Home Assistant** – enable the example server block in `config/alveus.yaml`.
 - **Vision** – Bonsai ships an `mmproj` vision tower; llama-server can take images
   (`--mmproj`), so a `screenshot → describe` tool is feasible.
-- **Multiple wake models** – `WakeWord` takes a single model today; extend to a list.
 - **Speaker identification** – gate destructive actions on your voice.
 
 ## Documentation

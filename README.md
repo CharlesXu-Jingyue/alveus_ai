@@ -20,7 +20,7 @@ Every stage is a pluggable backend chosen in `config/alveus.yaml`:
 | LLM | Bonsai-27B 1-bit via PrismML llama.cpp (`bonsai-1bit`) | `bonsai-ternary`, or any OpenAI-compatible server (vLLM, Ollama, LM Studio, remote) |
 | STT | faster-whisper `large-v3-turbo` (GPU) | NVIDIA Parakeet TDT 0.6B v3 (`parakeet`), any `/v1/audio/transcriptions` server |
 | TTS | Kokoro-82M (`af_heart`) | Chatterbox Turbo (voice cloning), any `/v1/audio/speech` server |
-| activation | say **Alveus** / **Aurea**, or `ctrl+alt+space` | openWakeWord neural wake word (`hey jarvis` or a custom model) |
+| activation | say **Alveus** / **Aurea** (transcript match and/or custom-trained openWakeWord models), or `ctrl+alt+space` | pretrained openWakeWord phrases (`hey jarvis`, `alexa`, …) |
 | audio I/O | PipeWire (`pw-record`/`pw-play`) | PortAudio via sounddevice |
 
 ## Install (any Linux + CUDA machine)
@@ -127,16 +127,11 @@ docs/              wake-words.md and more
 
 ## Next items
 
-1. **Chat scrolling**: while a reply is generating, the log forces itself to the bottom. Let the user
-   scroll up and read; resume following the generation head when they scroll back to the bottom.
-2. **Wake words**: name activation misses too often, probably because "Alveus" and "Aurea" are
-   uncommon words for the recognizer. Train custom openWakeWord models for both names
-   (`scripts/train_wakeword.sh`, [docs/wake-words.md](docs/wake-words.md)) and use `mode: both`.
-3. **Conversations and memory**: store conversations, let the user browse and resume them, and give
+1. **Conversations and memory**: store conversations, let the user browse and resume them, and give
    the assistant a memory that persists across restarts (facts, preferences, summaries).
-4. **Image and video models**: vision input (Bonsai ships an `mmproj` tower; screenshots and camera
+2. **Image and video models**: vision input (Bonsai ships an `mmproj` tower; screenshots and camera
    frames), image generation, and video understanding/generation as further pluggable backends.
-5. **Interrupt by speech**: step 1 is PipeWire echo cancellation so the microphone no longer hears
+3. **Interrupt by speech**: step 1 is PipeWire echo cancellation so the microphone no longer hears
    the assistant's own voice; then name-triggered barge-in ("Aurea…" while it speaks cuts it off and
    listens); later the custom wake-word models make that instant.
 
