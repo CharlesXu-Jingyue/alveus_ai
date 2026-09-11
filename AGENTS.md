@@ -42,7 +42,7 @@ change with a descriptive message (see `git log` for the style).
 | LLM server | http://127.0.0.1:8080/v1 (OpenAI-compatible) |
 | opencode config (coder tool) | `~/.config/opencode/opencode.jsonc`, provider `bonsai` |
 | ComfyUI (image generation, not yet wired to Alveus) | checkout `~/local/lib/ComfyUI`, conda env `comfy` (torch cu130), user unit `comfyui.service` on http://127.0.0.1:8188, `RequiresMountsFor=/mnt/data` |
-| ComfyUI models | `/mnt/data/comfy/models/{checkpoints,diffusion_models,text_encoders,vae,loras}` via `extra_model_paths.yaml`; `/mnt/data` is the NTFS "Data" drive (fstab by label, `ntfs3`, uid 1000) |
+| ComfyUI models | `/mnt/data/comfy/models/{checkpoints,diffusion_models,text_encoders,vae,loras,controlnet,model_patches}` via `extra_model_paths.yaml`; `/mnt/data` is the NTFS "Data" drive (fstab by label, `ntfs3`, uid 1000) |
 | generated images | ComfyUI GUI renders: `~/local/lib/ComfyUI/output` (ComfyUI's default). Alveus-made images (planned): copied to `~/local/data/alveus-ai/images`; both paths to be settings |
 | exported workflows (API format) | `config/comfy/*.json` (`z_image_turbo_demo.json` so far) |
 
