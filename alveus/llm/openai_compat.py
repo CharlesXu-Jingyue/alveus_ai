@@ -48,7 +48,8 @@ class OpenAICompatLLM:
     def _payload(self, messages, tools, thinking) -> dict[str, Any]:
         body: dict[str, Any] = {
             "model": self.model,
-            "messages": messages,
+            # drop private bookkeeping keys such as "_reasoning" (GUI only)
+            "messages": [{k: v for k, v in m.items() if not k.startswith("_")} for m in messages],
             "temperature": self.temperature,
             "top_p": self.top_p,
             "max_tokens": self.max_tokens,

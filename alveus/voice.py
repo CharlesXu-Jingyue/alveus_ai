@@ -300,6 +300,8 @@ class VoiceAssistant:
                         reply_parts.append(ev.text)
                         self.on_event("assistant_delta", text=ev.text)
                         await speaker.feed(ev.text)
+                    elif ev.kind == "reasoning":
+                        self.on_event("assistant_reasoning", text=ev.text)
                     elif ev.kind == "tool_start":
                         self.on_event("tool_start", tool=ev.tool, args=ev.args)
                     elif ev.kind == "tool_result":

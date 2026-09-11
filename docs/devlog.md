@@ -38,6 +38,18 @@ Smaller ideas: timers/reminders (`systemd-run --user --on-active` or an in-proce
 `/speak`), Home Assistant, speaker identification, a reasoning on/off toggle (`thinking:` per
 profile is a one-line patch; there is no effort dial, only llama-server's `--reasoning-budget`).
 
+## 2026-09-11 — reasoning for spoken turns and across reloads
+
+- The GUI showed the model's reasoning only for turns typed into the page: `VoiceAssistant.respond`
+  (spoken turns, and `/chat` with `speak`) never published reasoning deltas, and `/history` had no
+  reasoning at all, so a reload dropped every reasoning block. Now the agent keeps each assistant
+  message's reasoning under a private `_reasoning` key in `Agent.history` (the LLM client strips
+  keys starting with `_` before sending, so the model never re-reads its own thoughts), `/history`
+  exposes it as `reasoning` per turn, the voice path publishes `assistant_reasoning` events, and the
+  page renders all three sources through one `thinkBlock()` helper. Tests cover the normalisation
+  and the payload stripping. Note for the record: llama-server itself always returned
+  `reasoning_content`, with and without tools; the drop was entirely in Alveus.
+
 ## 2026-09-10 (evening) — persona against false refusals; GUI power menu
 
 - `config/persona.md` gained a paragraph stating the setting Bonsai (Qwen3.6 post-training) is

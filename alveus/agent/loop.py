@@ -159,6 +159,7 @@ class Agent:
         for round_no in range(self.max_rounds + 1):
             messages = [{"role": "system", "content": self.system_prompt}, *self.history]
             content_parts: list[str] = []
+            reasoning_parts: list[str] = []
             tool_calls: list[dict[str, Any]] = []
             try:
                 stream = self.llm.stream(messages, tools, thinking=th)
@@ -170,6 +171,7 @@ class Agent:
                         content_parts.append(ev.text)
                         yield AgentEvent("content", text=ev.text)
                     elif ev.kind == "reasoning":
+                        reasoning_parts.append(ev.text)
                         yield AgentEvent("reasoning", text=ev.text)
                     elif ev.kind == "tool_call" and ev.tool_call:
                         tool_calls.append(ev.tool_call)
@@ -182,22 +184,27 @@ class Agent:
                 return
 
             content = "".join(content_parts)
+            # "_reasoning" is kept for the GUI (history view) only; the LLM client strips private keys
+            # before sending, so the model never sees its old reasoning as part of the conversation.
+            reasoning = "".join(reasoning_parts).strip()
+            extra = {"_reasoning": reasoning} if reasoning else {}
             if self._interrupted:
-                self.history.append({"role": "assistant", "content": content + " [interrupted by the user]"})
+                self.history.append({"role": "assistant", "content": content + " [interrupted by the user]", **extra})
                 yield AgentEvent("interrupted", text="Interrupted.")
                 return
             if not tool_calls:
-                self.history.append({"role": "assistant", "content": content})
+                self.history.append({"role": "assistant", "content": content, **extra})
                 return
 
             if round_no >= self.max_rounds:
-                self.history.append({"role": "assistant", "content": content or "(tool limit reached)"})
+                self.history.append({"role": "assistant", "content": content or "(tool limit reached)", **extra})
                 yield AgentEvent("error", text="I reached the tool-call limit for this request.")
                 return
 
             self.history.append({
                 "role": "assistant",
                 "content": content or None,
+                **extra,
                 "tool_calls": [
                     {"id": tc["id"], "type": "function",
                      "function": {"name": tc["name"], "arguments": tc["arguments"]}}

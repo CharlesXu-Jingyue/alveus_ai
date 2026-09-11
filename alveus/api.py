@@ -647,6 +647,8 @@ def _normalize_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 out.append(turn)
             if m.get("content"):
                 turn["text"] = (turn["text"] + "\n" + m["content"]).strip() if turn["text"] else m["content"]
+            if m.get("_reasoning"):
+                turn["reasoning"] = (turn.get("reasoning", "") + "\n\n" + m["_reasoning"]).strip()
             for tc in m.get("tool_calls") or []:
                 fn = tc.get("function") or {}
                 try:

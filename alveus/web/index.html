@@ -327,6 +327,7 @@ function connectEvents(){
       else { voice.msg=null; addMessage(ev.who, ev.text, ev.source); }
     }
     else if (ev.type==='assistant_start'){ voice.msg=null; voice.text=''; voice.tool=null; }
+    else if (ev.type==='assistant_reasoning'){ thinkBlock(voiceMsg(), ev.text); scrollBottom(); }
     else if (ev.type==='assistant_delta'){ const m=voiceMsg(); voice.text+=ev.text; m.querySelector('.bubble').innerHTML=md(voice.text); m.dataset.text=voice.text; scrollBottom(); }
     else if (ev.type==='tool_start'){ const m=voiceMsg(); voice.tool=toolCard(ev.tool, ev.args||{}); m.querySelector('.tools').appendChild(voice.tool); scrollBottom(); }
     else if (ev.type==='tool_result'){
@@ -360,6 +361,13 @@ logCol.addEventListener('click', async e => {
 // a voice turn streams into one assistant message; if something else (e.g. your spoken "yes")
 // was added after it, the rest of the reply continues in a fresh bubble below
 const voice = {msg:null, text:'', tool:null};
+// the collapsible "reasoning" block of an assistant message (created on first use, text appended)
+function thinkBlock(m, text){
+  let t = m.querySelector('details.think');
+  if (!t){ t=document.createElement('details'); t.className='think'; t.open=$('showThinking').checked; t.innerHTML='<summary>reasoning</summary><div class="t"></div>';
+    m.insertBefore(t, m.querySelector('.tools') || m.querySelector('.bubble')); }
+  t.querySelector('.t').textContent += text; return t;
+}
 function voiceMsg(){
   if (voice.msg && voice.msg === logCol.lastElementChild) return voice.msg;
   voice.msg = addMessage('assistant', '', 'voice'); voice.text='';
@@ -440,6 +448,7 @@ async function loadHistory(){
       if (t.role==='user') addMessage('user', t.text);
       else {
         const m = addMessage('assistant', t.text || '');
+        if (t.reasoning) thinkBlock(m, t.reasoning);
         if (t.tools && t.tools.length){
           const wrap=document.createElement('div'); wrap.className='tools';
           for (const tl of t.tools){ const c=toolCard(tl.name||'tool', tl.args||{}); toolDone(c, tl.result||''); if (tl.result==null) c.querySelector('.st').textContent='no result'; wrap.appendChild(c); }
@@ -459,7 +468,7 @@ async function send(text, opts={}){
   let userMsg = opts.retry ? addMessage('user', '…') : addMessage('user', text);
   const m = addMessage('assistant', ''); const bubble=m.querySelector('.bubble'); bubble.classList.add('cursor');
   const tools=document.createElement('div'); tools.className='tools'; m.insertBefore(tools, bubble);
-  let think=null, full='', pendingTool=null;
+  let full='', pendingTool=null;
   try{
     const r = await fetch('/chat/stream', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({text, speak: $('speakReplies').checked, retry: !!opts.retry})});
     if(!r.ok) throw new Error(r.status+' '+r.statusText);
@@ -473,7 +482,7 @@ async function send(text, opts={}){
         const ev = JSON.parse(line.slice(5));
         if (ev.type==='retry'){ userMsg.dataset.text=ev.text; userMsg.querySelector('.bubble').innerHTML=esc(ev.text).replace(/\n/g,'<br>'); }
         else if (ev.type==='content'){ full+=ev.text; bubble.innerHTML = md(full); m.dataset.text = full; }
-        else if (ev.type==='reasoning'){ if(!think){ think=document.createElement('details'); think.className='think'; think.open=$('showThinking').checked; think.innerHTML='<summary>reasoning</summary><div class="t"></div>'; m.insertBefore(think, tools); } think.querySelector('.t').textContent += ev.text; }
+        else if (ev.type==='reasoning'){ thinkBlock(m, ev.text); }
         else if (ev.type==='tool_start'){ pendingTool = toolCard(ev.tool, ev.args); tools.appendChild(pendingTool); }
         else if (ev.type==='tool_result'){ const c = pendingTool || toolCard(ev.tool,{}); toolDone(c, ev.text); if(!pendingTool) tools.appendChild(c); pendingTool=null; }
         else if (ev.type==='confirm'){ confirmCard(ev, m, bubble); }

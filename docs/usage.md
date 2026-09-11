@@ -62,7 +62,7 @@ only.
 
 **Chat tab.** Type a request (Enter sends, Shift+Enter for a newline). Replies stream in; tool calls
 appear as expandable chips above the answer with their arguments and results; the model's reasoning
-can be shown with the "Show reasoning" toggle. Destructive actions pause the reply with an
+can be shown with the "Show reasoning" toggle (it is on by default). Reasoning appears for typed and spoken turns alike, and it is kept with the conversation, so it is still there after a page reload; it is never sent back to the model. Destructive actions pause the reply with an
 **Allow / Deny** card. "Speak replies aloud" plays the answer through the speaker. Voice turns you
 say out loud appear in the same log (tagged *voice*) and stream live, with their tool cards and any
 question asked aloud ("I am about to … Should I go ahead?"), because GUI and microphone share one
