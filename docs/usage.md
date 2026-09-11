@@ -72,6 +72,15 @@ is running the **Send** button turns into **Interrupt**, which stops generation,
 calls, cuts speech and denies any open confirmation. Under each answer: **Copy**, **Speak** (say it
 again), **Stop** (stop speaking) and **Retry** (ask the same question again).
 
+**Header buttons.** **■ Stop** cuts speech. **↻ Restart** restarts the assistant service (the
+conversation is cleared, the LLM server keeps running). **⏻ Power** opens a menu to stop the
+assistant, the LLM server, or both; each asks for confirmation. Stopping the LLM server alone frees
+its VRAM for ComfyUI while the page stays up (the LLM light turns red until the server is started
+again). Stopping the assistant takes this page with it: an overlay shows the `systemctl --user
+start` command, and the page reloads by itself once the assistant is back. Nothing restarts from
+the overlay, so start the services from a terminal (or log in again, as both units are enabled).
+The Restart and Power buttons appear only when Alveus runs under systemd.
+
 While a reply streams in, the log follows the newest text only as long as you are at the bottom. Scroll up to read
 earlier parts and it stops following; a **↓ newer messages** button appears and takes you back, or scroll to
 the bottom yourself. Your own messages and confirmation questions always scroll into view.

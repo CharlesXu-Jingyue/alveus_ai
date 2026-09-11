@@ -55,6 +55,14 @@ header{display:flex;align-items:center;gap:14px;padding:0 18px;height:58px;borde
 .btn.primary{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 70%,#3FB6D8));border-color:transparent;color:#fff;box-shadow:0 0 14px var(--accent-glow)}
 .btn.primary:hover{filter:brightness(1.06);color:#fff}
 .btn.danger{color:var(--danger);border-color:var(--danger)}
+.menu-wrap{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 6px);min-width:280px;background:var(--surface);border:1px solid var(--rule-2);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:6px;z-index:30;display:flex;flex-direction:column;gap:2px}
+.menu[hidden]{display:none}
+.menu button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;border:0;background:none;border-radius:7px;padding:8px 10px;color:var(--ink);font:inherit}
+.menu button:hover{background:var(--rule)}
+.menu button small{color:var(--muted);font-size:11.5px;line-height:1.35}
+.menu button small code{font-size:11px}
+.menu button.danger b{color:var(--danger)}
 .btn:disabled{opacity:.5;cursor:default;filter:none}
 .llm{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
 .llm .dot{width:7px;height:7px;border-radius:50%;background:var(--danger)}
@@ -206,6 +214,14 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
     <span class="llm" id="llm"><span class="dot"></span><span id="llmText">LLM</span></span>
     <button class="btn" id="btnStop" title="Stop speaking">■ Stop</button>
     <button class="btn" id="btnRestart" title="Restart the assistant service (models reload, conversation is cleared; the LLM server keeps running)" hidden>↻ Restart</button>
+    <div class="menu-wrap" id="powerWrap" hidden>
+      <button class="btn" id="btnPower" title="Stop the assistant, the LLM server, or both" aria-haspopup="menu" aria-expanded="false">⏻ Power</button>
+      <div class="menu" id="powerMenu" role="menu" hidden>
+        <button role="menuitem" data-what="assistant"><b>Stop assistant</b><small>Voice, GUI and tools go away. The LLM server keeps its 10 GB of VRAM.</small></button>
+        <button role="menuitem" data-what="llm"><b>Stop LLM server</b><small>Frees the GPU for ComfyUI. The assistant stays up but cannot answer.</small></button>
+        <button role="menuitem" data-what="both" class="danger"><b>Stop both</b><small>Everything off. Start again with <code>systemctl --user start alveus-llm alveus</code>.</small></button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -288,7 +304,7 @@ async function refreshHealth(){
     $('llmText').title = health.ok ? health.llm : (health.llm_service?.last_error || health.llm);
     $('toolCount').textContent = `${health.tools} tools`;
     if (health.tts_warning && !window._ttsWarned){ window._ttsWarned=true; toast(health.tts_warning, true); }
-    $('btnListen').disabled = !health.voice; $('btnStop').disabled = !health.voice; $('btnRestart').hidden = !health.managed_by_systemd;
+    $('btnListen').disabled = !health.voice; $('btnStop').disabled = !health.voice; $('btnRestart').hidden = !health.managed_by_systemd; $('powerWrap').hidden = !health.managed_by_systemd;
     if (!health.voice) setState('text-only');
     return true;
   }catch(e){ setState('offline'); return false; }
@@ -326,6 +342,7 @@ function connectEvents(){
       const m = voiceMsg(); confirmCard(ev, m, m.querySelector('.bubble')); }
     else if (ev.type==='reset') { clearLog(); }
     else if (ev.type==='restarting') showOverlay('Restarting…');
+    else if (ev.type==='stopping') { if (ev.what==='llm') { toast('LLM server stopping'); setTimeout(refreshHealth, 2500); } else showStopped(ev.what); }
   };
   es.onerror = () => { setState('offline'); es.close(); setTimeout(connectEvents, 3000); refreshHealth(); };
   es.onopen = () => refreshHealth();
@@ -722,6 +739,28 @@ async function doRestart(what){
 $('restartA').onclick=()=>doRestart('assistant'); $('restartB').onclick=()=>doRestart('both');
 $('btnStop').onclick = async () => { try{ await j('/stop',{method:'POST'}); }catch(e){ toast(e.message,true);} };
 $('btnRestart').onclick=()=>{ if (confirm('Restart the assistant now? Speech models reload (about 20 s) and the current conversation is cleared.')) doRestart('assistant'); };
+const powerMenu=$('powerMenu'), btnPower=$('btnPower');
+function togglePower(open){ const o = open ?? powerMenu.hidden; powerMenu.hidden = !o; btnPower.setAttribute('aria-expanded', String(o)); }
+btnPower.onclick = e => { e.stopPropagation(); togglePower(); };
+document.addEventListener('click', () => { if (!powerMenu.hidden) togglePower(false); });
+document.addEventListener('keydown', e => { if (e.key==='Escape' && !powerMenu.hidden) togglePower(false); });
+powerMenu.querySelectorAll('button').forEach(b => b.onclick = async e => { e.stopPropagation(); togglePower(false); const what=b.dataset.what;
+  const msg = {assistant:'Stop the assistant now? Voice, this page and the tools stop until the service is started again.',
+               llm:'Stop the LLM server now? The assistant stays up but cannot answer until the server is started again.',
+               both:'Stop the assistant and the LLM server now? Both stay off until started again.'}[what];
+  if (!confirm(msg)) return;
+  try{ await j('/services/stop',{method:'POST', body:JSON.stringify({what})}); }
+  catch(err){ toast(/404/.test(err.message) ? 'The running assistant predates this button: restart it once (↻ Restart), then try again.' : err.message, true); return; }
+  if (what==='llm'){ toast('LLM server stopping'); setTimeout(refreshHealth, 2500); } else showStopped(what);
+});
+function showStopped(what){
+  if(es) es.close(); restartKind=null; setState('offline');
+  $('ovTitle').textContent = what==='both' ? 'Assistant and LLM server stopped' : 'Assistant stopped';
+  $('ovSub').innerHTML = `Nothing restarts them from here. Start again from a terminal:<br><code class="cmd" style="display:inline-block;margin-top:8px">systemctl --user start ${what==='both'?'alveus-llm alveus':'alveus'}</code><br><small style="display:block;margin-top:10px;color:#9fb0b5">They also start at your next login. This page reloads by itself once the assistant is back.</small>`;
+  $('overlay').classList.add('show');
+  const poll = async () => { try{ const h = await j('/health'); if (h && h.tools!==undefined){ location.reload(); return; } }catch{} setTimeout(poll, 3000); };
+  setTimeout(poll, 5000);
+}
 function showOverlay(title){ $('ovTitle').textContent=title; $('overlay').classList.add('show'); restartKind=null; if(es) es.close();
   let tries=0; const poll = async () => { tries++; try{ const h = await j('/health'); if (h && h.tools!==undefined){
         if (h.llm_service && h.llm_service.active!=='active' && tries>8){ llmFailed(h); return; }

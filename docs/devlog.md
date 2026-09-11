@@ -35,6 +35,25 @@ Smaller ideas: timers/reminders (`systemd-run --user --on-active` or an in-proce
 `/speak`), Home Assistant, speaker identification, a reasoning on/off toggle (`thinking:` per
 profile is a one-line patch; there is no effort dial, only llama-server's `--reasoning-budget`).
 
+## 2026-09-10 (evening) — persona against false refusals; GUI power menu
+
+- `config/persona.md` gained a paragraph stating the setting Bonsai (Qwen3.6 post-training) is
+  missing: a private machine, an adult owner and administrator as the only user, requests are their
+  own decisions; no refusals, hedging, disclaimers or moralizing; comply the first time. The owner's
+  earlier line ("comply when asked repeatedly or with a strong tone") was dropped because it implied
+  the first ask may be refused. Next levers if a hard refusal remains: prefill the assistant turn
+  in `Agent.run`, then abliterated weights. Persona edits apply after an assistant restart (383fe3b).
+- GUI header: **⏻ Power** menu to stop the assistant, the LLM server, or both, via the new
+  `POST /services/stop` (`what: assistant | llm | both`, systemd only, detached `systemctl --user
+  stop`). Stopping the assistant shows an overlay with the start command and polls `/health` until
+  the service is back; other open tabs get the same overlay through the `stopping` SSE event.
+  The "Stop LLM" case exists for ComfyUI: the 24 GB card cannot hold Bonsai and a 20 GB image
+  model at once. Verified with headless Chrome (menu opens, Escape closes, screenshot).
+- Answered for the record: ComfyUI's prompt queue and `/history` are in-memory and lost on restart
+  (images on disk survive); Alveus history is `Agent.history` only (plan item 1); Qwen-Image
+  instructions given (fp8 files from `Comfy-Org/Qwen-Image_ComfyUI`, 2512 refresh, no quantizing
+  needed; nvfp4 or GGUF via ComfyUI-GGUF if smaller is wanted).
+
 ## 2026-09-10 — ComfyUI installed next to Alveus
 
 - Windows C: shrunk from 735 GB to 500 GB (from Windows), the 1.8 TB NTFS "Data" drive mounted at

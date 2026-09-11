@@ -478,15 +478,25 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         if not os.environ.get("INVOCATION_ID"):
             raise HTTPException(409, "Alveus is not running under systemd. Restart it yourself: stop this "
                                      "process and run `alveus talk` again (or `systemctl --user restart alveus`).")
-        units = {"assistant": ["alveus.service"], "llm": ["alveus-llm.service"],
-                 "both": ["alveus-llm.service", "alveus.service"]}.get(inp.what)
-        if not units:
-            raise HTTPException(400, "what must be assistant | llm | both")
+        units = _units(inp.what)
         bus.publish("restarting", what=inp.what)
         # detached so the restart survives this process being killed
         subprocess.Popen(["systemctl", "--user", "restart", *units], start_new_session=True,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return {"restarting": units}
+
+    @app.post("/services/stop")
+    async def services_stop(inp: RestartIn) -> dict[str, Any]:
+        """Stop the assistant, the LLM server, or both (systemd only). Nothing restarts them:
+        use `systemctl --user start alveus-llm alveus` or a login (the units are enabled)."""
+        if not os.environ.get("INVOCATION_ID"):
+            raise HTTPException(409, "Alveus is not running under systemd. Stop this process yourself "
+                                     "(Ctrl-C in the `alveus talk` terminal).")
+        units = _units(inp.what)
+        bus.publish("stopping", what=inp.what)
+        subprocess.Popen(["systemctl", "--user", "stop", *units], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return {"stopping": units}
 
     @app.get("/voices")
     async def voices(dir: str = "") -> dict[str, Any]:
@@ -593,6 +603,15 @@ def _list_voices(voices_dir: str | None) -> list[str]:
     if not d.is_dir():
         return []
     return sorted(f.name for f in d.iterdir() if f.suffix.lower() in (".wav", ".flac", ".mp3") and f.is_file())
+
+
+def _units(what: str) -> list[str]:
+    """Map the GUI's assistant | llm | both to systemd unit names (LLM first: the assistant depends on it)."""
+    units = {"assistant": ["alveus.service"], "llm": ["alveus-llm.service"],
+             "both": ["alveus-llm.service", "alveus.service"]}.get(what)
+    if not units:
+        raise HTTPException(400, "what must be assistant | llm | both")
+    return units
 
 
 def _unit_status(unit: str) -> dict[str, Any]:
