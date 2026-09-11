@@ -55,6 +55,17 @@ profile is a one-line patch; there is no effort dial, only llama-server's `--rea
 - ComfyUI's service dropped `--output-directory`: renders from the ComfyUI GUI land in its default
   `~/local/lib/ComfyUI/output` again. Decision: when Alveus generates images it copies the result
   into its own folder; both paths become editable settings once the image tool exists (plan 2).
+- Persona: the speaking-style paragraph now asks for conversational speech (everyday words,
+  contractions, answer first, varied openings, no filler, items strung into a sentence, numbers
+  said aloud, tool results described in plain terms, one short question when ambiguous). The
+  "always introduce yourself" wording became "introduce yourself when asked", which reads less
+  like a greeting on every turn.
+- `config/comfy/` now holds seven API-format workflows exported by the owner from the ComfyUI GUI,
+  all with plain node ids and every model file present on the Data drive: text-to-image for
+  Z-Image Turbo, Qwen-Image 2512, SDXL base, SDXL base + refiner (two variants); image-to-image
+  for SDXL and Z-Image Turbo with the Fun ControlNet Union (Canny). These are the candidates for the
+  image tool's manifest. ComfyUI's `extra_model_paths.yaml` gained `controlnet` and
+  `model_patches` (the Fun ControlNet loads through ModelPatchLoader, not ControlNetLoader).
 - Answered for the record: ComfyUI's prompt queue and `/history` are in-memory and lost on restart
   (images on disk survive); Alveus history is `Agent.history` only (plan item 1); Qwen-Image
   instructions given (fp8 files from `Comfy-Org/Qwen-Image_ComfyUI`, 2512 refresh, no quantizing
