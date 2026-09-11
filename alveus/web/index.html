@@ -750,7 +750,7 @@ powerMenu.querySelectorAll('button').forEach(b => b.onclick = async e => { e.sto
                both:'Stop the assistant and the LLM server now? Both stay off until started again.'}[what];
   if (!confirm(msg)) return;
   try{ await j('/services/stop',{method:'POST', body:JSON.stringify({what})}); }
-  catch(err){ toast(/404/.test(err.message) ? 'The running assistant predates this button: restart it once (↻ Restart), then try again.' : err.message, true); return; }
+  catch(err){ toast(/not found|404/i.test(err.message) ? 'The running assistant predates this button: restart it once (↻ Restart), then try again.' : err.message, true); return; }
   if (what==='llm'){ toast('LLM server stopping'); setTimeout(refreshHealth, 2500); } else showStopped(what);
 });
 function showStopped(what){
