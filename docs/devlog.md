@@ -13,8 +13,11 @@ README and development.md point here instead of keeping their own copies.
    wired to Alveus. Design: `mcp_servers/comfy.py` exposes each exported workflow in `config/comfy/` as
    one tool with a few parameters (prompt, size, seed, steps), driven by a manifest that maps
    parameters to node inputs by node *title*. It POSTs `/prompt`, polls `/history/<id>`, fetches the
-   image via `/view`, saves it under `~/local/data/alveus-ai/images` and opens it with the desktop
-   tool. VRAM rule: Z-Image and SDXL fit next to the LLM; FLUX.1 dev and FLUX.2 klein 9B need
+   image via `/view` or copies it from ComfyUI's own output folder (`~/local/lib/ComfyUI/output`,
+   the default; the service no longer passes `--output-directory`) into Alveus's image folder
+   (`~/local/data/alveus-ai/images`) and opens it with the desktop tool. Both paths are settings
+   (`images.comfy_output` and `images.dir`, editable in the GUI) so the GUI's own renders stay in
+   ComfyUI's folder while Alveus-made images live with the other Alveus data. VRAM rule: Z-Image and SDXL fit next to the LLM; FLUX.1 dev and FLUX.2 klein 9B need
    `alveus-llm` stopped for the render (then restarted) or a clear failure; free ComfyUI's memory
    after every job (`POST /free`). Later: `scripts/install_comfy.sh`, image-to-image, showing the
    image in the GUI.
@@ -49,6 +52,9 @@ profile is a one-line patch; there is no effort dial, only llama-server's `--rea
   the service is back; other open tabs get the same overlay through the `stopping` SSE event.
   The "Stop LLM" case exists for ComfyUI: the 24 GB card cannot hold Bonsai and a 20 GB image
   model at once. Verified with headless Chrome (menu opens, Escape closes, screenshot).
+- ComfyUI's service dropped `--output-directory`: renders from the ComfyUI GUI land in its default
+  `~/local/lib/ComfyUI/output` again. Decision: when Alveus generates images it copies the result
+  into its own folder; both paths become editable settings once the image tool exists (plan 2).
 - Answered for the record: ComfyUI's prompt queue and `/history` are in-memory and lost on restart
   (images on disk survive); Alveus history is `Agent.history` only (plan item 1); Qwen-Image
   instructions given (fp8 files from `Comfy-Org/Qwen-Image_ComfyUI`, 2512 refresh, no quantizing
