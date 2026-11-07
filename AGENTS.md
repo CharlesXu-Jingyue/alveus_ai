@@ -54,9 +54,10 @@ downloads on `/mnt/data`); device names (`nvmeXn1`) change between boots, so fst
 
 ## Current configuration (check `config/local.yaml`, it may have moved on)
 
-LLM profile `bonsai-ternary` (Ternary-Bonsai-27B, ~89 tok/s). Profiles = provider + model
-(`alveus/llm/providers.py`); cloud profiles `claude`, `chatgpt`, `deepseek` and a placeholder
-`qwen-local` are defined but unused, and no API keys are stored yet. STT faster-whisper large-v3-turbo,
+LLM profile `deepseek` (deepseek-v4-pro, disposable test key with ~$10 credit, chosen by the
+owner on 2026-11-07); the local `bonsai-ternary` (Ternary-Bonsai-27B, ~89 tok/s) is one click
+away. Profiles = provider + model (`alveus/llm/providers.py`); `claude` and `chatgpt` have no key
+yet, `qwen-local` has no weights. On a cloud profile the assistant keeps `alveus-llm` stopped. STT faster-whisper large-v3-turbo,
 language fixed to `en` unless the owner cleared it. TTS **Chatterbox multilingual** with the cloned
 sample `m_demo_charles.wav`; voice gender `auto` (inferred from the `m_`/`f_` file prefix) → the
 assistant currently calls itself Alveus. Activation: `mode: both` (names in the transcript plus the custom openWakeWord models
@@ -87,6 +88,25 @@ curl -s localhost:8765/health | python -m json.tool
   the shell (happened twice). Use pids or `systemctl`.
 - Keep `config/local.yaml` intact: it holds the owner's choices. Change it via
   `alveus.config.patch_local_yaml()` or the GUI, not by hand-editing in bulk.
+
+## API keys: never look at them
+
+Cloud LLM keys live in `~/.config/alveus/secrets.env` (or the environment). The owner puts them
+there through the GUI or `alveus llm key` in their own terminal. A session working on Alveus must:
+
+- never read, print, grep, copy or summarize `~/.config/alveus/secrets.env`, nor run anything that
+  prints environments (`env`, `printenv`, `set`, `systemctl --user show-environment`,
+  `/proc/*/environ`, `ps e`) or request headers;
+- check whether a key is set only by its source: `alveus llm profiles`, `alveus doctor`,
+  `GET /secrets`, or `python -c "from alveus import credentials as c; print(c.source('NAME'))"`;
+- never ask the owner to paste a key into the chat, and never export a key in the shell running
+  the session (Claude Code itself reads `ANTHROPIC_API_KEY`);
+- use the key only by running Alveus (`alveus llm test --profile NAME`, `alveus chat --profile NAME`,
+  a test instance); outputs show replies and masked errors, not keys;
+- treat cloud requests as paid: say beforehand when a test makes more than a few requests. The
+  current test key is a disposable DeepSeek key with about $10 of credit (2026-11-07).
+
+If a key does show up in output anyway, stop, tell the owner to revoke it, and do not repeat it.
 
 ## Conventions
 

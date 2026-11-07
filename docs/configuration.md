@@ -48,6 +48,7 @@ Changes take effect on the next start (`systemctl --user restart alveus`).
 | `temperature`, `top_p`, `max_tokens` | `0.7`, `0.95`, `4096` | request defaults for every profile; a profile's own value wins; `null` = not sent. Never sent to providers that reject them (Claude, OpenAI) unless the profile sets them |
 | `effort` | `null` | reasoning depth for models that have it: `low` \| `medium` \| `high` \| `xhigh` \| `max` (Claude `output_config.effort`, OpenAI `reasoning.effort`, DeepSeek `reasoning_effort`); `null` = model default |
 | `max_tool_rounds` | `12` | maximum LLM↔tool iterations in one turn |
+| `manage_local_server` | `true` | when the assistant starts, align the `alveus-llm` unit with the profile: stop it for a profile without `serve:` (cloud, external server), start it if it is down, restart it if it serves another model. Skipped for one-off overrides (`--profile`, `ALVEUS_LLM_PROFILE`) and when the unit is not installed |
 | `profiles.<name>.provider` | | preset from `alveus/llm/providers.py`: `llama_server`, `vllm`, `ollama`, `openai_compat`, `openai`, `anthropic`, `deepseek`, `openrouter` (or any name, with `api` + `base_url`). Old profiles with `backend: openai` still work (= `openai_compat`) |
 | `profiles.<name>.model` | | model id; for local servers it must equal an id in `GET /v1/models` (llama-server: set with `--alias`) |
 | `profiles.<name>.api` | from provider | protocol: `openai_chat` \| `openai_responses` \| `anthropic_messages` |

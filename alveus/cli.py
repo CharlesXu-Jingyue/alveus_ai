@@ -31,7 +31,8 @@ def _setup_logging(cfg, verbose: bool = False) -> None:
     level = logging.DEBUG if verbose else getattr(logging, str(cfg.logging.get("level", "INFO")).upper(), logging.INFO)
     logging.basicConfig(level=level, format="%(message)s", datefmt="[%X]",
                         handlers=[RichHandler(console=console, show_path=False, rich_tracebacks=False)])
-    for noisy in ("httpx", "httpcore", "openai", "urllib3", "numba", "faster_whisper", "mcp"):
+    # SDK debug logs would write every request body (the whole conversation) to the log
+    for noisy in ("httpx", "httpcore", "httpx2", "openai", "anthropic", "urllib3", "numba", "faster_whisper", "mcp"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     log_dir = cfg.logging.get("dir")
     if log_dir:
@@ -153,9 +154,9 @@ def chat(verbose: bool = typer.Option(False, "-v", "--verbose"), no_tools: bool 
                     reply_parts.append(ev.text)
                     console.print(ev.text, end="", highlight=False, markup=False)
                 elif ev.kind == "reasoning" and show_thinking:
-                    console.print(f"[dim]{ev.text}[/dim]", end="", highlight=False, markup=False)
+                    console.print(ev.text, style="dim", end="", highlight=False, markup=False)
                 elif ev.kind == "tool_result":
-                    console.print(f"\n  [dim]⚙ {ev.tool} → {ev.text[:140].replace(chr(10), ' ')}[/dim]", highlight=False, markup=False)
+                    console.print(f"\n  ⚙ {ev.tool} → {ev.text[:140].replace(chr(10), ' ')}", style="dim", highlight=False, markup=False)
                 elif ev.kind == "error":
                     console.print(f"\n[red]{ev.text}[/red]")
             console.print(f"\n[dim]({time.time() - t0:.1f}s)[/dim]")
@@ -441,7 +442,7 @@ def llm_test(prompt: str = "Say hello in one sentence.", profile: str = typer.Op
                     console.print(ev.text, end="", markup=False)
                     n += 1
                 elif ev.kind == "reasoning" and show_thinking:
-                    console.print(f"[dim]{ev.text}[/dim]", end="", highlight=False, markup=False)
+                    console.print(ev.text, style="dim", end="", highlight=False, markup=False)
                 elif ev.kind == "done":
                     console.print(f"\n[dim]{ev.usage.get('completion_tokens', n)} tokens in {time.time() - t0:.1f}s "
                                   f"(finish: {ev.finish_reason}, usage: {ev.usage})[/dim]")

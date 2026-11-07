@@ -28,6 +28,9 @@ llm:
   effort: null
   # Max tool-call rounds per user turn.
   max_tool_rounds: 12
+  # When the assistant starts, bring the local LLM server (systemd unit alveus-llm) in line with the
+  # profile: stop it for a cloud profile (frees the GPU), start or restart it for a local one.
+  manage_local_server: true
   # A profile = a provider + a model. The provider (alveus/llm/providers.py) supplies the protocol,
   # address and API-key variable: llama_server | vllm | ollama | openai_compat (give base_url) |
   # openai | anthropic | deepseek | openrouter. Any preset key can be overridden here.

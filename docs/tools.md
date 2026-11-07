@@ -91,7 +91,9 @@ e.g. `qwen3.8-27b`, must be listed under that provider too), for a cloud profile
 `<opencode provider>/<model>` (e.g. `anthropic/claude-opus-5-5`; opencode must be signed in to that
 provider with `opencode auth login`, or the profile sets `opencode_model`); `opencode-default` leaves
 the choice to opencode; any `provider/model` id from `opencode models` (e.g. `deepseek/deepseek-v4-flash`)
-sends the work to that model instead. The coder is the only tool server that sees API-key variables
+sends the work to that model instead. The files/shell tools refuse the folder holding the API keys (`~/.config/alveus/`: reading,
+listing, searching into it, and shell commands naming it); a casual-leak guard, not a sandbox.
+The coder is the only tool server that sees API-key variables
 from the environment (`inherit_api_keys: true`), since opencode may use them to sign in. `ALVEUS_CODE_DIR` is the coding folder: the tools' descriptions quote it so the model knows it, and
 `directory` is resolved against it: empty, `~`, `.` or `default` mean the folder itself; a bare name
 (`repo`, `repo/foo`) is looked up inside it (then under `~`); absolute and `~/…` paths are used as given.

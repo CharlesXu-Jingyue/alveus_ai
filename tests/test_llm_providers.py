@@ -101,3 +101,24 @@ def test_hub_env_tells_the_coder_which_model_auto_means():
     env = hub_env(cfg)
     assert env["ALVEUS_OPENCODE_AUTO"] == "" and env["ALVEUS_LLM_MODEL"] == "bonsai-27b-1bit"
     assert not any("sk-" in v for v in env.values())
+
+
+def test_files_tool_refuses_the_key_folder(monkeypatch, tmp_path):
+    import importlib
+    monkeypatch.setenv("ALVEUS_SECRETS", str(tmp_path / "keys" / "secrets.env"))
+    monkeypatch.setenv("ALVEUS_FS_ROOTS", str(tmp_path))
+    (tmp_path / "keys").mkdir()
+    (tmp_path / "keys" / "secrets.env").write_text("DEEPSEEK_API_KEY=sk-should-not-leak\n")
+    (tmp_path / "notes.txt").write_text("sk-should-not-leak is mentioned here too\n")
+    import mcp_servers.files_shell as fs
+    fs = importlib.reload(fs)
+    # tool errors come back as {"error": ...} replies (mcp_servers/common.py), never with the content
+    out = fs.read_file(str(tmp_path / "keys" / "secrets.env"))
+    assert "API keys" in out and "sk-should-not-leak" not in out
+    assert "Refused" in fs.list_dir(str(tmp_path / "keys"))
+    assert "Refused" in fs.find_files("*.env", str(tmp_path / "keys"))
+    hits = __import__("json").loads(fs.search_text("sk-should-not-leak", str(tmp_path)))["hits"]
+    assert [h["file"] for h in hits] == [str(tmp_path / "notes.txt")]     # the key folder is skipped
+    assert "Refused" in fs.run_command("cat ~/.config/alveus/secrets.env", str(tmp_path))
+    assert "Refused" in fs.run_command(f"grep -r sk {tmp_path / 'keys'}", str(tmp_path))
+    assert "Refused" not in fs.run_command("echo ok", str(tmp_path))

@@ -200,7 +200,8 @@ Cloud models work the same way: `ALVEUS_LLM_PROFILE=claude alveus chat` for a tr
 be set first, see [backends.md](backends.md#api-keys)), or choose `claude`, `chatgpt` or `deepseek`
 in Settings → Language model → Model profile, where the key fields are right below. Saving checks
 the key and model, then restarts both services; `alveus-llm` stops by itself because a cloud
-profile needs no local server. Everything said in the conversation, and what the tools read for
+profile needs no local server, and the assistant keeps it stopped at every start until you choose
+a local profile again. The last chosen profile is what starts after a reboot. Everything said in the conversation, and what the tools read for
 it, then goes to that provider. To add your own (another model, OpenRouter, a vLLM box on the
 network), add a profile; the keys are described in [configuration.md](configuration.md#llm).
 

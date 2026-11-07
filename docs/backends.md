@@ -116,8 +116,13 @@ Speech recognition and synthesis stay local.
 ### Switching
 
 GUI: Settings → Language model → Model profile, then save (check, then restart of both services).
-Choosing a cloud profile makes `alveus llm serve` exit at once, so `alveus-llm` stops and the GPU
-is free (ComfyUI, bigger speech models). CLI: `alveus llm profiles` (provider, local/cloud, key
+The choice is stored as `llm.profile` in `config/local.yaml`, so every later start, including after
+a reboot, uses the model chosen last. Choosing a cloud profile makes `alveus llm serve` exit at once,
+so `alveus-llm` stops and the GPU is free (ComfyUI, bigger speech models). On top of that the
+assistant checks the unit every time it starts (`alveus/llm/service.py`, `llm.manage_local_server`):
+it stops a local server that a cloud profile does not need, starts one a local profile needs, and
+restarts it when it serves a different model, so a switch through the YAML editor or a hand edit
+followed by `systemctl --user restart alveus` ends in the same state. CLI: `alveus llm profiles` (provider, local/cloud, key
 or weights present), `alveus llm test --profile claude` (one request), `alveus chat --profile
 deepseek` (text REPL with tools), `ALVEUS_LLM_PROFILE=chatgpt alveus talk`.
 

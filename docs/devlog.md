@@ -40,6 +40,30 @@ profile is a one-line patch; `llm.effort` exists for cloud models, local ones on
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
 
+## 2026-11-07 (later) — first live cloud runs (DeepSeek); the local server follows the profile; key hygiene
+
+- **Live DeepSeek.** With the owner's disposable key (entered by them; never seen by the session):
+  `alveus llm test --profile deepseek` with thinking on (reasoning streamed to the GUI channel) and
+  `--no-thinking` (`thinking: {type: disabled}` accepted, no reasoning returned); a two-turn
+  `alveus chat --profile deepseek` with a tool call in each turn (the second turn carries the first
+  turn's `reasoning_content`, which DeepSeek demands); one turn through the running assistant.
+  Replies took 2–5 s per turn including the tool round. About a dozen requests in total; the
+  account showed $17.56 afterwards (`GET /user/balance`).
+- **Gap found and closed.** The owner had switched to DeepSeek and restarted only the assistant
+  (old code), so llama-server kept ~10 GB of VRAM. Now `alveus/llm/service.py` runs first in
+  `VoiceAssistant.start()`: a profile without `serve:` stops `alveus-llm`, a local profile starts it
+  if down and restarts it if it serves another model (`llm.manage_local_server`, default on;
+  skipped for `--profile` overrides because the unit serves the saved profile). Verified on the
+  real services: local → DeepSeek (restart both) and DeepSeek → local → DeepSeek with
+  assistant-only restarts; GPU memory 13.9 GB → 3.7 GB, and the profile survives restarts because
+  it is saved in `config/local.yaml`. `--no-block` systemctl calls, since the caller is itself a unit.
+- **Key hygiene.** AGENTS.md has a rule section for sessions (never read the key file or dump
+  environments, check keys only by source, warn before paid test series). The files/shell tools
+  refuse `~/.config/alveus/` (read, list, find, search, and shell commands naming it). The
+  `anthropic` and `httpx2` loggers are held at WARNING like `openai`/`httpx`, so DEBUG logs do not
+  copy whole conversations. Fixed `--show-thinking` and the tool lines in `alveus chat` / `llm
+  test` printing literal `[dim]` tags.
+
 ## 2026-11-07 — swappable language model: providers, three protocols, cloud keys (branch `llm-providers`)
 
 - **Why.** The owner wants the central model swappable: the local Bonsai server today, but also

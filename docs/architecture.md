@@ -43,7 +43,8 @@
 Two long-running processes matter: **`alveus-llm`** (llama-server holding the model in VRAM) and
 **`alveus`** (`alveus talk`: audio loop, agent, speech models, API, and the five MCP child processes
 it spawns over stdio). With a cloud profile, `alveus-llm` exits right after start (nothing to serve)
-and the agent talks to the provider's API instead.
+and the agent talks to the provider's API instead; when the assistant starts it also stops a
+leftover local server, or (re)starts it for a local profile (`alveus/llm/service.py`).
 
 ## Packages
 

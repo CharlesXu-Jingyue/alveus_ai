@@ -83,11 +83,14 @@ class VoiceAssistant:
 
     # ------------------------------------------------------------------ lifecycle
     async def start(self) -> None:
-        log.info("Loading speech models...")
         loop = asyncio.get_running_loop()
+        prof = llm_profile(self.cfg)
+        # first, so a cloud profile frees the GPU before the speech models load
+        from .llm.service import reconcile_local_server
+        await loop.run_in_executor(self._pool, reconcile_local_server, self.cfg, prof)
+        log.info("Loading speech models...")
         await asyncio.gather(loop.run_in_executor(self._pool, self.stt.load),
                              loop.run_in_executor(self._pool, self.tts.load))
-        prof = llm_profile(self.cfg)
         llm = make_llm(prof)
         ok, msg = await llm.health()
         log.info("LLM %s: %s", "OK" if ok else "NOT READY", msg)
