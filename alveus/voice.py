@@ -301,7 +301,8 @@ class VoiceAssistant:
         return text
 
     def _record_utterance(self, prefix: list[np.ndarray] | None, max_len: float | None,
-                          watch_wake: bool = False, patient: bool = False) -> np.ndarray | None:
+                          watch_wake: bool = False, patient: bool = False,
+                          no_speech_timeout: float = 6.0) -> np.ndarray | None:
         """Blocking: capture until end-of-speech silence. Returns float32 16 kHz or None.
         With ``watch_wake`` the frames are also scored by the openWakeWord model (mode ``both``: VAD
         starts recording before the phrase is complete); a detection sets ``self._wake_hit`` and
@@ -312,7 +313,6 @@ class VoiceAssistant:
         end_silence = float(v.get("end_silence_ms", 700)) / 1000
         min_speech = float(v.get("min_speech_ms", 250)) / 1000
         max_len = max_len or float(v.get("max_utterance_s", 60))
-        no_speech_timeout = 6.0
         frames: list[np.ndarray] = list(prefix or [])
         if not frames:
             self.vad.reset()
@@ -427,25 +427,24 @@ class VoiceAssistant:
             self.audio_out.play(audio, self.tts.sample_rate)
             self._set(State.THINKING)
             return await gui(description)
-        # Ask, chime, then listen patiently; an unclear reply or silence gets one more, shorter question.
-        # Silence is reported as "no answer", not as a refusal, so the model may simply ask again.
+        # Ask like a person would, then listen patiently (activation.confirm_wait_s). Silence means "not
+        # now": the action is left undone, reported to the model as "no answer" (not as a refusal), and
+        # not asked again. Only a reply that is neither yes nor no gets one more, shorter question.
+        wait = float(self.cfg.activation.get("confirm_wait_s", 15) or 15)
         prompts = [f"I'm about to {description.removeprefix('[sudo] ')}. Should I go ahead?",
-                   "Sorry, I didn't catch that. Should I go ahead? Yes or no?"]
+                   "Sorry, should I go ahead? Yes or no?"]
         for attempt, prompt in enumerate(prompts, 1):
             self.on_event("voice_confirm", text=prompt)
             audio = await loop.run_in_executor(self._pool, self.tts.synthesize, speakable(prompt))
             self._set(State.SPEAKING)
             self.audio_out.play(audio, self.tts.sample_rate)
             await loop.run_in_executor(self._pool, self.audio_out.wait)
-            if self.cfg.audio.get("chimes", True):   # the cue to answer now
-                self.audio_out.play(listen_chime(), CHIME_SR)
-                await loop.run_in_executor(self._pool, self.audio_out.wait)
             await asyncio.sleep(0.15)                 # let the speaker's last samples die away
             self._set(State.LISTENING)
-            rec = await loop.run_in_executor(self._pool, self._record_utterance, None, 10.0, False, True)
+            rec = await loop.run_in_executor(self._pool, self._record_utterance, None, wait + 15.0, False, True, wait)
             if rec is None:
-                log.info("confirmation (try %d): no answer heard", attempt)
-                continue
+                log.info("confirmation (try %d): no answer within %.0f s; leaving it undone", attempt, wait)
+                break
             ans = (await loop.run_in_executor(self._pool, self.stt.transcribe, rec, 16000)).strip()
             self.on_transcript("user", ans)
             verdict = classify_answer(ans)

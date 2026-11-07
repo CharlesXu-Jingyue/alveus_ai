@@ -50,8 +50,8 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 | `MCP server 'x' failed to start: Connection closed` | server crashed at import | run it directly: `python -m mcp_servers.x` to see the traceback |
 | `ModuleNotFoundError: mcp.server.fastmcp` | mcp ≥ 2 renamed FastMCP | already handled by `mcp_servers/common.py`; use `from .common import FastMCP` |
 | Desktop tools say "missing tools: xdotool…" | optional binaries absent | `sudo apt install xdotool wmctrl xclip playerctl` |
-| It asks before closing a window (or another action) although the model's reasoning said it would just do it | the confirmation gate is in the agent, not the model: tools marked destructive always ask | tick the tool under Tools & safety → Don't ask for these (`tools.no_confirm`) |
-| "The close was cancelled" although you said yes | (fixed 2026-11-07) a click or the tail of its own question ended the listening window before the answer, and silence counted as "declined" | now: chime, then patient listening, one repeat; silence is "no answer". The journal logs `confirmation (try N): heard '…' -> yes/no/unclear` |
+| It asks before an action although the model's reasoning said it would just do it | the confirmation gate is in the agent, not the model: tools marked destructive ask (closing windows no longer does) | tick the tool under Tools & safety → Don't ask for these (`tools.no_confirm`) |
+| It gave up on an action although you were about to answer | `activation.confirm_wait_s` (default 15 s) ran out; silence means "not now" | raise the wait (Activation → Time to answer a question). The journal logs `confirmation (try N): heard '…' -> yes/no/unclear` or `no answer within N s` |
 | `code_task` returns quickly with no summary | opencode not authenticated/configured | `opencode run "hi"` in a terminal; check `~/.config/opencode/opencode.jsonc` |
 
 ## Cloud models

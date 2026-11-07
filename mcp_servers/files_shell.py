@@ -137,9 +137,14 @@ def search_text(query: str, path: str = "~", file_glob: str = "*", max_results: 
 
 
 @mcp.tool(annotations=annot(destructive=True))
-def move_path(src: str, dst: str) -> str:
-    """Move or rename a file or folder."""
+def move_path(src: str, dst: str, overwrite: bool = False) -> str:
+    """Move or rename a file or folder. Refuses to replace an existing destination unless
+    overwrite=true (the user is asked first in that case)."""
     s, d = _safe(src), _safe(dst)
+    if d.is_dir() and not s.samefile(d):
+        d = _safe(str(d / s.name))       # into an existing folder, like mv
+    if d.exists() and not overwrite:
+        return j({"error": f"{d} already exists; call again with overwrite=true to replace it"})
     s.rename(d)
     return j({"moved": str(s), "to": str(d)})
 

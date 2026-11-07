@@ -40,6 +40,18 @@ profile is a one-line patch; `llm.effort` exists for cloud models, local ones on
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
 
+## 2026-11-07 (late night) — confirmations follow the conversation; fewer of them
+
+- Owner: no chime before answering (keep the flow natural); silence was intentional; wait longer
+  after the question. The chime is gone; the wait is `activation.confirm_wait_s` (15 s, was a fixed
+  6 s); silence now ends the question (no automatic re-ask) and the model is told the user did not
+  answer and not to ask again; an unclear reply still gets one shorter question.
+- Relaxed what asks: `close_window` is no longer marked destructive; `move_path` refuses to overwrite
+  and asks only with `overwrite=true`; `control_service` asks only for stop/disable or system scope
+  (`ASK_WHEN` in `agent/loop.py`); `rmdir` left the risky-shell pattern. Delete, kill, power and risky
+  shell commands still ask. The persona no longer tells the model to ask for confirmation itself
+  (the system does), so the model and the gate do not both ask.
+
 ## 2026-11-07 (night) — a confirmation that never heard the answer; settings apply without a restart; previews on the speaker
 
 - **"Close it" was asked although the model chose not to ask, then counted as declined.** From the saved

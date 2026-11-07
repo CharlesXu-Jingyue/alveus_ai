@@ -80,7 +80,8 @@ def test_silence_is_no_answer_not_a_refusal():
     agent = Agent(OneCall("desktop__close_window", {"title_substring": "Firefox"}), hub, load_config())
     out = run_turn(agent, confirm)
     assert asked == ["close window: Firefox"] and hub.calls == []
-    assert "No clear answer" in out and "declined" not in out and not agent._declined_this_turn
+    assert "did not answer" in out and "do not ask again" in out and "declined" not in out
+    assert not agent._declined_this_turn
 
 
 def test_a_real_no_still_blocks_retries():
@@ -214,3 +215,76 @@ def test_live_apply_reloads_another_engine(monkeypatch):
     new["tts"]["backend"] = "chatterbox" if old.tts.backend != "chatterbox" else "kokoro"
     rep = asyncio.run(live.apply_config(a, new))
     assert isinstance(a.tts, Other) and loaded == [True] and rep["reloaded"]
+
+
+# ------------------------------------------------------------------ which calls ask (relaxed 2026-11-07)
+def test_risk_depends_on_the_call():
+    from alveus.agent.loop import Agent as A
+    mv = ToolInfo(server="files", name="move_path", full_name="files__move_path", description="", schema={}, destructive=True)
+    svc = ToolInfo(server="system", name="control_service", full_name="system__control_service", description="", schema={},
+                   destructive=True)
+    assert not A._is_destructive(mv, {"src": "a", "dst": "b"}) and A._is_destructive(mv, {"src": "a", "dst": "b", "overwrite": True})
+    assert not A._is_destructive(svc, {"name": "x", "action": "restart"})
+    assert A._is_destructive(svc, {"name": "x", "action": "stop"}) and A._is_destructive(svc, {"name": "x", "action": "start", "scope": "system"})
+    assert not A._is_destructive(SHELL, {"command": "rmdir empty_dir"}) and A._is_destructive(SHELL, {"command": "rm -r x"})
+
+
+def test_close_window_is_not_marked_risky_and_move_refuses_to_overwrite(tmp_path, monkeypatch):
+    import importlib
+    import inspect
+
+    import mcp_servers.desktop as desktop
+    assert "destructive" not in inspect.getsource(desktop.close_window).split("def close_window")[0][-80:]
+    monkeypatch.setenv("ALVEUS_FS_ROOTS", str(tmp_path))
+    import mcp_servers.files_shell as fs
+    fs = importlib.reload(fs)
+    (tmp_path / "a.txt").write_text("new")
+    (tmp_path / "b.txt").write_text("old")
+    assert "already exists" in fs.move_path(str(tmp_path / "a.txt"), str(tmp_path / "b.txt"))
+    assert (tmp_path / "b.txt").read_text() == "old"
+    fs.move_path(str(tmp_path / "a.txt"), str(tmp_path / "b.txt"), overwrite=True)
+    assert (tmp_path / "b.txt").read_text() == "new"
+
+
+# ------------------------------------------------------------------ the spoken question
+class Spoken:
+    def __init__(self, answers):
+        self.cfg = load_config()
+        self.answers = list(answers)       # None = silence
+        self.prompts, self.waits = [], []
+        self._pool = None
+        self.tts = type("T", (), {"sample_rate": 24000, "synthesize": lambda s, t: np.zeros(10)})()
+        self.stt = type("S", (), {"transcribe": lambda s, a, sr: a})()
+        self.audio_out = type("O", (), {"play": lambda s, a, sr: None, "wait": lambda s: None})()
+
+    def on_event(self, kind, **d):
+        self.prompts.append(d.get("text"))
+
+    def on_transcript(self, who, text):
+        pass
+
+    def _set(self, s):
+        pass
+
+    def _record_utterance(self, prefix, max_len, watch_wake=False, patient=False, no_speech_timeout=6.0):
+        self.waits.append((no_speech_timeout, patient))
+        return self.answers.pop(0)
+
+
+def ask(answers):
+    v = Spoken(answers)
+    return asyncio.run(VoiceAssistant._confirm(v, "close window: Firefox")), v
+
+
+def test_silence_leaves_it_undone_without_asking_again():
+    res, v = ask([None])
+    assert res == {"ok": False, "reason": "no_answer"} and len(v.prompts) == 1
+    assert v.waits == [(15.0, True)]                                    # the longer, patient wait
+    assert v.prompts[0] == "I'm about to close window: Firefox. Should I go ahead?"
+
+
+def test_an_unclear_reply_gets_one_more_question():
+    res, v = ask(["hmm", "yes please"])
+    assert res is True and len(v.prompts) == 2
+    res, v = ask(["no"])
+    assert res is False and len(v.prompts) == 1

@@ -708,6 +708,7 @@ const SECTIONS = [
            {t:'multi', p:'activation.wake_word.oww_model', o:'oww_models', l:'Wake-word models', h:'Tick several to listen for all of them.'},
            {t:'number', p:'activation.wake_word.threshold', l:'Sensitivity threshold', step:0.05, min:0.1, max:0.95, h:'Lower wakes more easily but falsely more often.'}]}},
   {t:'number', p:'activation.wake_word.follow_up_window_s', l:'Follow-up window (s)', min:0, max:60, h:'After it answers you can keep talking without its name this long. 0 = off.'},
+  {t:'number', p:'activation.confirm_wait_s', l:'Time to answer a question (s)', min:3, max:60, h:'How long it waits for your yes or no before a risky action. Silence means “not now”.'},
   {t:'bool', p:'activation.hotkey.enabled', l:'Keyboard shortcut', h:'A global key combination works like a talk button.', on:[
     {t:'hotkey', p:'activation.hotkey.combo', l:'Keys', h:'Click Record, then press the combination.'},
     {t:'select', p:'activation.hotkey.mode', l:'Behaviour', o:[{v:'toggle', l:'press once; it stops when you pause'}, {v:'hold', l:'listen while the keys are held'}]}]},

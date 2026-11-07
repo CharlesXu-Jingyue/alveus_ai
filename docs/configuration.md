@@ -159,6 +159,7 @@ stt:
 | `wake_word.threshold` | `0.5` | openWakeWord score threshold |
 | `wake_word.name_segment_s` | `12` | max length of a speech segment checked for a name |
 | `wake_word.follow_up_window_s` | `8` | seconds after a reply during which no name is needed (`0` disables) |
+| `confirm_wait_s` | `15` | how long it waits for a yes/no after asking to confirm a risky action; silence = not now (left undone, not asked again) |
 | `hotkey.enabled` | `true` | |
 | `hotkey.combo` | `<ctrl>+<alt>+<space>` | pynput syntax: `<ctrl>+<shift>+a`, `<cmd>+<space>`, … |
 | `hotkey.mode` | `toggle` | `toggle` (press to start, silence/press ends) or `hold` (push-to-talk) |

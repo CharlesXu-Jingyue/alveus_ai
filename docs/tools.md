@@ -26,7 +26,7 @@ Access is restricted to `ALVEUS_FS_ROOTS` (colon-separated; default `~`). Paths 
 | `write_file` | `path`, `content`, `append=false` | creates parent folders |
 | `find_files` | `pattern`, `path="~"`, `max_results=100` | recursive glob (`*.pdf`), skips dot-dirs/node_modules |
 | `search_text` | `query`, `path="~"`, `file_glob="*"`, `max_results=50`, `regex=false` | grep-like, case-insensitive, skips files > 5 MB |
-| `move_path` **!** | `src`, `dst` | rename/move |
+| `move_path` | `src`, `dst`, `overwrite=false` | rename/move; refuses to replace an existing file unless `overwrite`, which asks first |
 | `delete_path` **!** | `path` | unlink file or remove empty dir |
 | `run_command` | `command`, `cwd="~"`, `timeout_s=60` | bash, stdout/stderr/exit code; dangerous commands confirmed |
 
@@ -48,7 +48,7 @@ missing otherwise; `playerctl` improves media control but D-Bus MPRIS is used as
 | `media_control` | `action` = play/pause/play_pause/next/previous/stop/status | MPRIS via playerctl or gdbus |
 | `list_windows` | | `wmctrl -l` |
 | `focus_window` | `title_substring` | raise window |
-| `close_window` **!** | `title_substring` | graceful close |
+| `close_window` | `title_substring` | graceful close (apps with unsaved work ask themselves); no confirmation |
 | `type_text` | `text` | `xdotool type` (X11 only) |
 | `press_keys` | `keys` (xdotool syntax, e.g. `ctrl+s`) | `xdotool key` (X11 only) |
 | `screenshot` | `path=""` | PNG via gnome-screenshot, GNOME Shell D-Bus, or ImageMagick `import` |
@@ -66,7 +66,7 @@ missing otherwise; `playerctl` improves media control but D-Bus MPRIS is used as
 | `find_process` | `name` | match on name or command line |
 | `kill_process` **!** | `pid`, `force=false` | SIGTERM / SIGKILL |
 | `list_services` | `scope="user"|"system"`, `state="running"|"failed"|"all"` | systemd units |
-| `control_service` **!** | `name`, `action` (start/stop/restart/enable/disable/status), `scope="user"` | systemctl; system scope may prompt polkit |
+| `control_service` | `name`, `action` (start/stop/restart/enable/disable/status), `scope="user"` | systemctl; asks first only for stop/disable or system scope (which may also prompt polkit) |
 | `network_info` | | IPv4 per interface, internet reachability (ping 1.1.1.1) |
 | `power` **!** | `action` = suspend/hibernate/reboot/poweroff/lock | systemctl / loginctl |
 

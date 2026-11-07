@@ -78,8 +78,15 @@ class AgentEvent:
 
 # any command that escalates privileges is confirmed by the user ("allow once")
 _SUDO = re.compile(r"(^|[;&|(]\s*)sudo\s", re.IGNORECASE)
+# Tools whose risk depends on the call: asked only when the rule is true (the tool may still be marked
+# destructive for other MCP clients). Tools not listed here ask whenever they are marked destructive.
+ASK_WHEN = {
+    "move_path": lambda a: bool(a.get("overwrite")),                                   # replaces a file
+    "control_service": lambda a: str(a.get("action", "")).lower() in ("stop", "disable")
+    or str(a.get("scope", "user")).lower() == "system",
+}
 _DESTRUCTIVE_SHELL = re.compile(
-    r"(^|[;&|]\s*)(sudo\s+)?(rm\s|rmdir\s|shred\s|mkfs|dd\s|kill(all)?\s|pkill\s|shutdown|reboot|poweroff|"
+    r"(^|[;&|]\s*)(sudo\s+)?(rm\s|shred\s|mkfs|dd\s|kill(all)?\s|pkill\s|shutdown|reboot|poweroff|"
     r"systemctl\s+(stop|disable|poweroff|reboot|halt)|git\s+(push\s+--force|reset\s+--hard|clean\s+-f)|"
     r"chmod\s+-R|chown\s+-R|>\s*/dev/sd|truncate\s|:\(\)\s*\{)",
     re.IGNORECASE,
@@ -306,10 +313,10 @@ class Agent:
             ok = ans.get("ok") if isinstance(ans, dict) else bool(ans)
             if not ok:
                 if isinstance(ans, dict) and ans.get("reason") == "no_answer":
-                    # silence or an unclear reply is not a refusal: the model may ask the user again
-                    return json.dumps({"cancelled": True, "message": "No clear answer to the confirmation question "
-                                       "was heard, so the action was not run. Ask the user in one short sentence "
-                                       "whether they want it; do it only after they say yes."})
+                    # no answer = "not now": left undone without counting as a refusal
+                    return json.dumps({"cancelled": True, "message": "The user did not answer the confirmation "
+                                       "question, so the action was not run. Say in a few words that you left it "
+                                       "for now; do not ask again unless the user brings it up."})
                 self._declined_this_turn = True
                 return json.dumps({"cancelled": True, "message": "The user declined this action. Do not retry it "
                                    "or attempt it another way; tell the user it was cancelled."})
@@ -325,6 +332,8 @@ class Agent:
 
     @staticmethod
     def _is_destructive(info, args: dict[str, Any]) -> bool:
+        if info.name in ASK_WHEN:
+            return bool(ASK_WHEN[info.name](args))
         if info.destructive:
             return True
         if info.name in ("run_command", "shell", "bash"):

@@ -159,16 +159,20 @@ nothing. Tool servers, audio devices and the API address are reported as needing
 
 - **Destructive gate.** The gate is in the agent loop, not in the model: whatever the model reasons
   ("closing a window it just opened is fine"), the call is confirmed before execution if the tool carries
-  `destructive_hint` (delete_path, move_path, close_window, kill_process, control_service,
-  power) or if a `run_command` command matches `_DESTRUCTIVE_SHELL` in `agent/loop.py`
-  (`rm`, `kill`, `shutdown`, `mkfs`, `dd`, `git push --force`, `chmod -R`, …). In voice mode the
+  `destructive_hint` (delete_path, kill_process, power; move_path and control_service only per
+  `ASK_WHEN` in `agent/loop.py`: replacing an existing file, or stopping/disabling a service or any
+  system-scope action) or if a `run_command` command matches `_DESTRUCTIVE_SHELL` (`rm`, `kill`,
+  `shutdown`, `mkfs`, `dd`, `git push --force`, `chmod -R`, …). Closing a window, starting or restarting
+  a user service, renaming without overwriting and `rmdir` do not ask (relaxed 2026-11-07). The persona
+  tells the model that the system asks, so it does not ask a second time. In voice mode the
   assistant asks aloud and listens for yes/no; in `alveus chat` it prompts on the terminal;
   through the bare `/chat` API there is no confirmer, so destructive calls are refused.
   Disable with `tools.confirm_destructive: false`.
-  Spoken confirmations name the action in plain words ("close window: Firefox"), chime when it is time
-  to answer, ignore clicks and the tail of their own voice, and ask once more when the reply is unclear.
-  Silence or an unclear reply is reported to the model as *no answer* (it may ask again); only a heard
-  "no" counts as *declined*, which also blocks retries in that request. `tools.no_confirm` lists risky
+  Spoken confirmations name the action in plain words ("close window: Firefox") and then simply wait,
+  like a person would (no chime), for `activation.confirm_wait_s` (15 s), ignoring clicks and the tail of
+  their own voice. Silence means "not now": the action is left undone and the model is told the user did
+  not answer and not to ask again; a reply that is neither yes nor no gets one shorter question; only a
+  heard "no" counts as *declined*, which also blocks retries in that request. `tools.no_confirm` lists risky
   tools the owner trusts to run without asking; shell commands and sudo are always checked.
 - **Filesystem scope.** The files server only touches paths under `ALVEUS_FS_ROOTS`
   (default `~`).

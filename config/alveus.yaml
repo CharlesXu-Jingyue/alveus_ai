@@ -176,6 +176,8 @@ activation:
     name_segment_s: 12
     # Keep listening for follow-ups this many seconds after the assistant finishes speaking.
     follow_up_window_s: 8
+  # How long it waits for your yes/no after asking to confirm a risky action. Silence = not now.
+  confirm_wait_s: 15
   hotkey:
     enabled: true
     # pynput format. Press once to start listening, again (or stay silent) to stop.

@@ -192,9 +192,10 @@ def focus_window(title_substring: str) -> str:
     return j({"error": missing("wmctrl", "xdotool")})
 
 
-@mcp.tool(annotations=annot(destructive=True))
+@mcp.tool()
 def close_window(title_substring: str) -> str:
-    """Close the first window whose title contains the text."""
+    """Close the first window whose title contains the text (a normal close: apps with unsaved work
+    ask on their own)."""
     if have("wmctrl"):
         return j(run(["wmctrl", "-c", title_substring]))
     return j({"error": missing("wmctrl")})
