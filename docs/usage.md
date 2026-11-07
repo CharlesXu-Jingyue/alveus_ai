@@ -62,7 +62,7 @@ only.
 
 **Chat tab.** Type a request (Enter sends, Shift+Enter for a newline). Replies stream in; tool calls
 appear as expandable chips above the answer with their arguments and results; the model's reasoning
-can be shown with the "Show reasoning" toggle (it is on by default). Reasoning appears for typed and spoken turns alike, and it is kept with the conversation, so it is still there after a page reload; it is never sent back to the model. Destructive actions pause the reply with an
+can be shown with the "Show reasoning" toggle (it is on by default). Reasoning appears for typed and spoken turns alike, and it is kept with the conversation, so it is still there after a page reload. Local models never see their old reasoning again; cloud models that need it get their own back (DeepSeek, and Claude and ChatGPT in the provider's signed or encrypted form). Destructive actions pause the reply with an
 **Allow / Deny** card. "Speak replies aloud" plays the answer through the speaker. Voice turns you
 say out loud appear in the same log (tagged *voice*) and stream live, with their tool cards and any
 question asked aloud ("I am about to … Should I go ahead?"), because GUI and microphone share one
@@ -98,8 +98,11 @@ voice, activation mode and names, hotkey, VAD timing, chimes, tool safety, log l
 whether the value is overridden on this machine and offers *reset to default*. **Save** writes the
 changes to `config/local.yaml`; nothing is applied until you press **Restart assistant** (or
 **Restart LLM + assistant** when the model profile changed). Changing the model profile first runs
-a load check of the new weights with your llama-server binary (5–20 s); if the file cannot be
-loaded, nothing is saved and the error is shown. If the LLM service still fails to come up after a
+a check: for a local profile a load test of the new weights with your llama-server binary
+(5–20 s), for a cloud profile a question to the provider whether the API key and model are accepted
+(nothing is generated); if it fails, nothing is saved and the error is shown. API keys for cloud
+profiles are entered right below the profile; they are saved immediately to
+`~/.config/alveus/secrets.env`, never shown again, and used from the next request. If the LLM service still fails to come up after a
 restart, the page shows the server's error and offers to revert to the previous profile. The page reconnects by itself, usually
 in 10–40 s while models reload. The *Advanced* section edits `local.yaml` and the persona prompt as
 raw text.
@@ -138,9 +141,10 @@ In text mode destructive confirmations are terminal `[y/N]` prompts.
 | `alveus devices` | audio devices (`wpctl status` on PipeWire) |
 | `alveus doctor [--warm]` | environment health check; `--warm` also loads STT/TTS/wake word |
 | `alveus wakeword-test [--seconds N]` | live openWakeWord scores |
-| `alveus llm profiles` | table of LLM profiles and whether their weights exist |
-| `alveus llm serve [--profile P] [--host H] [--port N] [--extra "…"]` | launch llama-server for a profile (what the service runs) |
-| `alveus llm test [--prompt "…"] [--profile P]` | stream a quick reply |
+| `alveus llm profiles` | table of LLM profiles: provider, protocol, local/cloud, and whether the weights or the API key are present |
+| `alveus llm key NAME [--remove]` | store an API key (asked without echo) in `~/.config/alveus/secrets.env` |
+| `alveus llm serve [--profile P] [--host H] [--port N] [--extra "…"]` | launch llama-server for a profile (what the service runs); exits 0 for profiles without a local server |
+| `alveus llm test [--prompt "…"] [--profile P] [--show-thinking] [--thinking/--no-thinking]` | stream a quick reply (one paid request for a cloud profile) |
 | `alveus tts say "text" [--out file.wav]` | synthesize and play / save |
 | `alveus tts voices` | list voices of the active TTS backend |
 | `alveus stt test [--seconds N] [--file x.wav]` | record (or read a WAV) and transcribe |
@@ -191,6 +195,14 @@ llm:
 
 The Ternary model is ~7 GB (vs 3.8 GB), keeps ~95 % of full-precision quality (vs ~90 %) and
 scores higher on tool use; generation is somewhat slower.
+
+Cloud models work the same way: `ALVEUS_LLM_PROFILE=claude alveus chat` for a try (the key must
+be set first, see [backends.md](backends.md#api-keys)), or choose `claude`, `chatgpt` or `deepseek`
+in Settings → Language model → Model profile, where the key fields are right below. Saving checks
+the key and model, then restarts both services; `alveus-llm` stops by itself because a cloud
+profile needs no local server. Everything said in the conversation, and what the tools read for
+it, then goes to that provider. To add your own (another model, OpenRouter, a vLLM box on the
+network), add a profile; the keys are described in [configuration.md](configuration.md#llm).
 
 ## Changing the voice (and the name)
 

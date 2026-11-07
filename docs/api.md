@@ -7,7 +7,7 @@ another device, tunnel instead of exposing the port: `ssh -L 8765:127.0.0.1:8765
 
 | method & path | body | response | notes |
 |---|---|---|---|
-| `GET /health` | | `{ok, llm, state, tools, stt, tts}` | `ok` = LLM endpoint reachable and serving the configured model; `state` is idle/listening/thinking/speaking in talk mode |
+| `GET /health` | | `{ok, llm, state, tools, stt, tts, profile, llm_provider, llm_model, llm_remote, llm_service, …}` | `ok` = LLM endpoint reachable (local: serving the configured model; cloud: key and model accepted, checked at most once a minute, and a successful reply counts); `state` is idle/listening/thinking/speaking in talk mode; `llm_service` (alveus-llm unit status) only for profiles with a local server |
 | `GET /tools` | | `[{name, description, destructive}]` | namespaced tool names as the model sees them |
 | `POST /chat` | `{"text": str, "speak": bool=false, "reset": bool=false}` | `{"reply": str}` | runs the agent with tools on the shared conversation history. `speak: true` (talk mode) also voices the reply through the speaker with sentence streaming. `reset` clears history first. Destructive tool calls are refused (no confirmer) unless `speak: true`, where confirmation is spoken |
 | `POST /speak` | `{"text": str, "play": bool=false}` | WAV bytes (`audio/wav`), or `{"played": true, "seconds": n}` when `play` | synthesize with the active TTS backend |
@@ -21,7 +21,10 @@ another device, tunnel instead of exposing the port: `ssh -L 8765:127.0.0.1:8765
 | `GET /history` | | `[{role, text, tools:[{name,args,result}]}]` | the shared conversation (voice and GUI turns) |
 | `POST /history/reset` | | `{"reset": true}` | clear the conversation |
 | `GET /events` | | SSE stream | live `state` (idle/listening/thinking/speaking), `transcript {who,text,source}`, `reset`, `config_saved`, `restarting`, `ping`; and the live progress of voice turns (`source: voice`): `assistant_start`, `assistant_delta {text}`, `tool_start {tool,args}`, `tool_result {tool,text}`, `voice_confirm {text}` (question asked aloud), `confirm {id,description,sudo}` (needs `POST /confirm`), then the final `transcript` |
-| `GET /config` | | `{effective, local, local_yaml, options, paths, env, managed_by_systemd, running_profile}` | merged configuration plus the machine overrides and option lists for the GUI |
+| `GET /config` | | `{effective, local, local_yaml, options, paths, env, managed_by_systemd, running_profile, llm_profile_info, secrets}` | merged configuration plus the machine overrides and option lists for the GUI; `llm_profile_info` = per profile `{label, provider, model, remote, local_server, api_key_env}`; `secrets` as `GET /secrets` |
+| `GET /secrets` | | `{path, keys: {NAME: {source, profiles, label}}}` | which API-key variables the profiles use and whether each is set (`source`: `env`, `file` or `null`); never the values |
+| `PUT /secrets` | `{"name": str, "value": str}` | same as `GET /secrets` | store an API key in `~/.config/alveus/secrets.env` (mode 600); empty `value` removes it. Only variables some profile or provider uses are accepted. Effective from the next request, no restart |
+| `POST /llm/check` | `{"profile": str}` | `{ok, kind, seconds, error?, detail?}` | preflight before switching profiles. Local server profile: llama-server loads the file on the CPU (5–40 s). Cloud/external (`kind`: `cloud`/`external`): key present and accepted, model known; nothing is generated |
 | `PUT /config` | `{"patch": {...}}` or `{"yaml": "..."}` | `{saved, local, local_yaml, restart_required}` | deep-merge into `config/local.yaml` (a `null` leaf stores an explicit null, e.g. auto-detect language; a leaf `{"$unset": true}` removes the override so the default applies) or replace the file; validated before writing |
 | `GET /persona` / `PUT /persona` | — / `{"text": str}` | `{text}` / `{saved}` | read/write `config/persona.md` |
 | `POST /restart` | `{"what": "assistant" \| "llm" \| "both"}` | `{restarting: [...]}` | restarts the systemd user units; 409 when not running under systemd |

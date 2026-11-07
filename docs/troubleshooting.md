@@ -52,6 +52,22 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 | Desktop tools say "missing tools: xdotool…" | optional binaries absent | `sudo apt install xdotool wmctrl xclip playerctl` |
 | `code_task` returns quickly with no summary | opencode not authenticated/configured | `opencode run "hi"` in a terminal; check `~/.config/opencode/opencode.jsonc` |
 
+## Cloud models
+
+| symptom | cause | fix |
+|---|---|---|
+| "The language model failed: no API key for Anthropic …" (spoken) | the profile's key variable is set neither in the environment nor in `~/.config/alveus/secrets.env` | Settings → Language model → API keys, or `alveus llm key ANTHROPIC_API_KEY`; no restart needed |
+| "… rejected the API key" | wrong, revoked or out-of-project key | paste a new key; `alveus llm test --profile <name>` checks it with one request |
+| "… says the account has no credit left" (HTTP 402) / "rate limiting us" (429) | billing or quota at the provider | top up / raise limits in the provider console; 429s and 5xx are already retried twice |
+| "… does not know this model" (404) | model id changed or not available to the account | `alveus llm profiles`, then fix `model` in the profile; the provider's model list is the reference |
+| Switching to a cloud profile is refused: "Profile … cannot be used yet" | the GUI preflight (`POST /llm/check`) found no key, a rejected key or an unknown model | enter the key under API keys (just below the profile) and save again |
+| GUI header shows "LLM ready · cloud" but `alveus-llm` is inactive | expected: a cloud profile needs no local server, `alveus llm serve` exits at once (frees the GPU) | nothing; switching back to a local profile restarts it |
+| DeepSeek: HTTP 400 about `reasoning_content` | the API requires earlier reasoning to be sent back once tools are used | handled by the `deepseek` preset (`reasoning_replay: all`); a hand-made profile on `openai_compat` needs `reasoning_replay: all` too |
+| Claude: HTTP 400 "Invalid `signature` in `thinking` block" | a replayed thinking block no longer matches the history before it (history edited in the middle) | the agent only trims whole old turns and drops the bound thinking then; if it still happens, `/history/reset` (GUI: clear conversation) and report the steps |
+| Claude: HTTP 400 mentioning `thinking` on an older model | model without adaptive thinking (e.g. Haiku 4.5) | set `thinking: false` in that profile |
+| OpenAI: tools never called, or HTTP 400 on `/chat/completions` | current OpenAI models call tools only through the Responses API | use `provider: openai` (Responses), not `openai_compat` pointed at api.openai.com |
+| The coder tool fails with "model not found" after switching to a cloud profile | `ALVEUS_OPENCODE_MODEL: auto` follows the profile, but opencode is not signed in to that provider | `opencode auth login`, or set the coding model explicitly in the GUI |
+
 ## Python environment
 
 | symptom | cause | fix |

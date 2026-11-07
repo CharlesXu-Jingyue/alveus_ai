@@ -37,18 +37,21 @@
         └───────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────────────────┘
                                                                         │
                                                     llama-server (:8080, systemd alveus-llm) ◄── LLM HTTP
+                                                    or a cloud API (Anthropic, OpenAI, DeepSeek, …)
 ```
 
 Two long-running processes matter: **`alveus-llm`** (llama-server holding the model in VRAM) and
 **`alveus`** (`alveus talk`: audio loop, agent, speech models, API, and the five MCP child processes
-it spawns over stdio).
+it spawns over stdio). With a cloud profile, `alveus-llm` exits right after start (nothing to serve)
+and the agent talks to the provider's API instead.
 
 ## Packages
 
 | path | responsibility |
 |---|---|
 | `alveus/config.py` | Layered YAML loading, `${VAR}`/`~` expansion, `DotDict`, `llm_profile()` |
-| `alveus/llm/` | `LLMBackend` protocol + `OpenAICompatLLM` (SSE streaming, tool-call accumulation, reasoning separation) |
+| `alveus/llm/` | `LLMBackend` protocol and `LLMEvent`/`LLMError` (`base.py`); provider presets and profile resolution (`providers.py`); one adapter per protocol: `openai_compat.py` (Chat Completions: local servers, DeepSeek, OpenRouter), `openai_responses.py` (OpenAI), `anthropic_messages.py` (Claude, official SDK); shared httpx/SSE helpers (`http.py`) |
+| `alveus/credentials.py` | API keys: environment, then `~/.config/alveus/secrets.env` (mode 600); never exported to child processes |
 | `alveus/stt/` | `STTBackend` protocol + faster-whisper, Parakeet (onnx-asr), OpenAI-HTTP |
 | `alveus/tts/` | `TTSBackend` protocol + Kokoro, Chatterbox, OpenAI-HTTP |
 | `alveus/audio/backend.py` | `AudioIn`/`AudioOut` with PipeWire (subprocess) and sounddevice implementations |
@@ -118,7 +121,7 @@ it spawns over stdio).
 - The main coroutine runs the state machine on asyncio.
 - Blocking work (audio reads, STT, TTS, VAD reset) runs in a 3-worker `ThreadPoolExecutor`.
 - `AudioIn` and `AudioOut` each own one background thread plus a `pw-record`/`pw-play` child.
-- LLM streaming is async (httpx). MCP servers are child processes; `ToolHub` talks to them
+- LLM streaming is async (httpx; the `anthropic` SDK for Claude). MCP servers are child processes; `ToolHub` talks to them
   through the `mcp` client library's async stdio transport, all inside one `AsyncExitStack`.
 - The FastAPI server runs in the same event loop (uvicorn `Server.serve()`), so `/chat` with
   `speak: true` shares the loaded models and the speaker queue with the voice loop.
@@ -127,6 +130,10 @@ it spawns over stdio).
 
 - The system prompt is `config/persona.md` rendered with `{name}`, `{other_name}`, `{voice_gender}`,
   `{user_name}`, `{date}`, `{hostname}`, `{os}`, plus a line listing available tool groups.
+- The history is provider-neutral (OpenAI-style messages); each LLM adapter converts it, and the
+  tool list, to its protocol (see [backends.md](backends.md#llm)). Provider-specific data that must
+  go back unchanged (Claude's signed thinking, OpenAI's encrypted reasoning) rides along as
+  `_replay` on the message; trimming old turns drops the part that is bound to the old prefix.
 - Tools are presented in OpenAI function-calling format, names namespaced `server__tool`
   (`system__gpu_status`). llama-server's `--jinja` renders Bonsai's Qwen3.6 chat template, which
   natively supports tools and thinking. `--reasoning-format deepseek` moves thinking into
@@ -148,6 +155,15 @@ it spawns over stdio).
   Disable with `tools.confirm_destructive: false`.
 - **Filesystem scope.** The files server only touches paths under `ALVEUS_FS_ROOTS`
   (default `~`).
+- **Cloud models.** With a cloud profile the conversation leaves the machine: transcripts, the system
+  prompt, and every tool result (file contents, command output, web pages) go to that provider. The
+  GUI's profile hint and these docs say so; local profiles keep everything on the machine.
+- **API keys.** Read from the environment or `~/.config/alveus/secrets.env` (outside the repo, mode
+  600), written by the GUI or `alveus llm key`; `GET /secrets` reports only whether a key is set.
+  Keys are not exported to `os.environ`, and API-key variables are removed from the tool servers'
+  environment (except the coder's), so the shell tool cannot print them. The file is still readable
+  by your user, and so by the files/shell tools if the model is talked into it; keep keys limited
+  (spend caps, separate project keys).
 - **Network exposure.** llama-server and the API bind to 127.0.0.1. Nothing is exposed on the LAN
   unless you change `api.host` or the server args.
 - **Prompt injection.** Web page content and file contents returned by tools are model input.

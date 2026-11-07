@@ -36,7 +36,58 @@ README and development.md point here instead of keeping their own copies.
 
 Smaller ideas: timers/reminders (`systemd-run --user --on-active` or an in-process timer that calls
 `/speak`), Home Assistant, speaker identification, a reasoning on/off toggle (`thinking:` per
-profile is a one-line patch; there is no effort dial, only llama-server's `--reasoning-budget`).
+profile is a one-line patch; `llm.effort` exists for cloud models, local ones only have
+llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
+cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
+
+## 2026-11-07 — swappable language model: providers, three protocols, cloud keys (branch `llm-providers`)
+
+- **Why.** The owner wants the central model swappable: the local Bonsai server today, but also
+  cloud APIs (DeepSeek, ChatGPT, Claude) or another local model (Qwen 3.8 27B), without code changes.
+  The old layer was one OpenAI-compatible client, which cannot serve Claude, nor current OpenAI
+  models (they call tools only through the Responses API).
+- **Design.** A profile is now a *provider* plus a *model*. Providers are presets
+  (`alveus/llm/providers.py`: protocol, address, key variable, quirks, parameters the provider
+  rejects), not classes; resolution is preset < llm-level defaults < profile. One adapter per wire
+  protocol: `openai_chat` (llama-server, vLLM, Ollama, DeepSeek, OpenRouter, anything compatible;
+  the old client, extended), `openai_responses` (OpenAI, stateless `store: false`, encrypted
+  reasoning replayed), `anthropic_messages` (Claude via the official `anthropic` SDK, adaptive
+  thinking with summaries for the GUI, prompt caching, server-side refusal fallback). The agent's
+  history stays provider-neutral; whatever a provider needs back verbatim (Claude's signed thinking
+  blocks, OpenAI's reasoning items) is stored per message as `_replay` and only that provider's
+  adapter reads it. Old `backend: openai` profiles keep working.
+- **Agent changes that every provider needed.** Normalized finish reasons; a tool call cut off by
+  the output limit is never run, and both that case and the tool-round limit now answer every
+  pending call (a dangling `tool_use` is a hard error for Claude and OpenAI); a refusal without
+  text is reported; `LLMError` messages are short enough to be spoken.
+- **Keys and privacy.** Keys live in the environment or `~/.config/alveus/secrets.env` (mode 600,
+  outside the repo), set in the GUI (write-only fields right under the profile) or with
+  `alveus llm key`. They are read per request (no restart), never exported to `os.environ`, and
+  API-key variables are stripped from tool servers' environments except the coder's
+  (`inherit_api_keys`). Docs and the GUI hint state plainly that a cloud profile sends the
+  conversation, tool results included, to the provider.
+- **Services.** `alveus llm serve` exits 0 for a profile without `serve:`, so choosing a cloud
+  profile stops `alveus-llm` and frees the GPU; `/health` only reports the unit for local-server
+  profiles, and the GUI preflight checks key and model for cloud profiles instead of loading weights.
+  The coder's `auto` follows cloud profiles too (`anthropic/claude-opus-5-5` in opencode terms).
+- **Learned.** DeepSeek returns HTTP 400 unless earlier `reasoning_content` is sent back once tools
+  are involved (preset `reasoning_replay: all`), and its thinking switch is `thinking: {type}` plus
+  `reasoning_effort`. Claude's thinking signatures cover everything before them, so trimming old
+  turns invalidates them: the agent drops that replay data when it trims (`prefix_bound`) and the
+  messages are rebuilt without thinking. The current Anthropic API version rejects
+  `temperature`/`top_p`/`top_k` on every model, and Claude Opus 5.5 cannot turn thinking off
+  (only `effort`, default `medium`); its notes between tool calls arrive as thinking blocks, which
+  `display: summarized` makes visible in the GUI. OpenAI's flagship ids are now `gpt-6*`.
+- **Verified.** 51 tests (adapters against recorded-style streams, including the SDK through a mock
+  transport and an interrupted Claude stream closing its connection). Local end to end: `alveus chat`
+  with tools on Bonsai through the new adapter. A text-only API instance on port 8799: key storage
+  (file mode 600, values never returned), and the preflight against the real Anthropic, OpenAI and
+  DeepSeek endpoints with a deliberately invalid key (each answered 401 and produced a readable
+  message, which also confirms the URLs). GUI rendered in headless Chrome over the DevTools
+  protocol: no JS errors, labelled profiles, effort choices, key rows. **Not verified:** an actual
+  generation from any cloud model; no keys are stored on this machine yet.
+- **Not done on purpose.** The Qwen 3.8 27B weights were not downloaded (profile `qwen-local` points
+  at the expected path); opencode's `bonsai` provider would need that model id added for `auto`.
 
 ## 2026-09-11 — reasoning for spoken turns and across reloads
 

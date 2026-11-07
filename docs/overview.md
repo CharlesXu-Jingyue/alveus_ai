@@ -3,10 +3,12 @@
 ## What Alveus is
 
 Alveus is a personal, "Jarvis-style" AI assistant that runs **entirely on one Linux machine
-with an NVIDIA GPU**. You speak to it, it understands, reasons with a local language model,
-acts on your computer through tools, and answers out loud. No audio, text, or data leaves the
-machine unless a tool you explicitly enabled (web search, page fetch, weather) reaches out to
-the internet.
+with an NVIDIA GPU**. You speak to it, it understands, reasons with a language model, acts on
+your computer through tools, and answers out loud. By default the language model is local too,
+and no audio, text, or data leaves the machine unless a tool you explicitly enabled (web search,
+page fetch, weather) reaches out to the internet. The model is swappable: a profile can instead
+use a cloud model (Claude, ChatGPT, DeepSeek, anything behind an OpenAI-compatible API), and then
+the conversation and what the tools read for it go to that provider; speech stays local.
 
 It answers to two names. **Alveus** is the default; when the configured voice is female (the
 default Kokoro voice `af_heart` is), it introduces itself as **Aurea**. Both names are always
@@ -15,18 +17,20 @@ name you used.
 
 ## Design goals
 
-1. **Fully local.** LLM inference (llama.cpp), speech-to-text, text-to-speech, voice activity
-   detection and wake-word detection all run on the local GPU/CPU.
+1. **Local by default.** LLM inference (llama.cpp), speech-to-text, text-to-speech, voice activity
+   detection and wake-word detection all run on the local GPU/CPU. A cloud LLM is an explicit
+   choice of profile, never a fallback.
 2. **Every stage swappable.** The LLM, STT engine, TTS engine, audio backend and activation
    method are each selected in one YAML file. Upgrading the model later means adding a
-   profile, not rewriting code. Any OpenAI-compatible server (vLLM, Ollama, LM Studio, a
-   remote API) is a valid LLM backend.
+   profile, not rewriting code. A profile is a provider plus a model: local servers (llama.cpp,
+   vLLM, Ollama, LM Studio), OpenAI (Responses API), Anthropic (Messages API), DeepSeek,
+   OpenRouter, or any OpenAI-compatible endpoint.
 3. **Real agency, with guard rails.** The model calls tools through the Model Context Protocol
    (MCP): files, shell, GNOME desktop, system status/control, web, and delegation of coding
    work to opencode. Destructive actions are confirmed by voice before they run.
 4. **Portable.** `install.sh` reproduces the whole stack on another Linux + CUDA box; nothing
    in the repo depends on this machine's paths.
-5. **Small.** ~2,500 lines of Python. Each backend is one short file.
+5. **Small.** ~5,600 lines of Python. Each backend is one short file.
 
 ## Capabilities at a glance
 
@@ -60,7 +64,8 @@ for the Ternary model (7.2 GB weights) or other GPU work.
 
 ## Glossary
 
-- **Profile** – a named LLM configuration under `llm.profiles` (endpoint, model id, sampling, how to launch a server for it).
+- **Profile** – a named LLM configuration under `llm.profiles`: a provider, a model id, optional tuning, and for local models how to launch a server for it.
+- **Provider** – a preset in `alveus/llm/providers.py` saying how to reach a kind of LLM service: protocol, address, API-key variable, quirks.
 - **Backend** – a Python class implementing one of the small protocols in `alveus/llm|stt|tts/base.py`.
 - **MCP** – Model Context Protocol: a standard for exposing tools to LLM agents. Each Alveus tool group is an MCP server process.
 - **ToolHub** – the MCP client inside Alveus that connects all servers and presents their tools to the model as `server__tool`.

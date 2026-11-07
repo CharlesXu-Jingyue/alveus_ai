@@ -39,6 +39,12 @@ What it does, in order (each step is also a standalone script under `scripts/`):
 6. **Services** (`--services`) – renders and enables `alveus-llm.service` and `alveus.service`
    as systemd user units.
 
+Cloud models need nothing extra at install time (the `anthropic` SDK is a regular dependency):
+pick the `claude`, `chatgpt` or `deepseek` profile in the GUI and paste the key under
+Settings → Language model → API keys, or run `alveus llm key ANTHROPIC_API_KEY`. Keys are stored in
+`~/.config/alveus/secrets.env`, outside the repository, so copying the repo to another machine
+never copies them.
+
 Flags: `--env NAME`, `--venv`, `--models DIR`, `--lib DIR`, `--ternary`, `--no-1bit`,
 `--with-chatterbox`, `--no-parakeet`, `--services`, `--skip-llama`, `--skip-models`.
 

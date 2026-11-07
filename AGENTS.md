@@ -7,7 +7,8 @@ it, what the owner cares about, and the traps that have already cost time. Writt
 
 Alveus (also called **Aurea** when its voice is female) is a fully local, voice-driven AI
 assistant for the owner's Linux workstation. Speech in → local LLM with tools → speech out, plus a
-browser GUI. Nothing leaves the machine except the web tools. Repo: `~/local/repo/alveus-ai`,
+browser GUI. Nothing leaves the machine except the web tools, unless a cloud LLM profile is selected
+(then the conversation goes to that provider). Repo: `~/local/repo/alveus-ai`,
 conda env `alveus`, Python 3.12. Everything is committed to git on `master`; commit after each
 change with a descriptive message (see `git log` for the style).
 
@@ -40,6 +41,7 @@ change with a descriptive message (see `git log` for the style).
 | logs | `journalctl --user -u alveus -f`, `logs/alveus.log` |
 | GUI + API | http://127.0.0.1:8765/ (served by the `alveus` service), API docs at `/docs`, handbook at `/handbook` |
 | LLM server | http://127.0.0.1:8080/v1 (OpenAI-compatible) |
+| API keys for cloud LLM profiles | `~/.config/alveus/secrets.env` (mode 600, outside the repo; `ALVEUS_SECRETS` overrides); GUI writes it via `PUT /secrets`, CLI `alveus llm key NAME` |
 | opencode config (coder tool) | `~/.config/opencode/opencode.jsonc`, provider `bonsai` |
 | ComfyUI (image generation, not yet wired to Alveus) | checkout `~/local/lib/ComfyUI`, conda env `comfy` (torch cu130), user unit `comfyui.service` on http://127.0.0.1:8188, `RequiresMountsFor=/mnt/data` |
 | ComfyUI models | `/mnt/data/comfy/models/{checkpoints,diffusion_models,text_encoders,vae,loras,controlnet,model_patches}` via `extra_model_paths.yaml`; `/mnt/data` is the NTFS "Data" drive (fstab by label, `ntfs3`, uid 1000) |
@@ -52,7 +54,9 @@ downloads on `/mnt/data`); device names (`nvmeXn1`) change between boots, so fst
 
 ## Current configuration (check `config/local.yaml`, it may have moved on)
 
-LLM profile `bonsai-ternary` (Ternary-Bonsai-27B, ~89 tok/s). STT faster-whisper large-v3-turbo,
+LLM profile `bonsai-ternary` (Ternary-Bonsai-27B, ~89 tok/s). Profiles = provider + model
+(`alveus/llm/providers.py`); cloud profiles `claude`, `chatgpt`, `deepseek` and a placeholder
+`qwen-local` are defined but unused, and no API keys are stored yet. STT faster-whisper large-v3-turbo,
 language fixed to `en` unless the owner cleared it. TTS **Chatterbox multilingual** with the cloned
 sample `m_demo_charles.wav`; voice gender `auto` (inferred from the `m_`/`f_` file prefix) → the
 assistant currently calls itself Alveus. Activation: `mode: both` (names in the transcript plus the custom openWakeWord models
@@ -87,7 +91,11 @@ curl -s localhost:8765/health | python -m json.tool
 ## Conventions
 
 - One backend per file under `alveus/llm|stt|tts/`, registered in that package's `__init__`
-  factory; heavy imports happen inside `load()`.
+  factory; heavy imports happen inside `load()`. LLM: one adapter per wire protocol
+  (`openai_chat`, `openai_responses`, `anthropic_messages`); providers are presets, not classes.
+  The history stays provider-neutral; provider-specific data rides in `_replay` (see `llm/base.py`).
+- API keys never go in YAML, never into `os.environ`, never into tool servers' environment
+  (`alveus/credentials.py`, `ToolHub.server_env`).
 - MCP servers: `from .common import FastMCP, annot, j, run`; return JSON strings; mark irreversible
   tools `annot(destructive=True)` — that is what triggers the spoken/GUI confirmation.
 - Config patch semantics (`alveus/config.py`): a `null` leaf stores an explicit null (e.g. language
@@ -128,6 +136,12 @@ curl -s localhost:8765/health | python -m json.tool
 - The `alveus.service` unit must not block on the LLM; the GUI has to stay reachable to fix things.
 - uvicorn captures SIGTERM for itself, so `systemctl stop` used to hang until SIGKILL (90 s);
   `cli.talk` now owns the signal handlers and `serve()` disables uvicorn's. `TimeoutStopSec=15`.
+- `alveus/web/index.html` contains intentional NUL bytes (markdown placeholders), so `file` calls it
+  "data", plain `grep` skips it (use `grep -a`) and some editors choke; patch it byte-safely.
+- `google-chrome --headless --dump-dom` dumps before the GUI's async code runs (and
+  `--virtual-time-budget` hangs on the `/events` stream). To check the rendered GUI, drive headless
+  Chrome over the DevTools protocol (`--remote-debugging-port`, Node 22's built-in WebSocket,
+  `Runtime.evaluate` after a few seconds) against a text-only test instance on another port.
 - Anything that drains the speaker queue must keep the `None` end marker (`StreamSpeaker.abort`);
   dropping it hung every reply stopped after generation had finished. `/debug/tasks` finds such hangs.
 

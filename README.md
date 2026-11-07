@@ -2,13 +2,15 @@
 
 Alveus (or **Aurea**, when it speaks with a female voice) is a Jarvis-style assistant that runs
 entirely on your own Linux + NVIDIA machine: local LLM, local speech-to-text, local
-text-to-speech, and tool access to your computer through MCP servers. Nothing leaves the box.
+text-to-speech, and tool access to your computer through MCP servers. With the default local model
+nothing leaves the box; a profile can instead use a cloud model (Claude, ChatGPT, DeepSeek, …),
+which then receives the conversation.
 
 ```
    mic ──► VAD ──► STT ──► "Aurea, …?" ──► Agent loop ◄──► MCP tools (files, shell, desktop,
                                               │                        system, web, coder/opencode)
                                               ▼
-                                   LLM (llama-server / any OpenAI-compatible API)
+                    LLM (local llama-server, or Claude / OpenAI / DeepSeek / any OpenAI-compatible API)
                                               │
                                    sentence stream ──► TTS ──► speaker
 ```
@@ -69,21 +71,27 @@ Destructive actions (delete, kill, shutdown, risky shell commands) are always co
 
 ## Swapping the LLM
 
-Add a profile under `llm.profiles` and set `llm.profile` (or `ALVEUS_LLM_PROFILE=name`):
+A profile is a provider plus a model; pick one in the GUI (Settings → Language model) or set
+`llm.profile` (or `ALVEUS_LLM_PROFILE=name`). Shipped: local `bonsai-1bit`, `bonsai-ternary`,
+`qwen-local`, and cloud `claude`, `chatgpt`, `deepseek` (enter the API key in the GUI, or
+`alveus llm key ANTHROPIC_API_KEY`). Add your own in `config/local.yaml`:
 
 ```yaml
 llm:
   profile: qwen-vllm
   profiles:
     qwen-vllm:
-      backend: openai
-      base_url: http://127.0.0.1:8000/v1
-      api_key: local
+      provider: vllm                   # or llama_server, ollama, openai_compat, openai, anthropic, deepseek, openrouter
       model: Qwen/Qwen3-32B
-      reasoning: true
+    sonnet:
+      provider: anthropic
+      model: claude-sonnet-5-5
+      max_tokens: 16000
 ```
 
-Profiles with a `serve:` block can be launched by `alveus llm serve --profile NAME`.
+Profiles with a `serve:` block are launched by `alveus llm serve --profile NAME` (the
+`alveus-llm` service); see [docs/backends.md](docs/backends.md#llm) for the providers and
+protocols.
 
 ## Adding tools
 

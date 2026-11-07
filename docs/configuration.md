@@ -45,21 +45,29 @@ Changes take effect on the next start (`systemctl --user restart alveus`).
 | key | default | meaning |
 |---|---|---|
 | `profile` | `bonsai-1bit` | active profile (override: `ALVEUS_LLM_PROFILE`, `alveus talk --profile`) |
-| `temperature`, `top_p`, `max_tokens` | `0.7`, `0.95`, `4096` | request defaults, overridable per profile |
+| `temperature`, `top_p`, `max_tokens` | `0.7`, `0.95`, `4096` | request defaults for every profile; a profile's own value wins; `null` = not sent. Never sent to providers that reject them (Claude, OpenAI) unless the profile sets them |
+| `effort` | `null` | reasoning depth for models that have it: `low` \| `medium` \| `high` \| `xhigh` \| `max` (Claude `output_config.effort`, OpenAI `reasoning.effort`, DeepSeek `reasoning_effort`); `null` = model default |
 | `max_tool_rounds` | `12` | maximum LLM↔tool iterations in one turn |
-| `profiles.<name>.backend` | `openai` | only OpenAI-compatible is implemented (aliases: `llama_server`, `vllm`, `ollama`) |
-| `profiles.<name>.base_url` | | e.g. `http://127.0.0.1:8080/v1` |
-| `profiles.<name>.api_key` | `local` | sent as Bearer token |
-| `profiles.<name>.model` | | must equal an id in `GET /v1/models` (llama-server: set with `--alias`) |
-| `profiles.<name>.reasoning` | `false` | model emits `reasoning_content` (informational) |
-| `profiles.<name>.thinking` | unset | `true`/`false` forces `chat_template_kwargs.enable_thinking` |
+| `profiles.<name>.provider` | | preset from `alveus/llm/providers.py`: `llama_server`, `vllm`, `ollama`, `openai_compat`, `openai`, `anthropic`, `deepseek`, `openrouter` (or any name, with `api` + `base_url`). Old profiles with `backend: openai` still work (= `openai_compat`) |
+| `profiles.<name>.model` | | model id; for local servers it must equal an id in `GET /v1/models` (llama-server: set with `--alias`) |
+| `profiles.<name>.api` | from provider | protocol: `openai_chat` \| `openai_responses` \| `anthropic_messages` |
+| `profiles.<name>.base_url` | from provider | e.g. `http://127.0.0.1:8080/v1`; required for `openai_compat` |
+| `profiles.<name>.api_key_env` | from provider | variable holding the key (environment or `~/.config/alveus/secrets.env`) |
+| `profiles.<name>.api_key` | | literal key, for local servers that want any string; do not put real keys in YAML |
+| `profiles.<name>.max_tokens`, `temperature`, `top_p`, `effort` | | per-profile overrides of the llm-level values |
+| `profiles.<name>.thinking` | unset | `true`/`false` forces thinking on/off where the provider has a switch (llama-server: `chat_template_kwargs.enable_thinking`; DeepSeek: `thinking.type`; Claude: `false` = send no thinking setting, for older models) |
 | `profiles.<name>.extra_body` | `{}` | merged into the request JSON (`top_k`, `min_p`, `repetition_penalty`, …) |
-| `profiles.<name>.serve.command` | | server binary for `alveus llm serve` |
+| `profiles.<name>.headers` | `{}` | extra HTTP headers (e.g. OpenRouter's `HTTP-Referer`) |
+| `profiles.<name>.opencode_model` | derived | what the coder tool's `auto` means for this profile (`provider/model` in opencode); derived from the preset's `opencode_provider` |
+| `profiles.<name>.serve.command` | | server binary for `alveus llm serve`; a profile without `serve` needs no local server (`alveus-llm` then exits and frees the GPU) |
 | `profiles.<name>.serve.model_path` | | GGUF path (checked by `doctor`) |
 | `profiles.<name>.serve.args` | | extra llama-server args; `--host/--port/-m/--alias` are added automatically |
+| preset keys | | `thinking_param`, `reasoning_replay`, `max_tokens_field` (openai_chat); `reasoning_summary`, `store` (openai_responses); `thinking_display`, `fallbacks`, `prompt_cache` (anthropic_messages); see `providers.py` and backends.md |
 
-Shipped profiles: `bonsai-1bit` (default) and `bonsai-ternary`. Both serve on port 8080, so only
-one runs at a time; switch with `llm.profile` and restart `alveus-llm`.
+Shipped profiles: local `bonsai-1bit` (default), `bonsai-ternary`, `qwen-local` (weights not
+downloaded), and cloud `claude`, `chatgpt`, `deepseek`. The local ones all serve on port 8080, so
+only one runs at a time; switch with `llm.profile` and restart `alveus-llm` (the GUI does both).
+API keys never go in this file: see [backends.md](backends.md#api-keys).
 
 llama-server flags used and why: `-ngl 99` all layers on GPU; `-c 32768` context (raise up to
 262144 if you need long documents, VRAM permitting); `--jinja` real chat template (required for
@@ -137,6 +145,7 @@ sampling `--temp 0.7 --top-p 0.95 --top-k 20` as recommended by the model card.
 | `servers.<name>.cwd` | repo root | |
 | `servers.<name>.enabled` | `true` | |
 | `servers.<name>.timeout_s` | `60` | startup timeout |
+| `servers.<name>.inherit_api_keys` | `false` | pass LLM API-key variables (`ANTHROPIC_API_KEY`, …) from the environment to this stdio server; only the coder needs it (opencode) |
 
 Built-in servers: `files`, `desktop`, `system`, `web`, `coder`. The coder server honours
 `ALVEUS_OPENCODE_MODEL` (`auto` = the assistant's own local model, `opencode-default`, or a

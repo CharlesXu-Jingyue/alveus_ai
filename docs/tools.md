@@ -85,10 +85,14 @@ These are the only tools that contact the internet.
 Delegates programming work to **opencode** (`opencode run --format json`, headless; the desktop app
 is not involved, but it shares opencode's config and credentials). Which model opencode uses is set by
 `tools.servers.coder.env.ALVEUS_OPENCODE_MODEL` (GUI: Tools & safety → Coding model):
-`auto` (default) requests the same local Bonsai model the assistant is running, via the `bonsai`
-provider in `~/.config/opencode/opencode.jsonc`, so it follows `llm.profile`; `opencode-default` leaves
+`auto` (default) requests the same model the assistant is running, so it follows `llm.profile`: for a
+local profile via the `bonsai` provider in `~/.config/opencode/opencode.jsonc` (a new local model's id,
+e.g. `qwen3.8-27b`, must be listed under that provider too), for a cloud profile as
+`<opencode provider>/<model>` (e.g. `anthropic/claude-opus-5-5`; opencode must be signed in to that
+provider with `opencode auth login`, or the profile sets `opencode_model`); `opencode-default` leaves
 the choice to opencode; any `provider/model` id from `opencode models` (e.g. `deepseek/deepseek-v4-flash`)
-sends the work to that model instead. `ALVEUS_CODE_DIR` is the coding folder: the tools' descriptions quote it so the model knows it, and
+sends the work to that model instead. The coder is the only tool server that sees API-key variables
+from the environment (`inherit_api_keys: true`), since opencode may use them to sign in. `ALVEUS_CODE_DIR` is the coding folder: the tools' descriptions quote it so the model knows it, and
 `directory` is resolved against it: empty, `~`, `.` or `default` mean the folder itself; a bare name
 (`repo`, `repo/foo`) is looked up inside it (then under `~`); absolute and `~/…` paths are used as given.
 An unknown name returns an error listing the folder's subdirectories so the model can pick one.
