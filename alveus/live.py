@@ -82,6 +82,8 @@ async def _engine(assistant, section: str, old, new, report: dict[str, list[str]
                                     f"{str(e)[:160]}); the previous one stays in use until a restart")
             return
     setattr(assistant, section, fresh)
+    if hasattr(cur, "close"):          # an engine in its own process (Qwen3-TTS) ends it here
+        cur.close()
     del cur
     _free_gpu()
     report["reloaded"].append(f"{label}: {getattr(fresh, 'name', section)} "

@@ -588,7 +588,7 @@ const get = (o,p) => p.split('.').reduce((a,k)=> (a && a[k]!==undefined) ? a[k] 
 const same = (a,b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 let cfg=null, dirty={}, instructions='', instrDirty=false, yamlDirty=false, searchQuery='';
 let pers={items:[], active:null, default:'calm'}, persEdits={};   // personalities, and unsaved edits by id
-let newProfiles={}, llmUI=null, modelLists={}, devices=null, voiceFiles={}, restartKind=null, prevProfile=null;
+let newProfiles={}, llmUI=null, modelLists={}, devices=null, voiceFiles={}, voiceTexts={}, restartKind=null, prevProfile=null;
 // value as it will be after saving: pending edit wins over the saved configuration
 const current = p => (p in dirty) ? (isUnset(dirty[p]) ? get(cfg.defaults||{}, p) : dirty[p]) : get(cfg.effective, p);
 const tpl = (s, scope) => typeof s==='string' ? s.replace(/\{(\w+)\}/g, (_,k) => scope[k] ?? '') : s;
@@ -634,6 +634,22 @@ const chatterboxModel = m => [
     {t:'number', p:`tts.chatterbox.models.${m}.exaggeration`, fb:['tts.chatterbox.exaggeration'], l:'Expressiveness', step:0.05, min:0, max:1, h:'0 = flat, 0.5 = natural, 1 = dramatic.'},
     {t:'number', p:`tts.chatterbox.models.${m}.cfg_weight`, fb:['tts.chatterbox.cfg_weight'], l:'Pacing', step:0.05, min:0, max:1,
      h:'Lower = slower, more deliberate delivery; 0.5 is the default.'}] : []),
+];
+const QWEN_MODELS = {'1_7b':'1.7B', '0_6b':'0.6B'};
+const qwen3Model = m => [
+  {t:'sample', p:`tts.qwen3.models.${m}.voice_ref`, fb:['tts.qwen3.voice_ref'], l:'Voice to copy', none:'none chosen: the first recording in the folder',
+   h:'A 5–15 s recording from the voices folder. ▶ plays it.',
+   more:'Qwen3-TTS has no voice of its own: it copies the recording you pick, in any of its 10 languages. Name files f_… or m_… so the voice gender, and with it the name the assistant uses, is picked up automatically.'},
+  {t:'words', of:`tts.qwen3.models.${m}.voice_ref`, offb:['tts.qwen3.voice_ref'], l:'Its words', h:'What the recording says, in NAME.txt beside it.',
+   more:'With the words, sentences in the recording’s own language are spoken by continuing the recording: the closest copy. Sentences in other languages copy only the timbre (that keeps the voice better across languages), and so does a recording without its words.'},
+  {t:'select', p:`tts.qwen3.models.${m}.voice_gender`, fb:['tts.qwen3.voice_gender','tts.voice_gender'], l:'Voice gender',
+   h:'Decides which of its names it uses (female voice → the female-voice name).', o: () => GENDERS('chatterbox', () => valueOf({p:`tts.qwen3.models.${m}.voice_ref`, fb:['tts.qwen3.voice_ref']}) || firstSample())},
+  {t:'lang', p:`tts.qwen3.models.${m}.language`, fb:['tts.qwen3.language'], l:'Spoken language', codes:'qwen3_languages', auto:'automatic, per sentence', autoValue:'auto',
+   h:'Automatic speaks each sentence in its own language; or fix one.'},
+  {t:'lang', p:`tts.qwen3.models.${m}.fallback_language`, fb:['tts.qwen3.fallback_language'], l:'Fallback language', codes:'qwen3_languages',
+   h:'For sentences too short to identify (numbers, names, single words).'},
+  {t:'number', p:`tts.qwen3.models.${m}.temperature`, fb:['tts.qwen3.temperature'], l:'Variation', step:0.05, min:0.3, max:1.3,
+   h:'Lower = steadier and flatter, higher = livelier but less predictable; 0.9 is the default.'},
 ];
 const WHISPER = [
   {v:'large-v3-turbo', l:'large-v3-turbo', d:'best balance (recommended)'}, {v:'large-v3', l:'large-v3', d:'most accurate, slower'},
@@ -683,6 +699,7 @@ const SECTIONS = [
   {t:'choice', p:'tts.backend', l:'Voice engine', h:'The engine that speaks the replies.', opts:[
     {v:'kokoro', l:'Kokoro', d:'Fast; 28 built-in English voices'},
     {v:'chatterbox', l:'Chatterbox', d:'Most natural; copies a voice from a recording; more VRAM'},
+    {v:'qwen3', l:'Qwen3-TTS', d:'Copies a voice; 10 languages incl. Chinese and Japanese; about 4 GB VRAM'},
     {v:'openai_http', l:'Other server', d:'A speech server you run'}], branch:{
    kokoro:[
     {t:'voice', p:'tts.kokoro.voice', l:'Voice', h:'▶ speaks a sample sentence on the speaker (while Kokoro is running).'},
@@ -695,6 +712,15 @@ const SECTIONS = [
     {t:'choice', p:'tts.chatterbox.model', l:'Model', h:'Each model keeps its own voice and settings.', opts:[
       {v:'turbo', l:'Turbo', d:'English, fastest'}, {v:'standard', l:'Standard', d:'English, adjustable expressiveness'},
       {v:'multilingual', l:'Multilingual', d:'23 languages, chosen per sentence'}], each: chatterboxModel, panel: v => `${SPEAK_MODELS[v]||v} settings (only for this model)`}],
+   qwen3:[
+    {t:'text', p:'tts.qwen3.voices_dir', fb:['tts.voices_dir'], l:'Voices folder', kind:'voicesdir',
+     h:'Folder with the recordings to copy; the same as Chatterbox’s unless set here.', more:'Drop 5–15 s recordings of one speaker without music in it, named f_… or m_…, each with its words in a .txt file of the same name if you have them (“Write it down” below makes one).'},
+    {t:'choice', p:'tts.qwen3.model', l:'Model', h:'Each model keeps its own voice and settings.', opts:[
+      {v:'1_7b', l:'1.7B', d:'Best quality; about 4 GB VRAM'}, {v:'0_6b', l:'0.6B', d:'Faster and lighter; 2.5 GB download on first use'}],
+     each: qwen3Model, panel: v => `${QWEN_MODELS[v]||v} settings (only for this model)`},
+    {t:'text', p:'tts.qwen3.weights_dir', l:'Model folder', nullable:true, h:'Where the model weights are kept; a missing model is downloaded there. Empty = the Hugging Face cache.'},
+    {t:'text', p:'tts.qwen3.python', l:'Its Python environment', h:'Qwen3-TTS runs in its own small environment (scripts/install_qwen3_tts.sh).',
+     more:'qwen-tts needs an older transformers than the rest of Alveus, so it runs as a separate worker process with this Python. Choosing another engine ends the worker and frees its memory.'}],
    openai_http:[
     {t:'text', p:'tts.openai_http.base_url', l:'Server address', h:'e.g. http://127.0.0.1:8880/v1 for Kokoro-FastAPI.'},
     {t:'text', p:'tts.openai_http.model', l:'Model name', h:'e.g. kokoro or tts-1, as the server expects.'},
@@ -753,7 +779,7 @@ const SECTIONS = [
 async function loadSettings(force){
   if (cfg && !force) return;
   try{ cfg = await j('/config'); instructions = (await j('/instructions')).text; pers = await j('/personalities'); }catch(e){ toast('Could not load config: '+e.message, true); return; }
-  dirty={}; newProfiles={}; instrDirty=false; persEdits={}; yamlDirty=false; modelLists={}; voiceFiles={};
+  dirty={}; newProfiles={}; instrDirty=false; persEdits={}; yamlDirty=false; modelLists={}; voiceFiles={}; voiceTexts={};
   llmUI = {provider: (profSummary(cfg.effective.llm.profile)||{}).provider || 'llama_server', baseUrl:{}};
   if (!devices) j('/audio/devices').then(d => { devices=d; rerender(); }).catch(()=>{ devices={sources:[], sinks:[]}; });
   renderSettings(); updateSavebar();
@@ -845,6 +871,7 @@ function fieldRow(F, scope){
       return (r.headers.get('content-type')||'').includes('json') ? await r.json() : {url: URL.createObjectURL(await r.blob())}; });
     el.appendChild(b); }
   else if (F.t==='sample'){ el=sampleControl(F, v); }
+  else if (F.t==='words'){ el=wordsControl(F); }
   else if (F.t==='device'){ el=deviceControl(F, v); }
   else if (F.t==='hotkey'){ el=hotkeyControl(F, v); }
   else if (F.t==='combo'){ const opts=[...(cfg.options[F.o]||[])].map(x=>({v:x, l:x})); opts.push({v:'__custom__', l:'type another…'});
@@ -904,16 +931,18 @@ function playBtn(title, disabled, start){
   return b;
 }
 const speakerHere = () => !!(health && health.voice);
-function samplesDir(){ return current('tts.chatterbox.voices_dir') ?? current('tts.voices_dir') ?? ''; }
+function samplesDir(){ const e=current('tts.backend'); return current(`tts.${e==='qwen3'?'qwen3':'chatterbox'}.voices_dir`) ?? current('tts.voices_dir') ?? ''; }
+const firstSample = () => { const d=samplesDir(); return (voiceFiles[d] || (d===cfg.effective.tts.voices_dir ? cfg.options.voice_samples||[] : []))[0] || ''; };
+const textsIn = dir => voiceTexts[dir] || (dir===cfg.effective.tts.voices_dir ? cfg.options.voice_texts||[] : []);
 let _samplesTimer=null;
 function refreshSamples(dir){ clearTimeout(_samplesTimer); _samplesTimer=setTimeout(async () => {
-  try{ const r=await j('/voices?dir='+encodeURIComponent(dir||'')); voiceFiles[dir]=r.files; document.querySelectorAll('.ctl [data-kind="sample"]').forEach(x => x._fill && x._fill(r.files));
+  try{ const r=await j('/voices?dir='+encodeURIComponent(dir||'')); voiceFiles[dir]=r.files; voiceTexts[dir]=r.texts||[]; document.querySelectorAll('.ctl [data-kind="sample"]').forEach(x => x._fill && x._fill(r.files));
     if (dir && !r.exists) toast('Voices folder not found: '+dir, true); }catch(e){} }, 400); }
 function sampleControl(F, v){
   const el=document.createElement('div'); el.className='inl'; const s=document.createElement('select'); s.dataset.kind='sample'; s.dataset.focus=F.p; el.appendChild(s);
   const dir=samplesDir(); const cur=v||'';
   const fill = files => { const name=cur.split('/').pop(); const known = files.includes(cur) || files.includes(name);
-    s.innerHTML = `<option value="">built-in voice (no recording)</option>` + files.map(x=>`<option value="${esc(x)}"${(x===cur||x===name)?' selected':''}>${esc(x)}</option>`).join('')
+    s.innerHTML = `<option value="">${esc(F.none || 'built-in voice (no recording)')}</option>` + files.map(x=>`<option value="${esc(x)}"${(x===cur||x===name)?' selected':''}>${esc(x)}</option>`).join('')
       + (cur && !known ? `<option value="${esc(cur)}" selected>${esc(cur)} — not in the folder</option>` : '') + `<option value="__custom__">another file…</option>`; };
   s._fill = fill; fill(voiceFiles[dir] || (dir===cfg.effective.tts.voices_dir ? cfg.options.voice_samples||[] : []));
   if (!voiceFiles[dir]) refreshSamples(dir);
@@ -921,6 +950,22 @@ function sampleControl(F, v){
   el.appendChild(playBtn('Play this recording', !cur, async () => speakerHere()
     ? await j('/voices/play',{method:'POST', body:JSON.stringify({name:s.value, dir})})
     : {url:`/voices/file?name=${encodeURIComponent(s.value)}&dir=${encodeURIComponent(dir)}`}));
+  return el;
+}
+// whether the chosen recording has its words (NAME.txt); offers to write them down with the speech recognizer
+function wordsControl(F){
+  const el=document.createElement('div'); el.className='inl';
+  const name=String(valueOf({p:F.of, fb:F.offb}) || firstSample()).split('/').pop(), dir=samplesDir(), texts=textsIn(dir);
+  const s=document.createElement('small'); s.className='sub'; el.appendChild(s);
+  if (!name){ s.textContent='The voices folder has no recordings yet.'; return el; }
+  if (texts.includes(name)){ s.textContent=`${name.replace(/\.[^.]+$/,'')}.txt is there: in its own language the voice is copied closely.`; return el; }
+  s.textContent='No words yet: only the timbre is copied.';
+  const b=document.createElement('button'); b.type='button'; b.className='btn'; b.textContent='Write it down';
+  b.title='Let the speech recognizer write down what the recording says and save it beside it'; el.appendChild(b);
+  b.onclick=async()=>{ b.disabled=true; b.textContent='Listening…';
+    try{ const r=await j('/voices/transcribe',{method:'POST', body:JSON.stringify({name, dir})}); voiceTexts[dir]=[...texts, name];
+      toast('Saved its words: “'+r.text.slice(0,70)+(r.text.length>70?'…':'')+'” (fix them in the .txt file if needed)'); rerender(); }
+    catch(e){ toast(e.message, true); b.disabled=false; b.textContent='Write it down'; } };
   return el;
 }
 function deviceControl(F, v){
@@ -1188,7 +1233,7 @@ function applySearch(){
 // edits that will actually be saved: those of new profiles that were not chosen in the end are dropped
 const pending = () => Object.keys(dirty).filter(p => { const m=p.match(/^llm\.profiles\.([^.]+)\./); return !(m && newProfiles[m[1]] && m[1]!==current('llm.profile')); });
 const needsLLM = () => pending().some(p => p==='llm.profile' || /^llm\.profiles\.[^.]+\.serve\./.test(p));
-const reloads = () => pending().some(p => /^(tts\.(backend|device|chatterbox\.model)|stt\.(backend|device|[a-z_]+\.model|[a-z_]+\.models\.[^.]+\.compute_type|[a-z_]+\.compute_type))$/.test(p));
+const reloads = () => pending().some(p => /^(tts\.(backend|device|chatterbox\.model|qwen3\.(model|python|weights_dir))|stt\.(backend|device|[a-z_]+\.model|[a-z_]+\.models\.[^.]+\.compute_type|[a-z_]+\.compute_type))$/.test(p));
 function buildPatch(){
   const patch={}; const sel=current('llm.profile');
   const set=(p,v)=>{ const parts=p.split('.'); let cur=patch; for (const k of parts.slice(0,-1)) cur=cur[k]??(cur[k]={}); cur[parts.at(-1)]=v; };

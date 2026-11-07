@@ -76,6 +76,9 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 | symptom | cause | fix |
 |---|---|---|
 | `CUDAExecutionProvider is not in available provider names` | CPU `onnxruntime` shadows `onnxruntime-gpu` | `pip uninstall -y onnxruntime && pip install --force-reinstall --no-deps onnxruntime-gpu` |
+| Qwen3-TTS: `cannot import name 'check_model_inputs' from 'transformers.utils.generic'` | qwen-tts imported in the main environment (transformers 5) | it must run through its worker: `tts.qwen3.python` → `.venv-qwen3tts/bin/python` (`scripts/install_qwen3_tts.sh`); never `pip install qwen-tts` into the alveus env (it would downgrade transformers for everything) |
+| Qwen3-TTS silent, `/health` shows a voice warning | no recording chosen and the voices folder is empty, or the worker failed to start (the error names the cause: missing environment, out of memory) | put a WAV in the voices folder and choose it; `alveus doctor` checks the environment; `journalctl --user -u alveus | grep -i qwen` |
+| Qwen3-TTS voice sounds less like the recording in English | expected across languages; it then copies the timbre only | for the closest copy use a recording in the language it mostly speaks, with its words in `NAME.txt` |
 | `chatterbox-tts requires numpy<2` / other pins broken | another package upgraded numpy/torch | `pip install "numpy<2"`; compare with `requirements-lock.txt`. Keep experimental tools (e.g. livekit-wakeword) in a separate env |
 | `openwakeword requires tflite-runtime` in `pip check` | intentional (no py3.12 wheels) | ignore; ONNX runtime is used |
 | faster-whisper `libcudnn` not found | cuDNN from torch wheels not loaded | the backend imports torch first; ensure torch is installed in the same env |

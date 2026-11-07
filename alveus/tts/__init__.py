@@ -14,6 +14,9 @@ def make_tts(cfg) -> TTSBackend:
     if backend == "chatterbox":
         from .chatterbox_tts import ChatterboxTTS
         return ChatterboxTTS(opts, device, voices_dir=opts.get("voices_dir"))
+    if backend == "qwen3":
+        from .qwen3_tts import Qwen3TTS
+        return Qwen3TTS(opts, device, voices_dir=opts.get("voices_dir"))
     if backend == "openai_http":
         from .openai_http_tts import OpenAIHttpTTS
         return OpenAIHttpTTS(opts)

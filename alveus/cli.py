@@ -327,6 +327,15 @@ def doctor(warm: bool = typer.Option(False, help="Also load STT/TTS/wake-word mo
             check(name, True, "installed")
         except Exception as e:  # noqa: BLE001
             check(name, False, f"not installed ({type(e).__name__})")
+    from .tts.qwen3_tts import DEFAULT_PYTHON
+    qpy = os.path.expanduser(str((cfg.tts.get("qwen3") or {}).get("python") or DEFAULT_PYTHON))
+    if os.path.exists(qpy):
+        r = subprocess.run([qpy, "-c", "import qwen_tts, transformers; print(transformers.__version__)"],
+                           capture_output=True, text=True, timeout=120)
+        check("qwen3-tts (own environment)", r.returncode == 0,
+              f"transformers {r.stdout.strip().splitlines()[-1]}" if r.returncode == 0 else (r.stderr.strip().splitlines() or ["?"])[-1])
+    else:
+        check("qwen3-tts (own environment)", False, "not installed (optional: scripts/install_qwen3_tts.sh)")
     for binname in ("opencode", "xdotool", "wmctrl", "xclip", "notify-send", "wpctl", "playerctl"):
         check(f"bin: {binname}", shutil.which(binname) is not None, shutil.which(binname) or "missing (optional)")
     if warm:

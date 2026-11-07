@@ -40,7 +40,39 @@ profile is a one-line patch; `llm.effort` exists for cloud models, local ones on
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
 
-## 2026-11-07 (latest) — instructions and personalities are separate; four personalities ship
+## 2026-11-07 (late afternoon) — Qwen3-TTS as a third voice engine; eight curated female voices
+
+- Owner: add Qwen3-TTS 1.7B as a TTS engine; download and curate female voice samples from 朱花
+  (aiseiyou.com), japanese-anime-speech, da-fei-yu-girl-voice-zh and TTS-SCDuFSC, and name them.
+- **Engine** (`tts.backend: qwen3`): qwen-tts 0.1.1 pins transformers 4.57.3 and fails on Alveus's
+  5.2 (`check_model_inputs` was removed), so it runs in a worker process with its own venv
+  (`.venv-qwen3tts`, on top of the alveus Python, 139 MB; `scripts/install_qwen3_tts.sh`,
+  `install.sh --with-qwen3-tts`). JSON request per sentence over a pipe, float32 audio back; the
+  worker ends with Alveus (stdin closes) or when the engine is swapped (`live._engine` calls
+  `close()`). Weights in `/mnt/data/models/tts` (root disk at 94 %). Measured: ready in 3.4 s,
+  3.9 GB VRAM, ~2 s per sentence (sdpa, no flash-attn); live swap Kokoro → Qwen3 → Kokoro works and
+  frees the worker. Models `1_7b` (downloaded) and `0_6b` (downloads on first use); per-model voice,
+  gender, language, variation in the settings tree; *Its words* shows whether the recording has a
+  transcript and *Write it down* (`POST /voices/transcribe`) makes one with the running STT.
+- **Cloning mode per sentence** (measured, see backends.md): with the transcript, in-context
+  cloning is best in the recording's own language (0.88–0.94 speaker similarity) but drifts for
+  English from a Japanese/Chinese voice (as low as 0.70; Yuzu came out at 155 Hz against a 396 Hz
+  recording); the x-vector mode holds at 0.87–0.92 there. The engine sends the transcript only
+  for sentences in the recording's language.
+- **Voices** (`voices/`, `SOURCES.md` with sources and terms): Ayaka/朱花 (official 8 s sample from the
+  AI声優 YouTube channel; free use, credit "AI声優-朱花"; her creator calls her a cheeky tsundere, which
+  pairs with the Tsundere personality), Hina, Yuzu, Mio, Shiori (one line each from four characters
+  of japanese-anime-speech shard 0, CC0; file names carry character codes `0fem_aia` etc.; lines with
+  adult or awkward content skipped), Feiyu/大肥鱼 (ModelScope, CC-BY-NC), Xiaoyu and Wanqing
+  (TTS-SCDuFSC speakers F004/F003, three sentences joined, CC-BY-NC-ND; the speakers read different
+  scripts after the first lines, so sentences are matched by text). All trimmed, mono 24 kHz,
+  -20 LUFS, with `.txt` words; chosen by noise floor, pauses, pitch and Whisper agreement with the
+  given text (0–0.08 apart from 朱花's spelling), then cloned with Qwen3-TTS in their language and in
+  English: Whisper understood every output.
+- Fixes on the way: a dead worker is retired at once (a race let the next sentence write to it);
+  with no voice chosen the gender (and name) follows the recording that is actually copied.
+
+## 2026-11-07 (afternoon) — instructions and personalities are separate; four personalities ship
 
 - Owner: separate personality from instructions (instructions = directions and boundaries,
   personality = how it sounds), store several personalities and choose one; the calm, warm one is

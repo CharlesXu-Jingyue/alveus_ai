@@ -168,6 +168,7 @@ transcript is ready ~0.1–0.3 s after you stop speaking, which is what gates th
 |---|---|---|---|---|---|
 | `kokoro` (default) | Kokoro-82M (PyTorch) | ~0.6 GB | ~10× faster than real time after warm-up | crisp, 28 voices, tiny | no cloning; sample rate 24 kHz |
 | `chatterbox` | Resemble Chatterbox: `turbo` (English), `standard` (English), `multilingual` (23 languages) | 3–4 GB | ~0.2× real time (4 s of speech in 0.85 s) | most natural, zero-shot voice cloning from a WAV; multilingual speaks zh, ja, ko, de, fr, es, it, pt, ru, ar, hi… | multilingual picks the language per sentence (`tts.chatterbox.language: auto`): script detection for CJK/Cyrillic/Arabic/…, `langdetect` for Latin text, `fallback_language` otherwise |
+| `qwen3` | Qwen3-TTS 12Hz Base (Alibaba Qwen, Apache-2.0): `1_7b` (1.7B), `0_6b` (0.6B) | 3.9 GB (1.7B) | ~0.55× real time without flash-attn (3.5 s of speech in 1.9 s; ~2 s per sentence) | voice cloning in 10 languages (zh, en, ja, ko, de, fr, ru, pt, es, it); copies a recording closely in its own language and keeps the voice across languages | no built-in voice (copies a recording; with none chosen, the folder's first). Runs in a worker process with its own environment (see below); 24 kHz |
 | `openai_http` | any `/v1/audio/speech` server | — | network | Kokoro-FastAPI, openedai-speech, … | |
 
 Switch: `tts.backend: chatterbox` (+ `chatterbox.voice_ref: ~/voices/me.wav` for cloning; `chatterbox.model:
@@ -182,6 +183,36 @@ decimal-aware) and each sentence is synthesized while the model continues genera
 time-to-first-word ≈ LLM thinking time + first sentence generation + ~0.2 s synthesis.
 
 
+### Qwen3-TTS (`alveus/tts/qwen3_tts.py`, `qwen3_worker.py`)
+
+- **Own environment, own process.** `qwen-tts` 0.1.1 pins `transformers==4.57.3` and imports names
+  that transformers 5 removed (`check_model_inputs`), while Alveus runs on 5.x (Chatterbox and the
+  rest). `scripts/install_qwen3_tts.sh` makes `.venv-qwen3tts/`, a venv on top of the Alveus Python
+  (`--system-site-packages`: torch, numpy, librosa are shared) with only qwen-tts, transformers
+  4.57.3, accelerate 1.12 and huggingface_hub < 1 added (139 MB). The engine starts
+  `qwen3_worker.py` with that Python (`tts.qwen3.python`) and talks to it over a pipe: one JSON line
+  per sentence, raw float32 samples back. Library output goes to stderr (kept for error messages).
+  The worker ends when its stdin closes, i.e. when Alveus exits or swaps the engine (`close()`
+  frees its 3.9 GB), and a crashed worker is restarted for the next sentence.
+- **Weights.** `tts.qwen3.weights_dir` holds one folder per model (`Qwen3-TTS-12Hz-1.7B-Base`, 4.5 GB
+  with its speech tokenizer); a missing one is downloaded there first. Unset: the Hugging Face cache.
+- **Copying a voice.** The Base models have no voice of their own. With the recording's words in
+  `NAME.txt` beside it (`GET /voices` lists which have them; *Write it down* in the GUI, `POST
+  /voices/transcribe`, makes one with the running speech recognizer), a sentence in the recording's
+  language is voiced by continuing the recording (in-context mode); a sentence in another language,
+  or a recording without words, uses the speaker embedding only (x-vector mode). Measured on the eight
+  curated voices with a speaker-embedding model (Chatterbox's voice encoder, cosine to the recording):
+  same language in-context 0.88–0.94; English from a Japanese/Chinese recording in-context 0.80–0.86
+  (worst take 0.70), x-vector 0.87–0.92 (worst 0.85), hence the rule. Whisper understood every test
+  sentence (character error 0–0.08).
+- **Language** per sentence like Chatterbox Multilingual (`language: auto`, script detection plus
+  `langdetect`, `fallback_language`), mapped to Qwen's names (`japanese`, …). Generation is capped at
+  about twice the slowest plausible reading of the sentence (`token_budget`), so a sentence the model
+  fails to end cannot run on; `temperature` (0.9) is the "Variation" setting.
+- Not used: the CustomVoice (nine preset speakers with style instructions) and VoiceDesign (voice from a
+  description) variants, and streaming generation (the open-source package only simulates it).
+  flash-attn is not installed (sdpa attention); it would speed generation up.
+
 ### Per-model settings and previews
 
 Each engine reads its options through `config.engine_opts()`: the engine block, overlaid with the
@@ -190,7 +221,7 @@ selected model's own block (`tts.chatterbox.models.<model>`), with `tts.voices_d
 the gender (and with it the assistant's name) follows whichever model is active. Kokoro's accent
 follows the chosen voice (`bf_…` → British) unless `lang_code` is set. In the GUI, ▶ next to a Kokoro
 voice speaks a sample sentence through the running engine (`POST /tts/preview`; another accent
-reuses the loaded model), and ▶ next to a Chatterbox voice plays the recording itself.
+reuses the loaded model), and ▶ next to a Chatterbox or Qwen3-TTS voice plays the recording itself.
 
 ## Voice activity & wake word
 

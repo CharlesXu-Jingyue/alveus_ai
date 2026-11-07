@@ -46,7 +46,12 @@ Settings → Language model → API keys, or run `alveus llm key ANTHROPIC_API_K
 never copies them.
 
 Flags: `--env NAME`, `--venv`, `--models DIR`, `--lib DIR`, `--ternary`, `--no-1bit`,
-`--with-chatterbox`, `--no-parakeet`, `--services`, `--skip-llama`, `--skip-models`.
+`--with-chatterbox`, `--with-qwen3-tts`, `--no-parakeet`, `--services`, `--skip-llama`, `--skip-models`.
+
+Qwen3-TTS runs in its own small environment (qwen-tts needs transformers 4.57, Alveus 5.x):
+`--with-qwen3-tts`, or later `conda activate alveus && scripts/install_qwen3_tts.sh [--weights DIR]`.
+With `--weights DIR` the 1.7B weights (4.5 GB) are downloaded there now; set `tts.qwen3.weights_dir`
+to the same folder. Otherwise they download on first use.
 
 ## Opening the GUI
 
@@ -76,6 +81,9 @@ alveus stt test           # microphone works (speak for 5 s)
 | `~/local/lib/llama.cpp-bonsai/build/bin/llama-server` | inference server binary |
 | `~/miniconda3/envs/alveus` | Python environment |
 | `~/.cache/huggingface/hub` | faster-whisper, Kokoro, Parakeet, Chatterbox weights |
+| `~/local/repo/alveus-ai/.venv-qwen3tts` | Qwen3-TTS's own environment (git-ignored) |
+| `/mnt/data/models/tts/Qwen3-TTS-12Hz-1.7B-Base` | Qwen3-TTS weights (`tts.qwen3.weights_dir`, this machine) |
+| `~/local/repo/alveus-ai/voices/` | recordings to copy, their `.txt` words, `SOURCES.md` (git-ignored) |
 | `~/miniconda3/envs/alveus/lib/python3.12/site-packages/openwakeword/resources/models` | pretrained wake-word models |
 | `~/.config/systemd/user/alveus*.service` | rendered service units |
 | `~/.config/opencode/opencode.jsonc` | opencode provider `bonsai` pointing at llama-server |

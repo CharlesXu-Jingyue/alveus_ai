@@ -21,7 +21,7 @@ Every stage is a pluggable backend chosen in `config/alveus.yaml`:
 |---|---|---|
 | LLM | Bonsai-27B 1-bit via PrismML llama.cpp (`bonsai-1bit`) | `bonsai-ternary`, or any OpenAI-compatible server (vLLM, Ollama, LM Studio, remote) |
 | STT | faster-whisper `large-v3-turbo` (GPU) | NVIDIA Parakeet TDT 0.6B v3 (`parakeet`), any `/v1/audio/transcriptions` server |
-| TTS | Kokoro-82M (`af_heart`) | Chatterbox Turbo (voice cloning), any `/v1/audio/speech` server |
+| TTS | Kokoro-82M (`af_heart`) | Chatterbox (voice cloning, 23 languages), Qwen3-TTS 1.7B (voice cloning, 10 languages), any `/v1/audio/speech` server |
 | activation | say **Alveus** / **Aurea** (transcript match and/or custom-trained openWakeWord models), or `ctrl+alt+space` | pretrained openWakeWord phrases (`hey jarvis`, `alexa`, …) |
 | audio I/O | PipeWire (`pw-record`/`pw-play`) | PortAudio via sounddevice |
 

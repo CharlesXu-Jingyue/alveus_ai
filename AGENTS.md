@@ -36,7 +36,8 @@ change with a descriptive message (see `git log` for the style).
 | machine-specific config (git-ignored) | `config/local.yaml` — read it first; defaults are `config/alveus.yaml` |
 | models (`ALVEUS_MODELS`) | `~/local/model/bonsai/Bonsai-27B-Q1_0.gguf`, `~/local/model/bonsai-ternary/Ternary-Bonsai-27B-PQ2_0.gguf` |
 | llama.cpp (PrismML fork, **prism** branch, relocatable build) | `~/local/lib/llama.cpp-bonsai/build/bin/llama-server` |
-| voice samples for cloning | `~/local/data/alveus-ai/voices/` (`tts.voices_dir`) |
+| voice samples for cloning | `~/local/repo/alveus-ai/voices/` (`tts.voices_dir`, git-ignored): `m_charles_demo.wav` plus eight curated female voices (`f_*_ja`, `f_*_zh`) with `.txt` transcripts; sources and terms in `voices/SOURCES.md` |
+| Qwen3-TTS | own env `.venv-qwen3tts/` (venv on the alveus Python, transformers 4.57.3), weights `/mnt/data/models/tts/Qwen3-TTS-12Hz-1.7B-Base` (`tts.qwen3.weights_dir`) |
 | systemd user units | `~/.config/systemd/user/alveus-llm.service`, `alveus.service` (rendered from `systemd/*.in` by `scripts/install_services.sh`) |
 | logs | `journalctl --user -u alveus -f`, `logs/alveus.log` |
 | GUI + API | http://127.0.0.1:8765/ (served by the `alveus` service), API docs at `/docs`, handbook at `/handbook` |
@@ -177,6 +178,11 @@ If a key does show up in output anyway, stop, tell the owner to revoke it, and d
   `--virtual-time-budget` hangs on the `/events` stream). To check the rendered GUI, drive headless
   Chrome over the DevTools protocol (`--remote-debugging-port`, Node 22's built-in WebSocket,
   `Runtime.evaluate` after a few seconds) against a text-only test instance on another port.
+- qwen-tts pins transformers 4.57 and breaks on 5.x (`check_model_inputs`): it runs only in its worker
+  process with `.venv-qwen3tts`; never install it into the alveus env. The root disk has ~12 GB free:
+  put model weights on `/mnt/data` (the Qwen weights are there).
+- The snap `ffmpeg` (`/snap/bin/ffmpeg`) cannot read `/tmp` (snap confinement: "No such file");
+  use the conda env's `~/miniconda3/envs/alveus/bin/ffmpeg`.
 - Anything that drains the speaker queue must keep the `None` end marker (`StreamSpeaker.abort`);
   dropping it hung every reply stopped after generation had finished. `/debug/tasks` finds such hangs.
 

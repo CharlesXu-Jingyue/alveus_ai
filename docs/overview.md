@@ -58,6 +58,7 @@ See [usage.md](usage.md) for more phrasing and [tools.md](tools.md) for the exac
 | openWakeWord (optional) | CPU | <1 s | ~5 ms per 80 ms chunk |
 | Parakeet TDT 0.6B v3 (optional) | ~1 GB / CPU | ~35 s first time | ~0.3 s per utterance |
 | Chatterbox Turbo (optional) | 3–4 GB | ~20 s | ~0.15 s to first audio |
+| Qwen3-TTS 1.7B (optional, own process) | 3.9 GB | ~3.5 s (weights cached) | ~2 s per sentence (0.55× real time) |
 
 Total with defaults: about 10 GB of the 24 GB VRAM while the assistant is running, leaving room
 for the Ternary model (7.2 GB weights) or other GPU work.

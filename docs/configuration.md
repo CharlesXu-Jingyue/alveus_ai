@@ -141,9 +141,9 @@ stt:
 
 | key | default | meaning |
 |---|---|---|
-| `backend` | `kokoro` | `kokoro` \| `chatterbox` \| `openai_http` (override: `ALVEUS_TTS_BACKEND`) |
+| `backend` | `kokoro` | `kokoro` \| `chatterbox` \| `qwen3` \| `openai_http` (override: `ALVEUS_TTS_BACKEND`) |
 | `device` | `cuda` | `cuda` or `cpu` |
-| `voice_gender` | `auto` | fallback for engines/models that set no `voice_gender` of their own. `auto` infers from the voice: Kokoro voice prefix (`af_`/`bf_` female, `am_`/`bm_` male), or for Chatterbox the cloned sample's file name (`f_*.wav` / `m_*.wav`); or `female`/`male`. Decides Alveus vs Aurea |
+| `voice_gender` | `auto` | fallback for engines/models that set no `voice_gender` of their own. `auto` infers from the voice: Kokoro voice prefix (`af_`/`bf_` female, `am_`/`bm_` male), or for Chatterbox and Qwen3-TTS the copied recording's file name (`f_*.wav` / `m_*.wav`); or `female`/`male`. Decides Alveus vs Aurea |
 | `<engine>.voice_gender`, `<engine>.models.<model>.voice_gender` | | the same per engine or model (the GUI sets these) |
 | `kokoro.voice` | `af_heart` | see `alveus tts voices` (28 English voices) |
 | `kokoro.speed` | `1.0` | |
@@ -153,6 +153,12 @@ stt:
 | `chatterbox.voice_ref` | `null` | a file name inside the voices folder, or an absolute path, of a 5–15 s WAV to clone; name it `f_…wav` or `m_…wav` so the gender (and name) is inferred. A missing file falls back to the built-in voice with a warning |
 | `chatterbox.language`, `.fallback_language` | `auto`, `en` | multilingual only: `auto` detects each sentence's language |
 | `chatterbox.exaggeration`, `.cfg_weight` | `0.5`, `0.5` | standard and multilingual: expressiveness and pacing |
+| `qwen3.model` | `1_7b` | `1_7b` (Qwen3-TTS-12Hz-1.7B-Base) or `0_6b` (0.6B-Base, faster); keys without dots because they are config paths (`qwen3.models.1_7b.voice_ref`) |
+| `qwen3.python` | `${ALVEUS_HOME}/.venv-qwen3tts/bin/python` | the environment the worker runs in (`scripts/install_qwen3_tts.sh`) |
+| `qwen3.weights_dir` | `null` | folder with one subfolder per model (downloaded there when missing); `null` = Hugging Face cache. This machine: `/mnt/data/models/tts` |
+| `qwen3.voices_dir`, `.voice_ref` | `tts.voices_dir`, `null` | the recording to copy (no built-in voice: `null` copies the folder's first recording). Its words in `NAME.txt` beside it give the closest copy in its own language |
+| `qwen3.language`, `.fallback_language` | `auto`, `en` | `auto` detects each sentence's language; or one of `zh en ja ko de fr ru pt es it` |
+| `qwen3.temperature` | `0.9` | "Variation": lower is steadier and flatter, higher livelier |
 | `openai_http.base_url`, `.model`, `.voice` | | any `/v1/audio/speech` server (e.g. Kokoro-FastAPI on :8880) |
 
 ## `audio`

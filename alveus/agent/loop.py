@@ -23,7 +23,7 @@ def voice_is_female(cfg) -> bool:
     """Infer the voice's gender from config.
 
     auto:  kokoro     -> voice name prefix (af_/bf_ female, am_/bm_ male)
-           chatterbox -> the cloned sample's file name must start with f_ or m_
+           chatterbox, qwen3 -> the copied recording's file name must start with f_ or m_
                          (e.g. f_charles_demo.wav); no sample / other name -> not female
            openai_http-> Kokoro-style voice name prefix if present
     """
@@ -39,8 +39,12 @@ def voice_is_female(cfg) -> bool:
     female_prefixes = ("af_", "bf_", "ef_", "ff_", "hf_", "if_", "jf_", "pf_", "zf_")
     if backend == "kokoro":
         return str(opts.get("voice") or "af_heart").lower().startswith(female_prefixes)
-    if backend == "chatterbox":
-        stem = Path(str(opts.get("voice_ref") or "")).name.lower()
+    if backend in ("chatterbox", "qwen3"):
+        ref = opts.get("voice_ref")
+        if not ref and backend == "qwen3":       # no voice chosen: it copies the folder's first recording
+            from ..tts.qwen3_tts import Qwen3TTS
+            ref = Qwen3TTS._first_recording(opts.get("voices_dir"))
+        stem = Path(str(ref or "")).name.lower()
         return stem.startswith("f_")
     if backend == "openai_http":
         return str(opts.get("voice") or "").lower().startswith(female_prefixes)

@@ -527,12 +527,15 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "llm_profiles_labels": {n: i["label"] for n, i in _profile_info(cfg).items()},
                 "effort_levels": ["low", "medium", "high", "xhigh", "max"],
                 "stt_backends": ["faster_whisper", "parakeet", "openai_http"],
-                "tts_backends": ["kokoro", "chatterbox", "openai_http"],
+                "tts_backends": ["kokoro", "chatterbox", "qwen3", "openai_http"],
+                "qwen3_models": list(__import__("alveus.tts.qwen3_tts", fromlist=["x"]).MODELS),
+                "qwen3_languages": ["auto", *__import__("alveus.tts.qwen3_tts", fromlist=["x"]).LANGS],
                 "kokoro_voices": KOKORO_VOICES,
                 "chatterbox_models": ["turbo", "standard", "multilingual"],
                 "chatterbox_languages": ["auto", *__import__("alveus.tts.chatterbox_tts", fromlist=["x"]).MULTILINGUAL_LANGS],
                 "voice_genders": ["auto", "female", "male"],
                 "voice_samples": voice_samples,
+                "voice_texts": _voice_texts(cfg.tts.get("voices_dir")),
                 "parakeet_models": ["nemo-parakeet-tdt-0.6b-v3", "nemo-parakeet-tdt-0.6b-v2", "nemo-parakeet-ctc-0.6b"],
                 "whisper_models": ["large-v3-turbo", "large-v3", "distil-large-v3", "medium", "small", "base"],
                 "oww_models": OWW_PRETRAINED + custom_oww,
@@ -743,7 +746,34 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         d = dir or load_config().tts.get("voices_dir") or ""
         path = Path(os.path.expanduser(d)) if d else None
         return {"dir": str(path) if path else "", "exists": bool(path and path.is_dir()),
-                "files": _list_voices(d)}
+                "files": _list_voices(d), "texts": _voice_texts(d)}
+
+    @app.post("/voices/transcribe")
+    async def voice_transcribe(inp: SampleIn) -> dict[str, Any]:
+        """Write down what a recording says (``NAME.txt`` beside it) with the speech recognizer, so
+        Qwen3-TTS can copy the voice closely in the recording's own language."""
+        cfg = load_config()
+        d = Path(os.path.expanduser(inp.dir or cfg.tts.get("voices_dir") or ""))
+        if not inp.name or inp.name not in _list_voices(str(d)):
+            raise HTTPException(404, "no such sample in the voices folder")
+        stt = getattr(assistant, "stt", None)
+        if stt is None:
+            raise HTTPException(409, "speech recognition is not running in this mode")
+        audio, sr = sf.read(str(d / inp.name), dtype="float32", always_2d=True)
+        mono = audio.mean(axis=1)
+        if sr != 16000:
+            import librosa
+            mono = librosa.resample(mono, orig_sr=sr, target_sr=16000)
+        text = (await asyncio.get_running_loop().run_in_executor(None, stt.transcribe, mono, 16000)).strip()
+        if not text:
+            raise HTTPException(422, "nothing recognisable in that recording")
+        (d / inp.name).with_suffix(".txt").write_text(text + "\n", encoding="utf-8")
+        log.info("voice sample %s: transcript saved (%d characters)", inp.name, len(text))
+        tts = getattr(assistant, "tts", None)
+        if tts is not None and hasattr(tts, "ref_text") and hasattr(tts, "reconfigure"):
+            from .config import engine_opts
+            tts.reconfigure(engine_opts(assistant.cfg, "tts"))   # picks the new transcript up
+        return {"name": inp.name, "text": text}
 
     @app.get("/services")
     async def services() -> dict[str, Any]:
@@ -850,6 +880,19 @@ def _opencode_models() -> list[str]:
         pass
     _opencode_cache = (time.time(), models)
     return models
+
+
+def _voice_texts(voices_dir: str | None) -> list[str]:
+    """Recordings in the folder that have their words beside them (NAME.txt, not empty)."""
+    d = Path(os.path.expanduser(str(voices_dir))) if voices_dir else None
+    out = []
+    for name in _list_voices(voices_dir):
+        try:
+            if (d / name).with_suffix(".txt").read_text(encoding="utf-8").strip():
+                out.append(name)
+        except OSError:
+            continue
+    return out
 
 
 def _list_voices(voices_dir: str | None) -> list[str]:

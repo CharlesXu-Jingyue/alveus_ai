@@ -111,7 +111,7 @@ machine's value, after which the inherited one applies (the engine's setting, or
   (e.g. `deepseek-flash`). The API key field sits in the provider's panel and saves at once.
 - **Pickers instead of typing:** microphones and speakers come from PipeWire; languages by name;
   Kokoro voices with accent and gender; ▶ plays a Kokoro voice (while Kokoro is the running engine)
-  or the recording a Chatterbox model copies; *Record* captures a keyboard shortcut.
+  or the recording a Chatterbox or Qwen3-TTS model copies; *Record* captures a keyboard shortcut.
 - **Saving applies right away, without a restart, and the conversation continues.** Voices, voice
   samples, speed, expressiveness, languages, names, model settings and switching between models,
   listening timing, wake-word names and sensitivity, the keyboard shortcut and the instructions take
@@ -240,13 +240,31 @@ tts:
 ```
 
 `alveus tts voices` lists the 28 Kokoro voices; `alveus tts say "…"` previews one after editing
-the config. For a cloned voice, switch `tts.backend` to `chatterbox` and set `chatterbox.voice_ref`
-to a clean 5–15 s WAV of the speaker.
+the config. For a cloned voice, switch `tts.backend` to `chatterbox` (or `qwen3`) and set
+`chatterbox.voice_ref` (`qwen3.voice_ref`) to a clean 5–15 s WAV of the speaker.
+
+**Voices that come ready to copy** (this machine's `voices/`, details and terms in `voices/SOURCES.md`),
+all female, each with its words in a `.txt` file:
+
+| file | voice | from |
+|---|---|---|
+| `f_ayaka_ja` | Ayaka (朱花), Japanese; cheeky, tsundere-style | AI声優-朱花 official sample (free use; credit "AI声優-朱花" if you publish) |
+| `f_hina_ja` | Hina, Japanese; high, soft, a little wistful | japanese-anime-speech (CC0) |
+| `f_yuzu_ja` | Yuzu, Japanese; high and playful | japanese-anime-speech (CC0) |
+| `f_mio_ja` | Mio, Japanese; gentle, mid pitch | japanese-anime-speech (CC0) |
+| `f_shiori_ja` | Shiori, Japanese; lower, calm, polite | japanese-anime-speech (CC0) |
+| `f_feiyu_zh` | Feiyu (大肥鱼), Chinese; young, warm, caring | da-fei-yu-girl-voice-zh (CC-BY-NC 4.0) |
+| `f_xiaoyu_zh` | Xiaoyu, Chinese; bright studio voice | TTS-SCDuFSC speaker F004 (CC-BY-NC-ND 4.0) |
+| `f_wanqing_zh` | Wanqing, Chinese; lower, relaxed studio voice | TTS-SCDuFSC speaker F003 (CC-BY-NC-ND 4.0) |
+
+They copy best with Qwen3-TTS, which speaks all of them in English too; Chatterbox Multilingual
+copies them as well. With your own recording, *Write it down* (Settings → Voice → Qwen3-TTS → Its
+words) saves what it says so Qwen3-TTS can copy it closely.
 
 ## Speaking other languages
 
-1. Settings → Speech: Text-to-speech engine `chatterbox`, Chatterbox model `multilingual`, output
-   language `auto` (or fix one, e.g. `zh`).
+1. Settings → Voice: engine *Qwen3-TTS* (10 languages) or *Chatterbox* → *Multilingual* (23), spoken
+   language *automatic* (or fix one, e.g. `zh`).
 2. Settings → Speech: clear *Spoken language* so Whisper detects the language you speak.
 3. Save, restart. Speak Chinese (or German, Japanese…) and the assistant hears, thinks and answers in
    that language; each sentence is voiced in the language it is written in, so mixed replies work.

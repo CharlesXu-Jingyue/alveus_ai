@@ -119,11 +119,11 @@ stt:
 
 # ---------------------------------------------------------------- Text to speech
 tts:
-  backend: kokoro                # kokoro | chatterbox | openai_http
+  backend: kokoro                # kokoro | chatterbox | qwen3 | openai_http
   device: cuda                   # cuda | cpu
   # Fallbacks for engines/models that set none themselves (each engine or model may set its own
   # voice_gender / voices_dir). voice_gender auto = infer from the voice: Kokoro voice prefix
-  # (af_/bf_ female, am_/bm_ male) or, for chatterbox, the cloned sample's file name starting with
+  # (af_/bf_ female, am_/bm_ male) or, for chatterbox and qwen3, the copied recording's name starting with
   # f_ / m_. Or force: female | male. The gender decides which name the assistant uses.
   voice_gender: auto
   # Folder holding voice samples (WAV) for cloning. The GUI lists its files as choices.
@@ -142,6 +142,20 @@ tts:
     fallback_language: en        # used when auto-detection is unsure
     exaggeration: 0.5
     cfg_weight: 0.5
+  qwen3:                         # Qwen3-TTS: copies a voice from a recording; zh en ja ko de fr ru pt es it
+    model: 1_7b                  # 1_7b (Qwen3-TTS-12Hz-1.7B-Base, best, ~4 GB VRAM) | 0_6b (0.6B-Base, faster)
+    # It runs in its own small environment (qwen-tts needs transformers 4.57): scripts/install_qwen3_tts.sh
+    python: ${ALVEUS_HOME}/.venv-qwen3tts/bin/python
+    # Folder for the weights (each model in a subfolder named after it, downloaded there on first use);
+    # null = the Hugging Face cache.
+    weights_dir: null
+    # Recording to copy (a file in voices_dir or a path); name it f_*/m_* for the gender. Its words in
+    # <name>.txt beside it give the closest copy; without that file only the timbre is copied.
+    # models.<model>.<key> overrides any of these for one model.
+    voice_ref: null
+    language: auto               # auto = detect per sentence | zh | en | ja | ko | de | fr | ru | pt | es | it
+    fallback_language: en        # used when auto-detection is unsure
+    temperature: 0.9             # variation: lower = steadier and flatter, higher = livelier, less predictable
   openai_http:                   # any /v1/audio/speech server (Kokoro-FastAPI, ...)
     base_url: http://127.0.0.1:8880/v1
     model: kokoro
