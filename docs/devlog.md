@@ -40,6 +40,33 @@ profile is a one-line patch; `llm.effort` exists for cloud models, local ones on
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
 
+## 2026-11-07 (latest) — instructions and personalities are separate; four personalities ship
+
+- Owner: separate personality from instructions (instructions = directions and boundaries,
+  personality = how it sounds), store several personalities and choose one; the calm, warm one is
+  the default, plus a sweet one (honest, intimate, a bit whimsical), a playful, slightly flirtatious
+  tsundere, and a genki one (proactive, attentive, optimistic).
+- `config/persona.md` became `config/instructions.md` (`assistant.instructions_file`; the old
+  `persona_file` key is still read) with a `{personality}` slot and a paragraph saying a personality
+  never changes what the assistant does or is a reason to refuse, delay or pad. The style lines that
+  were in it ("direct, warm, and unhurried", using the name now and then, everyday words) moved into
+  `config/personalities/calm.md`. One new direction for every personality: offer a further step
+  rather than taking it (genki's proactiveness stays an offer).
+- `alveus/personality.py`: shipped personalities in `config/personalities/` are read-only; the
+  owner's own and edited copies live in `assistant.personalities_dir` (`personalities/`, git-ignored)
+  and override by id; deleting a copy restores the original. Placeholders are filled by name only, so
+  a stray brace in hand-written text no longer breaks the prompt (`str.format` did).
+- API `GET/PUT /instructions` (replaces `/persona`), `GET /personalities`, `PUT`/`DELETE
+  /personalities/{id}`; switching is an ordinary setting (`assistant.personality`, applied live;
+  the report says "personality: Sweet"). The instructions path no longer needs a restart.
+- GUI: Assistant → Personality cards with an editor for the chosen one (name, description, words;
+  Save, Save as new…, Restore original, Delete); Advanced → Instructions. Settings search now also
+  matches the names on choice cards ("tsundere", "kokoro").
+- Live check on DeepSeek Flash, same question under each ("Long day. What is 15 percent of 80? And
+  should I bother finishing the analysis tonight?"): all answered "twelve" first and kept to two or
+  three sentences; calm was even, sweet called them "love" and offered to help tomorrow, tsundere
+  covered its concern with "don't get used to it", genki offered to note where they left off.
+
 ## 2026-11-07 (late night) — confirmations follow the conversation; fewer of them
 
 - Owner: no chime before answering (keep the flow natural); silence was intentional; wait longer

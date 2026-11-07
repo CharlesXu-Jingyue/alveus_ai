@@ -12,7 +12,7 @@ the conversation and what the tools read for it go to that provider; speech stay
 
 It answers to two names. **Alveus** is the default; when the configured voice is female (the
 default Kokoro voice `af_heart` is), it introduces itself as **Aurea**. Both names are always
-accepted, both wake it up, and the persona tells the model never to correct you about which
+accepted, both wake it up, and the instructions tell the model never to correct you about which
 name you used.
 
 ## Design goals

@@ -121,7 +121,14 @@ machine's value, after which the inherited one applies (the engine's setting, or
   for a restart; the page then says which and offers the restart button. Changing the model first runs a
   check (local: a load test of the weights, 5–40 s; cloud: whether the key and model are accepted); if it
   fails, nothing is saved. Leaving the page with unsaved changes asks first. The *Advanced* section edits
-  `local.yaml` and the persona prompt as raw text (both also applied right away).
+  `local.yaml` and the instructions as raw text (both also applied right away).
+- **Personality:** Assistant → Personality picks how it sounds: *Calm* (warm, steady, the default),
+  *Sweet* (honest, close, a little whimsical), *Tsundere* (teasing and prickly outside, caring
+  inside), *Genki* (upbeat, attentive, offers the next step). The panel below the cards edits the
+  chosen one's name, description and words; *Save as new…* keeps the words as another personality,
+  *Restore original* undoes your edits to a shipped one, *Delete* removes one of your own. What it may
+  do, the shape of its replies and the confirmations are in the instructions and stay the same for
+  every personality.
 - **Listening to voices:** ▶ next to a Kokoro voice speaks a sample sentence, and ▶ next to a
   Chatterbox voice plays the recording it copies, both on the assistant's speaker (in the browser when
   there is no speaker, e.g. `alveus api`). Kokoro previews need Kokoro to be the running engine.

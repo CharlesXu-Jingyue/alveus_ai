@@ -9,7 +9,15 @@ assistant:
   female_name: Aurea
   user_name: Charles
   language: en
-  persona_file: ${ALVEUS_HOME}/config/persona.md
+  # The system prompt has two parts. Instructions = directions and boundaries (identity, how spoken
+  # replies are shaped, what it may do, tools, confirmations); placeholders {name} {other_name}
+  # {voice_gender} {user_name} {date} {hostname} {os}, and {personality} where the personality goes.
+  instructions_file: ${ALVEUS_HOME}/config/instructions.md
+  # Personality = how it sounds (tone, word choice, humour), never what it does. Shipped:
+  # calm (default), sweet, tsundere, genki (config/personalities/). Your own ones, and edited copies
+  # of the shipped ones, go in personalities_dir (GUI: Settings > Assistant > Personality).
+  personality: calm
+  personalities_dir: ${ALVEUS_HOME}/personalities
   max_history_turns: 30
   # Speak while the model is still generating (sentence-level streaming).
   streaming_tts: true

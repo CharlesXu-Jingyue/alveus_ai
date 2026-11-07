@@ -129,6 +129,10 @@ If a key does show up in output anyway, stop, tell the owner to revoke it, and d
 - Settings apply without a restart (`alveus/live.py`, `PUT /config` with `apply: true`). A component
   that reads configuration only at start must be handled there (or get a `reconfigure(opts)` method
   returning False when it needs a reload); otherwise list its prefix in `live.RESTART`.
+- The system prompt = `config/instructions.md` (directions and boundaries; `{personality}` slot) + the
+  chosen personality (`config/personalities/*.md`, the owner's own in `personalities/`), built by
+  `alveus/personality.py`. Rules go in the instructions, manner in a personality; shipped personality
+  files are never written by the GUI (edits become copies in `personalities/`).
 - The confirmation gate is in the agent (`Agent._execute`), not the model: tools marked destructive
   always ask unless listed in `tools.no_confirm`. Silence is `{"ok": False, "reason": "no_answer"}`.
 - To test the GUI, run a text-only instance on port 8799 with `ALVEUS_LOCAL_CONFIG` pointing at a

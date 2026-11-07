@@ -139,8 +139,15 @@ nothing. Tool servers, audio devices and the API address are reported as needing
 
 ## Prompting and model interface
 
-- The system prompt is `config/persona.md` rendered with `{name}`, `{other_name}`, `{voice_gender}`,
-  `{user_name}`, `{date}`, `{hostname}`, `{os}`, plus a line listing available tool groups.
+- The system prompt has two halves (`alveus/personality.py`): the **instructions**
+  (`config/instructions.md`: identity, the shape of spoken replies, the private-system rules, tools,
+  confirmations) and a **personality** (`config/personalities/*.md` or the owner's own, chosen by
+  `assistant.personality`), which only shapes how it sounds. The personality goes where the
+  instructions say `{personality}`; the instructions state that it never changes what the assistant
+  does. Placeholders `{name}`, `{other_name}`, `{voice_gender}`, `{user_name}`, `{date}`, `{hostname}`,
+  `{os}` are filled in both (only these: other braces in hand-written text are left alone), and a line
+  listing the available tool groups is appended. The prompt is rebuilt when settings, the instructions
+  or a personality change, so all of these apply from the next request.
 - The history is provider-neutral (OpenAI-style messages); each LLM adapter converts it, and the
   tool list, to its protocol (see [backends.md](backends.md#llm)). Provider-specific data that must
   go back unchanged (Claude's signed thinking, OpenAI's encrypted reasoning) rides along as
@@ -163,8 +170,8 @@ nothing. Tool servers, audio devices and the API address are reported as needing
   `ASK_WHEN` in `agent/loop.py`: replacing an existing file, or stopping/disabling a service or any
   system-scope action) or if a `run_command` command matches `_DESTRUCTIVE_SHELL` (`rm`, `kill`,
   `shutdown`, `mkfs`, `dd`, `git push --force`, `chmod -R`, …). Closing a window, starting or restarting
-  a user service, renaming without overwriting and `rmdir` do not ask (relaxed 2026-11-07). The persona
-  tells the model that the system asks, so it does not ask a second time. In voice mode the
+  a user service, renaming without overwriting and `rmdir` do not ask (relaxed 2026-11-07). The
+  instructions tell the model that the system asks, so it does not ask a second time. In voice mode the
   assistant asks aloud and listens for yes/no; in `alveus chat` it prompts on the terminal;
   through the bare `/chat` API there is no confirmer, so destructive calls are refused.
   Disable with `tools.confirm_destructive: false`.
@@ -188,8 +195,8 @@ nothing. Tool servers, audio devices and the API address are reported as needing
 - **Network exposure.** llama-server and the API bind to 127.0.0.1. Nothing is exposed on the LAN
   unless you change `api.host` or the server args.
 - **Prompt injection.** Web page content and file contents returned by tools are model input.
-  The persona asks for confirmation before irreversible actions, and the gate enforces it for
-  the risky tool set regardless of what the model "decides".
+  The confirmation gate asks before the risky tool set regardless of what the model "decides"
+  (the instructions tell the model that the system asks, so it does not ask twice).
 
 ## Portability decisions
 

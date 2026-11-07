@@ -2,12 +2,9 @@
 from __future__ import annotations
 
 import asyncio
-import datetime as dt
 import json
 import logging
-import platform
 import re
-import socket
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -125,21 +122,9 @@ class Agent:
 
     # ------------------------------------------------------------------ prompt
     def _build_system_prompt(self) -> str:
-        a = self.cfg.assistant
-        persona = "You are {name}, a helpful local voice assistant."
-        pf = a.get("persona_file")
-        if pf and Path(pf).exists():
-            persona = Path(pf).read_text()
+        from ..personality import system_prompt
         name, other = active_names(self.cfg)
-        text = persona.format(
-            name=name,
-            other_name=other,
-            voice_gender="female" if voice_is_female(self.cfg) else "male",
-            user_name=a.get("user_name", "the user"),
-            date=dt.date.today().strftime("%A, %B %d, %Y"),
-            hostname=socket.gethostname(),
-            os=f"{platform.system()} {platform.release()}",
-        )
+        text = system_prompt(self.cfg, name, other, voice_is_female(self.cfg))
         if self.hub and self.hub.tools:
             servers = sorted({t.server for t in self.hub.tools.values()})
             text += f"\n\nAvailable tool groups: {', '.join(servers)}."

@@ -224,6 +224,10 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
 .switch[aria-checked="true"]::after{left:21px}
 .editor{background:var(--code-bg);border:1px solid var(--rule-2);border-radius:10px;width:100%;min-height:220px;padding:12px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;line-height:1.5;resize:vertical}
 .editor:focus{outline:none;border-color:var(--accent)}
+.pedit .ptext{padding:11px 16px}
+.pedit .ptext .lbl{margin-bottom:8px}
+.pedit .editor{min-height:170px;font-family:inherit;font-size:13.5px;line-height:1.55}
+.pedit .pbtns{display:flex;gap:8px;flex-wrap:wrap}
 .adv-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 0 0;font-size:13px;color:var(--muted);flex-wrap:wrap}
 .savebar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--rule);box-shadow:0 -6px 24px rgba(0,0,0,.06);transform:translateY(110%);transition:transform .2s ease}
 .savebar.show{transform:none}
@@ -582,7 +586,8 @@ const UNSET = {"$unset": true};   // remove the machine override so the inherite
 const isUnset = v => v && typeof v==='object' && v.$unset===true;
 const get = (o,p) => p.split('.').reduce((a,k)=> (a && a[k]!==undefined) ? a[k] : undefined, o);
 const same = (a,b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-let cfg=null, dirty={}, persona='', personaDirty=false, yamlDirty=false, searchQuery='';
+let cfg=null, dirty={}, instructions='', instrDirty=false, yamlDirty=false, searchQuery='';
+let pers={items:[], active:null, default:'calm'}, persEdits={};   // personalities, and unsaved edits by id
 let newProfiles={}, llmUI=null, modelLists={}, devices=null, voiceFiles={}, restartKind=null, prevProfile=null;
 // value as it will be after saving: pending edit wins over the saved configuration
 const current = p => (p in dirty) ? (isUnset(dirty[p]) ? get(cfg.defaults||{}, p) : dirty[p]) : get(cfg.effective, p);
@@ -639,6 +644,10 @@ const SECTIONS = [
   {t:'text', p:'assistant.name', l:'Name', h:'Its name with a male or neutral voice. Saying it wakes the assistant.'},
   {t:'text', p:'assistant.female_name', l:'Female-voice name', h:'Its name when the voice is female. Saying it wakes the assistant too.'},
   {t:'text', p:'assistant.user_name', l:'Your name', h:'How it addresses you.'},
+  {t:'choice', p:'assistant.personality', l:'Personality', h:'How it sounds: tone, word choice, humour. What it does and may do stays the same.',
+   more:'What it may do, how replies are shaped, tools and confirmations are its instructions (under Advanced); they hold for every personality. Edit a personality’s words below. Editing one that comes with Alveus saves your own copy; “Restore original” brings back the shipped words. “Save as new” keeps the words as another personality to choose.',
+   opts: () => pers.items.map(P => ({v:P.id, l:P.label, d:P.description || (P.shipped ? '' : 'your own')})),
+   each: id => [{t:'persona', id}], panel: id => { const P=persById(id); return P ? `${P.label}: its words` : 'Personality'; }},
   {t:'bool', p:'assistant.streaming_tts', l:'Speak while generating', h:'Starts talking after the first sentence instead of waiting for the whole reply.'},
   {t:'number', p:'assistant.max_history_turns', l:'Conversation memory (turns)', min:1, max:200, h:'How many of your recent requests it keeps in mind.',
    more:'More memory means a longer context sent to the model on every turn: slower on local models, more tokens on cloud models.'},
@@ -743,8 +752,8 @@ const SECTIONS = [
 // ---- loading and rendering
 async function loadSettings(force){
   if (cfg && !force) return;
-  try{ cfg = await j('/config'); persona = (await j('/persona')).text; }catch(e){ toast('Could not load config: '+e.message, true); return; }
-  dirty={}; newProfiles={}; personaDirty=false; yamlDirty=false; modelLists={}; voiceFiles={};
+  try{ cfg = await j('/config'); instructions = (await j('/instructions')).text; pers = await j('/personalities'); }catch(e){ toast('Could not load config: '+e.message, true); return; }
+  dirty={}; newProfiles={}; instrDirty=false; persEdits={}; yamlDirty=false; modelLists={}; voiceFiles={};
   llmUI = {provider: (profSummary(cfg.effective.llm.profile)||{}).provider || 'llama_server', baseUrl:{}};
   if (!devices) j('/audio/devices').then(d => { devices=d; rerender(); }).catch(()=>{ devices={sources:[], sinks:[]}; });
   renderSettings(); updateSavebar();
@@ -778,6 +787,7 @@ function renderItem(it, scope){
   const F = {...it, p: tpl(it.p, scope), fb: (it.fb||[]).map(q => tpl(q, scope))};
   if (F.t==='llm') return llmBlock();
   if (F.t==='choice') return choiceRow(F, scope);
+  if (F.t==='persona') return personaEditor(F.id);
   return fieldRow(F, scope);
 }
 function changedTag(F){
@@ -861,13 +871,13 @@ function branchPanel(items, scope, title){
 function choiceRow(F, scope){
   const v = valueOf(F); const wrap=document.createElement('div'); wrap.className='choice'+((F.p in dirty)?' dirty':''); wrap.dataset.path=F.p;
   const [head] = shell(F, 'chead'); wrap.appendChild(head);
-  const opt = F.opts.find(o => same(o.v, v));
+  const OPTS = typeof F.opts==='function' ? F.opts() : F.opts, opt = OPTS.find(o => same(o.v, v));
   if (F.style==='select'){
     const ctl=document.createElement('div'); ctl.className='ctl'; head.appendChild(ctl);
-    ctl.appendChild(selectEl(F, F.opts.map(o=>({v:o.v, l: o.d ? `${o.l} — ${o.d}` : o.l})), v, x=>setVal(F, x, true)));
+    ctl.appendChild(selectEl(F, OPTS.map(o=>({v:o.v, l: o.d ? `${o.l} — ${o.d}` : o.l})), v, x=>setVal(F, x, true)));
   } else {
     const opts=document.createElement('div'); opts.className='opts'; opts.setAttribute('role','radiogroup'); opts.setAttribute('aria-label', F.l);
-    for (const o of F.opts){ const b=document.createElement('button'); b.type='button'; const sel=same(o.v, v);
+    for (const o of OPTS){ const b=document.createElement('button'); b.type='button'; const sel=same(o.v, v);
       b.className='opt'+(sel?' sel':''); b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(sel)); b.dataset.focus=F.p+'='+o.v;
       b.innerHTML=`<b>${esc(o.l)}</b>${o.d?`<small>${esc(o.d)}</small>`:''}`; b.onclick=()=>setVal(F, o.v, true); opts.appendChild(b); }
     wrap.appendChild(opts);
@@ -1081,6 +1091,57 @@ function modelSettings(name, S, I){
   return branchPanel(items, {}, `Settings for ${S.model} (only for this model)`);
 }
 
+// ---- personalities: the words of one, saved through /personalities (not part of the settings patch)
+const persById = id => pers.items.find(P => P.id===id);
+const persDirty = id => { const E=persEdits[id], P=persById(id); return !!(E && P && (E.label!==P.label || E.description!==P.description || E.text!==P.text)); };
+const anyPersDirty = () => Object.keys(persEdits).some(persDirty);
+const slugOf = s => (s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40).replace(/-+$/,'')) || 'personality';
+function personaEditor(id){
+  const P=persById(id), box=document.createElement('div'); box.className='pedit';
+  if (!P){ box.innerHTML=`<div class="row"><div class="lbl"><b>Not found</b><small>There is no personality “${esc(id)}” any more; the default is used until you choose another.</small></div></div>`; return box; }
+  const E = persEdits[id] || (persEdits[id] = {label:P.label, description:P.description, text:P.text});
+  const inUse = pers.active===id;
+  box.innerHTML = `
+    <div class="row"><div class="lbl"><b>Name</b><small>Shown on its card.</small></div><div class="ctl"><input type="text" data-k="label" data-focus="pers.${esc(id)}.label"></div></div>
+    <div class="row"><div class="lbl"><b>Short description</b><small>One line under the name.</small></div><div class="ctl"><input type="text" data-k="description" data-focus="pers.${esc(id)}.description"></div></div>
+    <div class="ptext"><div class="lbl"><b>How it sounds</b><small>Written to the assistant, in plain words: its tone, word choice, humour, how it treats you. ${'{user_name}'} and ${'{name}'} are filled in. Leave rules and permissions to the instructions.</small></div>
+      <textarea class="editor" data-k="text" spellcheck="true" data-focus="pers.${esc(id)}.text"></textarea>
+      <div class="adv-row"><span class="pstate"></span><span class="pbtns"></span></div></div>`;
+  box.querySelectorAll('[data-k]').forEach(el => { el.value=E[el.dataset.k]; el.oninput=()=>{ E[el.dataset.k]=el.value; state(); updateSavebar(); }; });
+  const st=box.querySelector('.pstate'), btns=box.querySelector('.pbtns');
+  const mk=(label, title, fn, cls='btn')=>{ const b=document.createElement('button'); b.type='button'; b.className=cls; b.textContent=label; b.title=title; b.onclick=fn; btns.appendChild(b); return b; };
+  const where = P.shipped ? (P.edited ? 'Comes with Alveus; your edited copy is in use.' : 'Comes with Alveus.') : 'Your own.';
+  const state=()=>{ st.textContent = (persDirty(id) ? 'Unsaved changes. ' : '') + where + (inUse ? ' In use now.' : ''); save.disabled=!persDirty(id); };
+  if (P.shipped && P.edited) mk('Restore original', 'Remove your copy and use the words it came with', () => removeP(id, `Restore “${P.label}” to the words it came with? Your edits are lost.`));
+  if (!P.shipped) mk('Delete', inUse ? 'In use: choose another personality and save first' : 'Delete this personality', () => removeP(id, `Delete the personality “${P.label}”?`)).disabled = inUse;
+  mk('Save as new…', 'Keep these words as another personality, leaving this one as it was', () => saveNew(id));
+  const save=mk('Save', inUse ? 'Used from the next request on' : 'Save the words', () => saveP(id, id));
+  state();
+  return box;
+}
+async function saveP(id, target){
+  const E=persEdits[id];
+  try{ await j('/personalities/'+encodeURIComponent(target), {method:'PUT', body:JSON.stringify(E)});
+    toast(pers.active===target ? 'Personality saved; used from the next request' : 'Personality saved');
+    delete persEdits[id]; pers = await j('/personalities'); rerender(); updateSavebar(); return true; }
+  catch(e){ toast(e.message, true); return false; }
+}
+async function saveNew(id){
+  const E=persEdits[id]; const name=prompt('Name for the new personality:', E.label + ' (mine)'); if (!name || !name.trim()) return;
+  let pid=slugOf(name), n=2; while (persById(pid)) pid = slugOf(name).slice(0,36) + '-' + (n++);
+  const orig=persById(id); persEdits[pid] = {...E, label:name.trim()};
+  if (orig) persEdits[id] = {label:orig.label, description:orig.description, text:orig.text};   // the original stays as it was
+  if (await saveP(pid, pid)){ setVal({p:'assistant.personality'}, pid, true); toast(`Saved “${name.trim()}”; press Save below to use it`); }
+}
+async function removeP(id, question){
+  if (!confirm(question)) return;
+  try{ const r=await j('/personalities/'+encodeURIComponent(id), {method:'DELETE'});
+    toast(r.restored ? 'Original words restored' : 'Personality deleted');
+    delete persEdits[id]; if (!r.restored && dirty['assistant.personality']===id) delete dirty['assistant.personality'];
+    pers = await j('/personalities'); rerender(); updateSavebar(); }
+  catch(e){ toast(e.message, true); }
+}
+
 // ---- advanced editors
 function renderAdvanced(form, nav){
   const sec=document.createElement('section'); sec.className='grp'; sec.id='g-advanced';
@@ -1089,30 +1150,31 @@ function renderAdvanced(form, nav){
     <p class="desc" style="margin-bottom:8px">Everything changed in the form is stored here (<code class="mono">${esc(cfg.paths.local_yaml)}</code>), only what differs from the defaults in <code class="mono">config/alveus.yaml</code>. Model settings live under <code class="mono">llm.profiles</code>, per-model voice and speech settings under <code class="mono">&lt;engine&gt;.models.&lt;model&gt;</code>.</p>
     <textarea class="editor" id="yamlEd" spellcheck="false"></textarea>
     <div class="adv-row"><span>Saving here replaces the whole file.</span><button class="btn" id="saveYaml">Save settings file</button></div>
-    <h3 style="font-size:15px;margin:22px 0 4px">Personality and instructions</h3>
-    <p class="desc" style="margin-bottom:8px">What the assistant reads before every conversation (<code class="mono">config/persona.md</code>), in plain language. Filled in automatically: {name}, {other_name}, {voice_gender}, {user_name}, {date}, {hostname}, {os}.</p>
-    <textarea class="editor" id="personaEd" spellcheck="false"></textarea>
-    <div class="adv-row"><span>Used from the next request on.</span><button class="btn" id="savePersona">Save instructions</button></div>`;
+    <h3 style="font-size:15px;margin:22px 0 4px">Instructions</h3>
+    <p class="desc" style="margin-bottom:8px">The directions and boundaries it follows whatever its personality: who it is, how spoken replies are shaped, what it may do, tools and confirmations (<code class="mono">${esc(cfg.paths.instructions)}</code>). Filled in automatically: {name}, {other_name}, {voice_gender}, {user_name}, {date}, {hostname}, {os}; {personality} marks where the chosen personality’s words go (Assistant → Personality).</p>
+    <textarea class="editor" id="instrEd" spellcheck="false"></textarea>
+    <div class="adv-row"><span>Used from the next request on.</span><button class="btn" id="saveInstr">Save instructions</button></div>`;
   form.appendChild(sec); navLink(nav, sec, 'Advanced');
   const RS=profSummary(cfg.running_profile);
   const note=document.createElement('div'); note.className='note';
   note.innerHTML=`Running: <b>${esc(RS ? RS.model : cfg.running_profile)}</b>${RS?` <span>(${esc((cfg.llm_providers[RS.provider]||{}).title||RS.provider)})</span>`:''}<br>${cfg.managed_by_systemd?'Managed by systemd: restarts work from here.':'Not under systemd: restart <code>alveus talk</code> yourself after saving.'}`;
   nav.appendChild(note);
-  $('yamlEd').value = cfg.local_yaml; $('personaEd').value = persona;
-  $('yamlEd').oninput=()=>{yamlDirty=true; updateSavebar();}; $('personaEd').oninput=()=>{personaDirty=true; updateSavebar();};
+  $('yamlEd').value = cfg.local_yaml; $('instrEd').value = instructions;
+  $('yamlEd').oninput=()=>{yamlDirty=true; updateSavebar();}; $('instrEd').oninput=()=>{instrDirty=true; updateSavebar();};
   $('saveYaml').onclick = async () => { try{ const r=await j('/config',{method:'PUT', body:JSON.stringify({yaml:$('yamlEd').value, apply:true})}); const a=r.applied||{restart:[], errors:[]};
     toast(a.errors.length ? a.errors.join(' · ') : 'Settings file saved and applied', !!a.errors.length); yamlDirty=false; await loadSettings(true);
     if (a.restart.length) needRestart('assistant', 'Saved; ' + a.restart.join(', ') + ' change at the next restart'); }catch(e){ toast(e.message,true);} };
-  $('savePersona').onclick = async () => { try{ await j('/persona',{method:'PUT', body:JSON.stringify({text:$('personaEd').value})}); toast('Instructions saved; used from the next request'); personaDirty=false; updateSavebar(); }catch(e){ toast(e.message,true);} };
+  $('saveInstr').onclick = async () => { try{ const t=$('instrEd').value; await j('/instructions',{method:'PUT', body:JSON.stringify({text:t})}); instructions=t; toast('Instructions saved; used from the next request'); instrDirty=false; updateSavebar(); }catch(e){ toast(e.message,true);} };
 }
 
 // ---- search
-// A row stays when its label, hint, value or config path contains the text; a choice stays when it
+// A row stays when its label, hint, value, option names or config path contains the text; a choice stays when it
 // or anything inside it matches; sections and nav links without matches are hidden.
 function applySearch(){
   const q=searchQuery.trim().toLowerCase(); let n=0;
   const rows=[...document.querySelectorAll('#form .row, #form .chead')];
-  rows.forEach(r => { const hit=!q || (r.textContent+' '+(r.dataset.path||r.parentElement.dataset.path||'')).toLowerCase().includes(q); r.classList.toggle('nomatch', !hit); if (hit && q) n++; });
+  const cards = r => r.classList.contains('chead') ? (r.parentElement.querySelector(':scope > .opts')?.textContent || '') : '';   // a choice matches its options too
+  rows.forEach(r => { const hit=!q || (r.textContent+' '+cards(r)+' '+(r.dataset.path||r.parentElement.dataset.path||'')).toLowerCase().includes(q); r.classList.toggle('nomatch', !hit); if (hit && q) n++; });
   document.querySelectorAll('#form .choice').forEach(c => { const any=!q || [...c.querySelectorAll('.row, .chead')].some(r=>!r.classList.contains('nomatch'));
     c.classList.toggle('nomatch', !any); if (q && any) c.querySelector(':scope > .chead')?.classList.remove('nomatch'); });
   document.querySelectorAll('#form .rowwrap').forEach(w => { const any=!q || [...w.querySelectorAll('.row')].some(r=>!r.classList.contains('nomatch')); w.classList.toggle('nomatch', !any); if (q && any) w.firstElementChild.classList.remove('nomatch'); });
@@ -1139,12 +1201,13 @@ function buildPatch(){
 }
 function updateSavebar(){
   const n=pending().length, managed=!!(cfg && cfg.managed_by_systemd);
-  $('savebar').classList.toggle('show', n>0 || yamlDirty || personaDirty || !!restartKind);
-  $('save').hidden = !(n>0); $('discard').hidden = !(n>0||yamlDirty||personaDirty);
+  const edits = yamlDirty || instrDirty || anyPersDirty();
+  $('savebar').classList.toggle('show', n>0 || edits || !!restartKind);
+  $('save').hidden = !(n>0); $('discard').hidden = !(n>0||edits);
   $('save').textContent = 'Save';
   if (n>0) $('saveMsg').innerHTML = `<b>${n} unsaved change${n>1?'s':''}</b><small>${needsLLM() && (profSummary(current('llm.profile'))||{}).local_server ? 'Applied right away; the local model takes 20–40 s to load.'
       : reloads() ? 'Applied right away; the new engine or model takes a few seconds to load.' : 'Applied right away; the conversation continues.'}</small>`;
-  else if (yamlDirty||personaDirty) $('saveMsg').innerHTML = `<b>Unsaved editor changes</b><small>Use the Save button next to the editor.</small>`;
+  else if (edits) $('saveMsg').innerHTML = `<b>Unsaved editor changes</b><small>Use the Save button next to the ${anyPersDirty() ? 'personality' : 'editor'}.</small>`;
   else if (restartKind) $('saveMsg').innerHTML = `<b>Saved.</b><small>${restartWhy ? esc(restartWhy) + ': restart' : 'Restart'} to apply${restartKind==='llm'?' (the LLM server restarts too)':''}${managed?'':' (restart alveus talk yourself)'}.</small>`;
   $('restartA').hidden = !(restartKind==='assistant' && n===0); $('restartB').hidden = !(restartKind==='llm' && n===0);
   if (!managed){ $('restartA').hidden = $('restartB').hidden = true; }
@@ -1182,8 +1245,8 @@ async function saveSettings(){
 }
 $('save').onclick = () => saveSettings();
 // read-only handle for debugging the form from the browser console / DevTools
-window.alveusSettings = {get dirty(){ return dirty; }, get newProfiles(){ return newProfiles; }, current, buildPatch};
-window.addEventListener('beforeunload', e => { if (Object.keys(dirty).length || yamlDirty || personaDirty){ e.preventDefault(); e.returnValue=''; } });
+window.alveusSettings = {get dirty(){ return dirty; }, get newProfiles(){ return newProfiles; }, get pers(){ return pers; }, get persEdits(){ return persEdits; }, current, buildPatch};
+window.addEventListener('beforeunload', e => { if (Object.keys(dirty).length || yamlDirty || instrDirty || anyPersDirty()){ e.preventDefault(); e.returnValue=''; } });
 
 async function doRestart(what){
   try{ await j('/restart',{method:'POST', body:JSON.stringify({what})}); }catch(e){ toast(e.message,true); return; }

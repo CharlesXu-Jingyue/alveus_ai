@@ -2,7 +2,7 @@
 
 What happens per change (the conversation is kept in every case):
 
-  instant      names, persona and voice gender (system prompt rebuilt), language-model settings and
+  instant      names, personality, instructions and voice gender (system prompt rebuilt), language-model settings and
                switching to another profile (a new adapter; for a local model the alveus-llm unit is
                restarted with it), agent limits, voice and speech settings an engine can take in place
                (Kokoro voice / speed / accent, Chatterbox sample / expressiveness / languages, Whisper
@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 RESTART = (("tools.servers", "tool servers (which tools, folders, coding model)"),
            ("audio.backend", "audio system"), ("audio.input_device", "microphone"),
            ("audio.output_device", "speaker"), ("audio.sample_rate", "audio sample rate"),
-           ("api.", "web server address"), ("assistant.persona_file", "persona file location"))
+           ("api.", "web server address"))
 
 
 def diff_paths(a: Any, b: Any, prefix: str = "") -> list[str]:
@@ -123,8 +123,12 @@ async def apply_config(assistant, new) -> dict[str, list[str]]:
             report["live"].append(f"language model: {np_.get('model')}{note}")
         before = agent.system_prompt
         agent.system_prompt = agent._build_system_prompt()
-        if agent.system_prompt != before:
-            report["live"].append("instructions: names and persona updated")
+        if "assistant.personality" in changed:
+            from .personality import active
+            p = active(new)
+            report["live"].append(f"personality: {p.label if p else 'none'}")
+        elif agent.system_prompt != before:
+            report["live"].append("instructions: names and personality updated")
 
     for section in ("tts", "stt"):
         if any(p == section or p.startswith(section + ".") for p in changed):

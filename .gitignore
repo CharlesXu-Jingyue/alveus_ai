@@ -16,3 +16,4 @@ voices/
 images/
 .wakeword-train/
 data/
+/personalities/

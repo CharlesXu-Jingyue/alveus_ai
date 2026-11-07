@@ -25,11 +25,12 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel
 
 from . import __version__
+from . import personality
 from .config import (LOCAL_YAML, REPO_ROOT, load_config, patch_local_yaml, read_local_yaml, write_local_yaml)
+from .personality import instructions_path
 
 log = logging.getLogger(__name__)
 WEB_DIR = Path(__file__).parent / "web"
-PERSONA = REPO_ROOT / "config" / "persona.md"
 OWW_PRETRAINED = ["hey_jarvis", "alexa", "hey_mycroft", "hey_rhasspy", "weather", "timer"]
 
 
@@ -145,7 +146,13 @@ class ConfigIn(BaseModel):
     apply: bool = False     # bring the running assistant in line right away (alveus/live.py)
 
 
-class PersonaIn(BaseModel):
+class TextIn(BaseModel):
+    text: str
+
+
+class PersonalityIn(BaseModel):
+    label: str = ""
+    description: str = ""
     text: str
 
 
@@ -537,7 +544,7 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "destructive_tools": sorted(t.full_name for t in (assistant.hub.tools.values() if assistant.hub else [])
                                             if t.destructive),
             },
-            "paths": {"local_yaml": str(LOCAL_YAML), "persona": str(PERSONA),
+            "paths": {"local_yaml": str(LOCAL_YAML), "instructions": str(instructions_path(cfg)),
                       "defaults": str(REPO_ROOT / "config" / "alveus.yaml")},
             "env": dict(cfg._env),
             "managed_by_systemd": bool(os.environ.get("INVOCATION_ID")),
@@ -646,16 +653,56 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         return {"saved": True, "local": local, "local_yaml": read_local_yaml(), "applied": report,
                 "restart_required": True if report is None else bool(report["restart"])}
 
-    @app.get("/persona")
-    async def get_persona() -> dict[str, str]:
-        return {"text": PERSONA.read_text() if PERSONA.exists() else ""}
-
-    @app.put("/persona")
-    async def put_persona(inp: PersonaIn) -> dict[str, bool]:
-        PERSONA.write_text(inp.text if inp.text.endswith("\n") else inp.text + "\n")
-        if assistant.agent is not None:   # used from the next turn on
+    def _rebuild_prompt() -> None:
+        if assistant.agent is not None:   # used from the next request on
             assistant.agent.system_prompt = assistant.agent._build_system_prompt()
-        return {"saved": True, "restart_required": False}
+
+    @app.get("/instructions")
+    async def get_instructions() -> dict[str, str]:
+        """The instructions half of the system prompt (directions and boundaries)."""
+        p = instructions_path(assistant.cfg)
+        return {"text": p.read_text() if p.exists() else "", "path": str(p)}
+
+    @app.put("/instructions")
+    async def put_instructions(inp: TextIn) -> dict[str, bool]:
+        p = instructions_path(assistant.cfg)
+        p.write_text(inp.text if inp.text.endswith("\n") else inp.text + "\n")
+        _rebuild_prompt()
+        return {"saved": True}
+
+    @app.get("/personalities")
+    async def get_personalities() -> dict[str, Any]:
+        """Every personality (shipped and the owner's own) with its text, and which one is active."""
+        allp = personality.load_all(assistant.cfg)
+        act = personality.active(assistant.cfg)
+        return {"active": act.id if act else None, "default": personality.DEFAULT,
+                "own_dir": str(personality.own_dir(assistant.cfg)), "items": [p.as_dict() for p in allp.values()]}
+
+    @app.put("/personalities/{pid}")
+    async def put_personality(pid: str, inp: PersonalityIn) -> dict[str, Any]:
+        """Create or change one (a shipped one is saved as an edited copy in the owner's folder)."""
+        try:
+            p = personality.save(assistant.cfg, pid, inp.label, inp.description, inp.text)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        _rebuild_prompt()
+        bus.publish("config_saved")
+        return {"saved": True, "personality": p.as_dict()}
+
+    @app.delete("/personalities/{pid}")
+    async def delete_personality(pid: str) -> dict[str, Any]:
+        """Delete an own personality, or restore a shipped one to its original."""
+        act = personality.active(assistant.cfg)
+        allp = personality.load_all(assistant.cfg)
+        if pid in allp and not allp[pid].shipped and act and act.id == pid:
+            raise HTTPException(409, "This personality is in use; choose another one first.")
+        try:
+            what = personality.remove(assistant.cfg, pid)
+        except (ValueError, FileNotFoundError) as e:
+            raise HTTPException(404, str(e)) from e
+        _rebuild_prompt()
+        bus.publish("config_saved")
+        return {what: pid}
 
     @app.post("/restart")
     async def restart(inp: RestartIn) -> dict[str, Any]:

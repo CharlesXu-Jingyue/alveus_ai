@@ -34,7 +34,7 @@ preset in `alveus/llm/providers.py` plus a test, not in a new class.
 ```
 alveus/            core package (see architecture.md)
 mcp_servers/       built-in MCP servers
-config/            alveus.yaml (defaults), persona.md, local.yaml (git-ignored), comfy/ (exported ComfyUI workflows)
+config/            alveus.yaml (defaults), instructions.md, personalities/ (shipped), local.yaml (git-ignored), comfy/ (exported ComfyUI workflows)
 scripts/           installer pieces: pip_install_env.sh, build_llama.sh, download_models.sh,
                    install_services.sh, train_wakeword.sh
 systemd/           *.service.in templates rendered by install_services.sh

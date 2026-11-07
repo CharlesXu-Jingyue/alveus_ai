@@ -35,11 +35,33 @@ Changes take effect on the next start (`systemctl --user restart alveus`).
 |---|---|---|
 | `name` | `Alveus` | name used with a male/neutral voice; always accepted as a wake name |
 | `female_name` | `Aurea` | name used when the voice is female (see `tts.voice_gender`) |
-| `user_name` | `Charles` | how the assistant addresses you; injected into the persona |
+| `user_name` | `Charles` | how the assistant addresses you; filled into the instructions and the personality |
 | `language` | `en` | informational (STT language is set per backend) |
-| `persona_file` | `${ALVEUS_HOME}/config/persona.md` | system prompt template; placeholders `{name} {other_name} {voice_gender} {user_name} {date} {hostname} {os}` |
+| `instructions_file` | `${ALVEUS_HOME}/config/instructions.md` | the directions and boundaries half of the system prompt (identity, shape of spoken replies, what it may do, tools, confirmations); placeholders `{name} {other_name} {voice_gender} {user_name} {date} {hostname} {os}`, and `{personality}` where the personality goes (appended at the end when absent). Was `persona_file` (`config/persona.md`) before 2026-11-07; that key is still read when this one is unset |
+| `personality` | `calm` | which personality shapes how it sounds (tone, word choice, humour; never what it does): shipped `calm`, `sweet`, `tsundere`, `genki`, or one of your own. An id that no longer exists falls back to `calm` |
+| `personalities_dir` | `${ALVEUS_HOME}/personalities` | your own personalities and edited copies of the shipped ones (git-ignored). A copy with a shipped id wins over the shipped file; deleting it restores the original |
 | `max_history_turns` | `30` | user turns kept in the conversation |
 | `streaming_tts` | `true` | speak sentence by sentence while generating (voice loop and GUI "speak replies" alike; synthesis of the next sentence overlaps playback); `false` waits for the full reply. The journal logs `speech: … first audio after N s` per reply |
+
+### Instructions and personalities
+
+The system prompt is the instructions file with the chosen personality inserted at `{personality}`.
+Keep rules in the instructions and manner in the personality: the instructions say, for every
+personality, that a personality never changes what the assistant does. A personality is a Markdown
+file whose name is its id (`config/personalities/genki.md` → `genki`), with a short header:
+
+```markdown
+---
+label: Genki                       # shown on its card
+description: Upbeat, attentive and a step ahead
+order: 4                           # position among the shipped ones (optional)
+---
+You are genki: bright, energetic and optimistic, ...   (written to the assistant; {user_name} and {name} are filled in)
+```
+
+The GUI (Settings → Assistant → Personality) picks one, edits its words, saves a copy under a new
+name, deletes your own and restores a shipped one; the shipped files in `config/personalities/` are
+never written to. Switching or editing takes effect from the next request, without a restart.
 
 ## `llm`
 
