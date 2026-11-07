@@ -126,6 +126,11 @@ If a key does show up in output anyway, stop, tell the owner to revoke it, and d
   settings go under `<engine>.models.<model>` (resolved by `config.engine_opts`) or the LLM profile.
   The language model is a custom block (`llmBlock`: provider → model → that profile's settings).
   `h:` is one plain-language line, `more:` the details; the owner reads them and asks when vague.
+- Settings apply without a restart (`alveus/live.py`, `PUT /config` with `apply: true`). A component
+  that reads configuration only at start must be handled there (or get a `reconfigure(opts)` method
+  returning False when it needs a reload); otherwise list its prefix in `live.RESTART`.
+- The confirmation gate is in the agent (`Agent._execute`), not the model: tools marked destructive
+  always ask unless listed in `tools.no_confirm`. Silence is `{"ok": False, "reason": "no_answer"}`.
 - To test the GUI, run a text-only instance on port 8799 with `ALVEUS_LOCAL_CONFIG` pointing at a
   copy of `local.yaml` and **`INVOCATION_ID` unset** (otherwise its "Save & restart" restarts the real
   systemd services), and drive headless Chrome over DevTools; close each tab you open.

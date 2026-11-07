@@ -57,6 +57,14 @@ def active_names(cfg) -> tuple[str, str]:
     return (female, male) if voice_is_female(cfg) else (male, female)
 
 
+def describe_action(tool: str, args: dict[str, Any]) -> str:
+    """A confirmation question's subject in plain words: "close window: Firefox" rather than
+    the JSON arguments (it is spoken aloud and shown on the GUI's Allow/Deny card)."""
+    vals = [str(v) for v in args.values() if v not in (None, "", [], {}) and not isinstance(v, bool)]
+    text = tool.replace("_", " ") + (": " + ", ".join(vals) if vals else "")
+    return text if len(text) <= 160 else text[:157] + "..."
+
+
 @dataclass
 class AgentEvent:
     """kind: content | reasoning | tool_start | tool_result | confirm | done | error"""
@@ -96,6 +104,8 @@ class Agent:
         self.max_rounds = int(cfg.llm.get("max_tool_rounds", 12))
         self.max_history = int(cfg.assistant.get("max_history_turns", 30))
         self.confirm_destructive = bool(cfg.tools.get("confirm_destructive", True))
+        # risky tools the owner lets run without asking (sudo commands always ask: they need the password)
+        self.no_confirm = set(cfg.tools.get("no_confirm") or [])
         self.history: list[dict[str, Any]] = []
         self.system_prompt = self._build_system_prompt()
         # one conversation at a time (voice loop, GUI and API share the history)
@@ -280,19 +290,26 @@ class Agent:
         # credentials only ever come from the user's confirmation, never from the model
         args.pop("sudo_password", None)
         sudo = self._needs_sudo(info, args)
-        if sudo or (self.confirm_destructive and self._is_destructive(info, args)):
+        trusted = (info.full_name in self.no_confirm or info.name in self.no_confirm) \
+            and info.name not in ("run_command", "shell", "bash")   # shell commands are always checked
+        if sudo or (self.confirm_destructive and not trusted and self._is_destructive(info, args)):
             if confirm is None:
                 return json.dumps({"cancelled": True, "message": "This action needs user confirmation, "
                                    "but no confirmation channel is available here."})
             if getattr(self, "_declined_this_turn", False):
                 return json.dumps({"cancelled": True, "message": "The user already declined an action "
                                    "in this request. Do not retry or work around it; report that it was cancelled."})
-            desc = f"{info.name.replace('_', ' ')} with {json.dumps(args)[:200]}"
+            desc = describe_action(info.name, args)
             if sudo:
                 desc = "[sudo] " + desc
             ans = await confirm(desc)
             ok = ans.get("ok") if isinstance(ans, dict) else bool(ans)
             if not ok:
+                if isinstance(ans, dict) and ans.get("reason") == "no_answer":
+                    # silence or an unclear reply is not a refusal: the model may ask the user again
+                    return json.dumps({"cancelled": True, "message": "No clear answer to the confirmation question "
+                                       "was heard, so the action was not run. Ask the user in one short sentence "
+                                       "whether they want it; do it only after they say yes."})
                 self._declined_this_turn = True
                 return json.dumps({"cancelled": True, "message": "The user declined this action. Do not retry it "
                                    "or attempt it another way; tell the user it was cancelled."})

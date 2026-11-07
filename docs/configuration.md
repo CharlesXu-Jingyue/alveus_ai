@@ -168,6 +168,7 @@ stt:
 | key | default | meaning |
 |---|---|---|
 | `confirm_destructive` | `true` | ask before destructive tools / dangerous shell commands |
+| `no_confirm` | `[]` | risky tools that may run without asking, by full name (e.g. `desktop__close_window`); shell commands and sudo still ask (GUI: Tools & safety → Don't ask for these) |
 | `servers.<name>.command` | | argv list for a stdio MCP server; `python` is replaced by the env's interpreter |
 | `servers.<name>.url` | | HTTP MCP server (`…/sse` uses SSE transport, otherwise streamable HTTP) |
 | `servers.<name>.headers` | | HTTP headers (e.g. `Authorization`) |

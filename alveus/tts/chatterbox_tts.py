@@ -49,6 +49,24 @@ class ChatterboxTTS:
                             "using the built-in voice. Fix it in Settings → Speech → Voice sample to clone.")
             log.error(self.warning)
 
+    def reconfigure(self, opts: dict, voices_dir: str | None = None) -> bool:
+        """Apply new options in place when the same model stays loaded. False = reload needed: another
+        model, or back to the built-in voice (the model keeps the last cloned voice's conditioning)."""
+        if opts.get("model", "turbo") != self.variant:
+            return False
+        ref = resolve_voice_ref(opts.get("voice_ref"), voices_dir or opts.get("voices_dir"))
+        if self.voice_ref and not ref:
+            return False
+        self.voice_ref = ref
+        self.exaggeration = float(opts.get("exaggeration", 0.5))
+        self.cfg_weight = float(opts.get("cfg_weight", 0.5))
+        self.language = (opts.get("language") or "auto").lower()
+        self.fallback_language = (opts.get("fallback_language") or "en").lower()
+        self.warning = None
+        if opts.get("voice_ref") and not ref:
+            self.warning = f"voice sample not found: {opts.get('voice_ref')} — using the built-in voice."
+        return True
+
     def load(self) -> None:
         if self._model is not None:
             return

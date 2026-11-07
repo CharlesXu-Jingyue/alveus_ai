@@ -97,7 +97,7 @@ class ConfirmBroker:
             try:
                 return await asyncio.wait_for(fut, timeout)
             except TimeoutError:
-                return {"ok": False}
+                return {"ok": False, "reason": "no_answer"}
             finally:
                 self.pending.pop(cid, None)
         return confirm
@@ -142,6 +142,7 @@ class ConfirmIn(BaseModel):
 class ConfigIn(BaseModel):
     patch: dict[str, Any] | None = None
     yaml: str | None = None
+    apply: bool = False     # bring the running assistant in line right away (alveus/live.py)
 
 
 class PersonaIn(BaseModel):
@@ -160,6 +161,12 @@ class LLMCheckIn(BaseModel):
 class PreviewIn(BaseModel):
     voice: str
     text: str = ""
+    play: bool = True       # on the assistant's speaker; False (or no speaker) returns the WAV
+
+
+class SampleIn(BaseModel):
+    name: str
+    dir: str = ""
 
 
 class SecretIn(BaseModel):
@@ -527,6 +534,8 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "log_levels": ["DEBUG", "INFO", "WARNING"],
                 "audio_backends": ["auto", "pipewire", "sounddevice"],
                 "opencode_models": ["auto", "opencode-default", *_opencode_models()],
+                "destructive_tools": sorted(t.full_name for t in (assistant.hub.tools.values() if assistant.hub else [])
+                                            if t.destructive),
             },
             "paths": {"local_yaml": str(LOCAL_YAML), "persona": str(PERSONA),
                       "defaults": str(REPO_ROOT / "config" / "alveus.yaml")},
@@ -570,9 +579,28 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         text = inp.text or f"Hello, I am {active_names(assistant.cfg)[0]}. This is how I sound."
         loop = asyncio.get_running_loop()
         audio = await loop.run_in_executor(None, lambda: tts.synthesize(text, voice=inp.voice))
+        log.info("voice preview: %s (%.1f s)%s", inp.voice, len(audio) / tts.sample_rate,
+                 " on the speaker" if inp.play and has_voice else "")
+        if inp.play and has_voice:
+            assistant.audio_out.play(audio, tts.sample_rate)
+            return JSONResponse({"played": True, "seconds": len(audio) / tts.sample_rate})
         buf = io.BytesIO()
         sf.write(buf, audio, tts.sample_rate, format="WAV", subtype="PCM_16")
         return Response(buf.getvalue(), media_type="audio/wav")
+
+    @app.post("/voices/play")
+    async def voice_play(inp: SampleIn) -> dict[str, Any]:
+        """Play one recording from the voices folder on the assistant's speaker."""
+        if not has_voice:
+            raise HTTPException(409, "no speaker in this mode; use GET /voices/file")
+        d = Path(os.path.expanduser(inp.dir or load_config().tts.get("voices_dir") or ""))
+        if not inp.name or inp.name not in _list_voices(str(d)):
+            raise HTTPException(404, "no such sample in the voices folder")
+        audio, sr = sf.read(str(d / inp.name), dtype="float32", always_2d=True)
+        mono = audio.mean(axis=1)
+        log.info("voice sample: %s (%.1f s) on the speaker", inp.name, len(mono) / sr)
+        assistant.audio_out.play(mono, sr)
+        return {"played": True, "seconds": len(mono) / sr}
 
     @app.get("/secrets")
     async def get_secrets() -> dict[str, Any]:
@@ -605,13 +633,18 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 local = patch_local_yaml(inp.patch)
             else:
                 raise HTTPException(400, "send {patch: {...}} or {yaml: '...'}")
-            load_config()  # validate the merged result parses/expands
+            new_cfg = load_config()  # validate the merged result parses/expands
         except yaml.YAMLError as e:
             raise HTTPException(400, f"invalid YAML: {e}") from e
         except (ValueError, KeyError) as e:
             raise HTTPException(400, str(e)) from e
+        report = None
+        if inp.apply:
+            from .live import apply_config
+            report = await apply_config(assistant, new_cfg)
         bus.publish("config_saved")
-        return {"saved": True, "local": local, "local_yaml": read_local_yaml(), "restart_required": True}
+        return {"saved": True, "local": local, "local_yaml": read_local_yaml(), "applied": report,
+                "restart_required": True if report is None else bool(report["restart"])}
 
     @app.get("/persona")
     async def get_persona() -> dict[str, str]:
@@ -620,7 +653,9 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
     @app.put("/persona")
     async def put_persona(inp: PersonaIn) -> dict[str, bool]:
         PERSONA.write_text(inp.text if inp.text.endswith("\n") else inp.text + "\n")
-        return {"saved": True, "restart_required": True}
+        if assistant.agent is not None:   # used from the next turn on
+            assistant.agent.system_prompt = assistant.agent._build_system_prompt()
+        return {"saved": True, "restart_required": False}
 
     @app.post("/restart")
     async def restart(inp: RestartIn) -> dict[str, Any]:

@@ -186,6 +186,9 @@ activation:
 tools:
   # Built-in servers live in mcp_servers/. Any stdio/http MCP server can be added.
   confirm_destructive: true      # ask (spoken) before rm, kill, shutdown, etc.
+  # Risky tools that may run without asking, e.g. [desktop__close_window]. Shell commands matching the
+  # risky-command patterns and anything with sudo still ask.
+  no_confirm: []
   servers:
     files:
       command: [python, -m, mcp_servers.files_shell]

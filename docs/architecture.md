@@ -117,6 +117,16 @@ leftover local server, or (re)starts it for a local profile (`alveus/llm/service
 
 `on_state` callbacks let the CLI print state changes; the API's `/health` reports the current state.
 
+## Live settings
+
+`PUT /config` with `apply: true` (what the GUI sends) hands the new configuration to `alveus/live.py`:
+the agent gets new limits, a rebuilt system prompt and, if the profile changed, a new LLM adapter (the
+history is provider-neutral, so the conversation continues; `reconcile_local_server` restarts
+`alveus-llm` for another local model); each speech engine first tries `reconfigure(opts)` in place and
+otherwise a new engine is loaded, swapped in and the old one freed; the voice loop rebuilds its name
+matcher, wake-word model and hotkey listener. Everything the loop reads per use (`self.cfg`) needs
+nothing. Tool servers, audio devices and the API address are reported as needing a restart.
+
 ## Concurrency model
 
 - The main coroutine runs the state machine on asyncio.
@@ -147,13 +157,19 @@ leftover local server, or (re)starts it for a local profile (`alveus/llm/service
 
 ## Safety model
 
-- **Destructive gate.** A tool call is confirmed before execution if the tool carries
+- **Destructive gate.** The gate is in the agent loop, not in the model: whatever the model reasons
+  ("closing a window it just opened is fine"), the call is confirmed before execution if the tool carries
   `destructive_hint` (delete_path, move_path, close_window, kill_process, control_service,
   power) or if a `run_command` command matches `_DESTRUCTIVE_SHELL` in `agent/loop.py`
   (`rm`, `kill`, `shutdown`, `mkfs`, `dd`, `git push --force`, `chmod -R`, …). In voice mode the
   assistant asks aloud and listens for yes/no; in `alveus chat` it prompts on the terminal;
   through the bare `/chat` API there is no confirmer, so destructive calls are refused.
   Disable with `tools.confirm_destructive: false`.
+  Spoken confirmations name the action in plain words ("close window: Firefox"), chime when it is time
+  to answer, ignore clicks and the tail of their own voice, and ask once more when the reply is unclear.
+  Silence or an unclear reply is reported to the model as *no answer* (it may ask again); only a heard
+  "no" counts as *declined*, which also blocks retries in that request. `tools.no_confirm` lists risky
+  tools the owner trusts to run without asking; shell commands and sudo are always checked.
 - **Filesystem scope.** The files server only touches paths under `ALVEUS_FS_ROOTS`
   (default `~`).
 - **Cloud models.** With a cloud profile the conversation leaves the machine: transcripts, the system

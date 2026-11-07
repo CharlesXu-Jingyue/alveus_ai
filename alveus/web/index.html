@@ -300,7 +300,6 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
 <div class="savebar" id="savebar"><div class="in">
   <div class="msg-s" id="saveMsg"><b>Unsaved changes</b><small>Saved settings are written to config/local.yaml. A restart applies them.</small></div>
   <button class="btn" id="discard">Discard</button>
-  <button class="btn" id="saveOnly" hidden>Save without restart</button>
   <button class="btn primary" id="save">Save &amp; restart</button>
   <button class="btn" id="restartA" hidden>Restart assistant</button>
   <button class="btn" id="restartB" hidden>Restart LLM + assistant</button>
@@ -677,7 +676,7 @@ const SECTIONS = [
     {v:'chatterbox', l:'Chatterbox', d:'Most natural; copies a voice from a recording; more VRAM'},
     {v:'openai_http', l:'Other server', d:'A speech server you run'}], branch:{
    kokoro:[
-    {t:'voice', p:'tts.kokoro.voice', l:'Voice', h:'▶ plays a sample sentence (while Kokoro is running).'},
+    {t:'voice', p:'tts.kokoro.voice', l:'Voice', h:'▶ speaks a sample sentence on the speaker (while Kokoro is running).'},
     {t:'select', p:'tts.kokoro.voice_gender', fb:['tts.voice_gender'], l:'Voice gender', h:'Decides which of its names it uses.',
      o: () => GENDERS('kokoro', () => current('tts.kokoro.voice'))},
     {t:'number', p:'tts.kokoro.speed', l:'Speaking speed', step:0.05, min:0.5, max:2, h:'1.0 = normal, 1.2 brisk, 0.9 relaxed.'}],
@@ -723,7 +722,9 @@ const SECTIONS = [
   {t:'select', p:'audio.backend', l:'Audio system', h:'Automatic picks PipeWire on modern Linux desktops.', o:[{v:'auto', l:'automatic'}, {v:'pipewire', l:'PipeWire'}, {v:'sounddevice', l:'sounddevice (PortAudio)'}]},
  ]},
  {id:'tools', title:'Tools & safety', desc:'What the assistant may do on this computer.', items:[
-  {t:'bool', p:'tools.confirm_destructive', l:'Ask before risky actions', h:'Deleting, killing processes, shutting down… wait for your yes. Strongly recommended.'},
+  {t:'bool', p:'tools.confirm_destructive', l:'Ask before risky actions', h:'Deleting, killing processes, shutting down… wait for your yes. Strongly recommended.', on:[
+    {t:'multi', p:'tools.no_confirm', o:'destructive_tools', l:'Don’t ask for these', h:'Actions you trust it to do without the question.',
+     more:'Each is still a deliberate choice by the model. Shell commands that look risky (rm, kill, shutdown…) and anything with sudo always ask, whatever is ticked here.'}]},
   {t:'text', p:'tools.servers.files.env.ALVEUS_FS_ROOTS', l:'Folders it may access', h:'Files and shell tools stay inside these. Separate several with a colon, e.g. ~:/data.'},
   {t:'bool', p:'tools.servers.desktop.enabled', l:'Desktop tools', h:'Open apps and files, manage windows, type, volume, music, clipboard, screenshots.'},
   {t:'bool', p:'tools.servers.web.enabled', l:'Web tools', h:'Search the web, read pages, weather. The only tools that go online.'},
@@ -827,9 +828,10 @@ function fieldRow(F, scope){
   else if (F.t==='voice'){ const opts=(cfg.options.kokoro_voices||[]).map(x=>({v:x, l:kokoroLabel(x)}));
     el=document.createElement('div'); el.className='inl'; const s=selectEl(F, opts, v, x=>setVal(F, x, true)); el.appendChild(s);
     const running = cfg.running && cfg.running.tts==='kokoro';
-    const b=playBtn(running ? 'Hear this voice' : 'Preview works while Kokoro is the running voice engine', !running, async () => {
-      const r=await fetch('/tts/preview',{method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({voice: JSON.parse(s.value)})});
-      if (!r.ok){ let d=''; try{ d=(await r.json()).detail }catch{} throw new Error(d||r.status); } return URL.createObjectURL(await r.blob()); });
+    const b=playBtn(running ? (speakerHere() ? 'Hear this voice on the speaker' : 'Hear this voice') : 'Preview works while Kokoro is the running voice engine', !running, async () => {
+      const r=await fetch('/tts/preview',{method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({voice: JSON.parse(s.value), play: speakerHere()})});
+      if (!r.ok){ let d=''; try{ d=(await r.json()).detail }catch{} throw new Error(d||r.status); }
+      return (r.headers.get('content-type')||'').includes('json') ? await r.json() : {url: URL.createObjectURL(await r.blob())}; });
     el.appendChild(b); }
   else if (F.t==='sample'){ el=sampleControl(F, v); }
   else if (F.t==='device'){ el=deviceControl(F, v); }
@@ -873,17 +875,24 @@ function choiceRow(F, scope){
   if (kids && kids.length) wrap.appendChild(branchPanel(kids, {...scope, v}, F.panel ? F.panel(v) : `${opt ? opt.l : v} settings`));
   return wrap;
 }
-function playBtn(title, disabled, getUrl){
+// ▶ plays on the assistant's own speaker when there is one (that is the sound being chosen, and no
+// browser autoplay rule or tab mute can get in the way); otherwise in the browser. Second click stops.
+function playBtn(title, disabled, start){
   const b=document.createElement('button'); b.type='button'; b.className='btn play'; b.textContent='▶'; b.title=title; b.setAttribute('aria-label', title); b.disabled=disabled;
-  let audio=null;
+  let audio=null, timer=null;
+  const done=()=>{ audio=null; clearTimeout(timer); timer=null; b.textContent='▶'; };
   b.onclick=async()=>{
-    if (audio){ audio.pause(); audio=null; b.textContent='▶'; return; }   // second click stops
+    if (audio || timer){ if (audio) audio.pause(); else j('/stop',{method:'POST'}).catch(()=>{}); done(); return; }
     b.disabled=true; b.textContent='…';
-    try{ audio=new Audio(await getUrl()); audio.onended=()=>{ audio=null; b.textContent='▶'; }; await audio.play(); b.textContent='■'; }
-    catch(e){ audio=null; toast(e.message || 'could not play it', true); b.textContent='▶'; }
+    try{ const r=await start();
+      if (r.url){ audio=new Audio(r.url); audio.onended=done; await audio.play(); }
+      else timer=setTimeout(done, (r.seconds||1)*1000+300);
+      b.textContent='■'; }
+    catch(e){ done(); toast(e.message || 'could not play it', true); }
     b.disabled=false; };
   return b;
 }
+const speakerHere = () => !!(health && health.voice);
 function samplesDir(){ return current('tts.chatterbox.voices_dir') ?? current('tts.voices_dir') ?? ''; }
 let _samplesTimer=null;
 function refreshSamples(dir){ clearTimeout(_samplesTimer); _samplesTimer=setTimeout(async () => {
@@ -898,7 +907,9 @@ function sampleControl(F, v){
   s._fill = fill; fill(voiceFiles[dir] || (dir===cfg.effective.tts.voices_dir ? cfg.options.voice_samples||[] : []));
   if (!voiceFiles[dir]) refreshSamples(dir);
   s.onchange=()=>{ if (s.value==='__custom__'){ const t=prompt('Path to a WAV file:', cur); if (t) setVal(F, t, true); else rerender(); return; } setVal(F, s.value===''?null:s.value, true); };
-  el.appendChild(playBtn('Play this recording', !cur, async () => `/voices/file?name=${encodeURIComponent(s.value)}&dir=${encodeURIComponent(dir)}`));
+  el.appendChild(playBtn('Play this recording', !cur, async () => speakerHere()
+    ? await j('/voices/play',{method:'POST', body:JSON.stringify({name:s.value, dir})})
+    : {url:`/voices/file?name=${encodeURIComponent(s.value)}&dir=${encodeURIComponent(dir)}`}));
   return el;
 }
 function deviceControl(F, v){
@@ -1080,7 +1091,7 @@ function renderAdvanced(form, nav){
     <h3 style="font-size:15px;margin:22px 0 4px">Personality and instructions</h3>
     <p class="desc" style="margin-bottom:8px">What the assistant reads before every conversation (<code class="mono">config/persona.md</code>), in plain language. Filled in automatically: {name}, {other_name}, {voice_gender}, {user_name}, {date}, {hostname}, {os}.</p>
     <textarea class="editor" id="personaEd" spellcheck="false"></textarea>
-    <div class="adv-row"><span>Takes effect after the assistant restarts.</span><button class="btn" id="savePersona">Save instructions</button></div>`;
+    <div class="adv-row"><span>Used from the next request on.</span><button class="btn" id="savePersona">Save instructions</button></div>`;
   form.appendChild(sec); navLink(nav, sec, 'Advanced');
   const RS=profSummary(cfg.running_profile);
   const note=document.createElement('div'); note.className='note';
@@ -1088,8 +1099,10 @@ function renderAdvanced(form, nav){
   nav.appendChild(note);
   $('yamlEd').value = cfg.local_yaml; $('personaEd').value = persona;
   $('yamlEd').oninput=()=>{yamlDirty=true; updateSavebar();}; $('personaEd').oninput=()=>{personaDirty=true; updateSavebar();};
-  $('saveYaml').onclick = async () => { try{ await j('/config',{method:'PUT', body:JSON.stringify({yaml:$('yamlEd').value})}); toast('Settings file saved'); yamlDirty=false; await loadSettings(true); needRestart('assistant'); }catch(e){ toast(e.message,true);} };
-  $('savePersona').onclick = async () => { try{ await j('/persona',{method:'PUT', body:JSON.stringify({text:$('personaEd').value})}); toast('Instructions saved'); personaDirty=false; needRestart('assistant'); updateSavebar(); }catch(e){ toast(e.message,true);} };
+  $('saveYaml').onclick = async () => { try{ const r=await j('/config',{method:'PUT', body:JSON.stringify({yaml:$('yamlEd').value, apply:true})}); const a=r.applied||{restart:[], errors:[]};
+    toast(a.errors.length ? a.errors.join(' · ') : 'Settings file saved and applied', !!a.errors.length); yamlDirty=false; await loadSettings(true);
+    if (a.restart.length) needRestart('assistant', 'Saved; ' + a.restart.join(', ') + ' change at the next restart'); }catch(e){ toast(e.message,true);} };
+  $('savePersona').onclick = async () => { try{ await j('/persona',{method:'PUT', body:JSON.stringify({text:$('personaEd').value})}); toast('Instructions saved; used from the next request'); personaDirty=false; updateSavebar(); }catch(e){ toast(e.message,true);} };
 }
 
 // ---- search
@@ -1112,6 +1125,7 @@ function applySearch(){
 // edits that will actually be saved: those of new profiles that were not chosen in the end are dropped
 const pending = () => Object.keys(dirty).filter(p => { const m=p.match(/^llm\.profiles\.([^.]+)\./); return !(m && newProfiles[m[1]] && m[1]!==current('llm.profile')); });
 const needsLLM = () => pending().some(p => p==='llm.profile' || /^llm\.profiles\.[^.]+\.serve\./.test(p));
+const reloads = () => pending().some(p => /^(tts\.(backend|device|chatterbox\.model)|stt\.(backend|device|[a-z_]+\.model|[a-z_]+\.models\.[^.]+\.compute_type|[a-z_]+\.compute_type))$/.test(p));
 function buildPatch(){
   const patch={}; const sel=current('llm.profile');
   const set=(p,v)=>{ const parts=p.split('.'); let cur=patch; for (const k of parts.slice(0,-1)) cur=cur[k]??(cur[k]={}); cur[parts.at(-1)]=v; };
@@ -1125,41 +1139,47 @@ function buildPatch(){
 function updateSavebar(){
   const n=pending().length, managed=!!(cfg && cfg.managed_by_systemd);
   $('savebar').classList.toggle('show', n>0 || yamlDirty || personaDirty || !!restartKind);
-  $('save').hidden = !(n>0); $('saveOnly').hidden = !(n>0 && managed); $('discard').hidden = !(n>0||yamlDirty||personaDirty);
-  $('save').textContent = managed ? 'Save & restart' : 'Save';
-  if (n>0) $('saveMsg').innerHTML = `<b>${n} unsaved change${n>1?'s':''}</b><small>${needsLLM() ? 'Applying restarts the assistant and the LLM server (the model changes).' : 'Applying restarts the assistant (10–30 s; the conversation is cleared).'}</small>`;
+  $('save').hidden = !(n>0); $('discard').hidden = !(n>0||yamlDirty||personaDirty);
+  $('save').textContent = 'Save';
+  if (n>0) $('saveMsg').innerHTML = `<b>${n} unsaved change${n>1?'s':''}</b><small>${needsLLM() && (profSummary(current('llm.profile'))||{}).local_server ? 'Applied right away; the local model takes 20–40 s to load.'
+      : reloads() ? 'Applied right away; the new engine or model takes a few seconds to load.' : 'Applied right away; the conversation continues.'}</small>`;
   else if (yamlDirty||personaDirty) $('saveMsg').innerHTML = `<b>Unsaved editor changes</b><small>Use the Save button next to the editor.</small>`;
-  else if (restartKind) $('saveMsg').innerHTML = `<b>Saved.</b><small>Restart to apply${restartKind==='llm'?' (the model changed, so the LLM server restarts too)':''}.</small>`;
+  else if (restartKind) $('saveMsg').innerHTML = `<b>Saved.</b><small>${restartWhy ? esc(restartWhy) + ': restart' : 'Restart'} to apply${restartKind==='llm'?' (the LLM server restarts too)':''}${managed?'':' (restart alveus talk yourself)'}.</small>`;
   $('restartA').hidden = !(restartKind==='assistant' && n===0); $('restartB').hidden = !(restartKind==='llm' && n===0);
   if (!managed){ $('restartA').hidden = $('restartB').hidden = true; }
 }
-function needRestart(kind){ restartKind = (restartKind==='llm'||kind==='llm') ? 'llm' : 'assistant'; updateSavebar(); }
+let restartWhy='';
+function needRestart(kind, why){ restartKind = (restartKind==='llm'||kind==='llm') ? 'llm' : 'assistant'; if (why) restartWhy=why; updateSavebar(); }
 $('discard').onclick = () => { newProfiles={}; loadSettings(true); };
-async function saveSettings(restart){
-  const patch=buildPatch(), kind=needsLLM() ? 'llm' : 'assistant';
+async function saveSettings(){
+  const patch=buildPatch();
   if ('llm.profile' in dirty){
     const target=current('llm.profile'), S=profSummary(target), cloud=!(S && S.local_server);
     const definition = newProfiles[target] ? get(patch, `llm.profiles.${target}`) : undefined;
-    $('save').disabled=$('saveOnly').disabled=true;
+    $('save').disabled=true;
     $('saveMsg').innerHTML = cloud ? `<b>Checking ${esc(S?S.model:target)}…</b><small>Asks the provider whether the API key and the model are accepted; nothing is generated.</small>`
       : `<b>Checking that ${esc(S?S.model:target)} loads…</b><small>Reads the model file with llama-server on the CPU; 10–40 s.</small>`;
     try{
       const r = await j('/llm/check',{method:'POST', body:JSON.stringify({profile:target, ...(definition?{definition}:{})})});
-      if (!r.ok){ $('save').disabled=$('saveOnly').disabled=false; updateSavebar(); toast('Model check failed; nothing saved', true);
+      if (!r.ok){ $('save').disabled=false; updateSavebar(); toast('Model check failed; nothing saved', true);
         alert(cloud ? `${S?S.model:target} cannot be used yet:\n\n${r.error}\n\nNothing was changed. If the API key is missing or wrong, enter it above the model and save again.`
           : `The model ${S?S.model:target} cannot be loaded by your llama-server build:\n\n${r.error}\n\nNothing was changed. If it is a newer model file, rebuild llama.cpp (scripts/build_llama.sh) or point the profile's serve.command at a newer llama-server.`); return; }
       toast(cloud ? 'Key and model accepted' : `Model loads (${r.seconds ?? '?'} s)`);
-    }catch(e){ $('save').disabled=$('saveOnly').disabled=false; updateSavebar(); toast('Model check error: '+e.message, true); return; }
+    }catch(e){ $('save').disabled=false; updateSavebar(); toast('Model check error: '+e.message, true); return; }
     prevProfile = cfg.running_profile;
   }
-  try{ await j('/config',{method:'PUT', body:JSON.stringify({patch})}); }
-  catch(e){ $('save').disabled=$('saveOnly').disabled=false; toast('Save failed: '+e.message, true); return; }
-  $('save').disabled=$('saveOnly').disabled=false; dirty={}; newProfiles={};
-  if (restart && cfg.managed_by_systemd){ doRestart(kind==='llm' ? 'both' : 'assistant'); return; }
-  toast('Settings saved'); await loadSettings(true); needRestart(kind);
+  $('save').disabled=true; $('saveMsg').innerHTML=`<b>Applying…</b><small>${reloads() ? 'Loading the new engine or model; a few seconds.' : 'One moment.'}</small>`;
+  let res;
+  try{ res = await j('/config',{method:'PUT', body:JSON.stringify({patch, apply:true})}); }
+  catch(e){ $('save').disabled=false; updateSavebar(); toast('Save failed: '+e.message, true); return; }
+  $('save').disabled=false; dirty={}; newProfiles={};
+  const a = res.applied || {live:[], reloaded:[], restart:[], errors:[]};
+  if (a.errors.length) toast(a.errors.join(' · '), true);
+  else toast(['Saved and applied', ...a.reloaded].join(' · '));
+  await loadSettings(true); refreshHealth();
+  if (a.restart.length) needRestart('assistant', 'Saved; ' + a.restart.join(', ') + ' change at the next restart');
 }
-$('save').onclick = () => saveSettings(true);
-$('saveOnly').onclick = () => saveSettings(false);
+$('save').onclick = () => saveSettings();
 // read-only handle for debugging the form from the browser console / DevTools
 window.alveusSettings = {get dirty(){ return dirty; }, get newProfiles(){ return newProfiles; }, current, buildPatch};
 window.addEventListener('beforeunload', e => { if (Object.keys(dirty).length || yamlDirty || personaDirty){ e.preventDefault(); e.returnValue=''; } });

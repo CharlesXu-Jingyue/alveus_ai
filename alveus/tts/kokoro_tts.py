@@ -37,6 +37,20 @@ class KokoroTTS:
         # warm up
         self.synthesize("Ready.")
 
+    def reconfigure(self, opts: dict) -> bool:
+        """Apply new options in place (no reload): voice, speed, accent. Always possible: another accent
+        gets its own pipeline on the already loaded model."""
+        self.voice = opts.get("voice", self.voice)
+        self.speed = float(opts.get("speed", self.speed))
+        lang = opts.get("lang_code") or (self.voice[:1] if self.voice[:1] in "ab" else "a")
+        if self._pipe is not None and lang != self.lang_code:
+            from kokoro import KPipeline
+            self._pipes[self.lang_code] = self._pipe          # kept for previews in that accent
+            self._pipe = self._pipes.pop(lang, None) or KPipeline(lang_code=lang, repo_id="hexgrad/Kokoro-82M",
+                                                                 model=self._pipe.model)
+        self.lang_code = lang
+        return True
+
     def _pipe_for(self, voice: str):
         """The pipeline for a voice's accent; another accent reuses the loaded model (no extra VRAM)."""
         lang = voice[:1] if voice[:1] in "ab" else self.lang_code

@@ -112,14 +112,19 @@ machine's value, after which the inherited one applies (the engine's setting, or
 - **Pickers instead of typing:** microphones and speakers come from PipeWire; languages by name;
   Kokoro voices with accent and gender; ▶ plays a Kokoro voice (while Kokoro is the running engine)
   or the recording a Chatterbox model copies; *Record* captures a keyboard shortcut.
-- **Saving:** **Save & restart** writes `config/local.yaml` and restarts what is needed (the LLM
-  server too when the model changes); **Save without restart** keeps the running assistant as it is.
-  Changing the model first runs a check: for a local model a load test of the weights with your
-  llama-server binary (5–40 s), for a cloud model a question to the provider whether the key and the
-  model are accepted (nothing is generated); if it fails, nothing is saved. If the LLM service still
-  fails to come up after a restart, the page shows the server's error and offers to revert. Leaving the
-  page with unsaved changes asks first. The *Advanced* section edits `local.yaml` and the persona
-  prompt as raw text.
+- **Saving applies right away, without a restart, and the conversation continues.** Voices, voice
+  samples, speed, expressiveness, languages, names, model settings and switching between models,
+  listening timing, wake-word names and sensitivity, the keyboard shortcut and the instructions take
+  effect immediately. Another voice or speech-recognition engine or model is loaded first, swapped in,
+  and the old one freed (a few seconds; nothing is kept loaded in advance); a different local language
+  model restarts only the LLM server (20–40 s). Only tool servers, audio devices and the web address wait
+  for a restart; the page then says which and offers the restart button. Changing the model first runs a
+  check (local: a load test of the weights, 5–40 s; cloud: whether the key and model are accepted); if it
+  fails, nothing is saved. Leaving the page with unsaved changes asks first. The *Advanced* section edits
+  `local.yaml` and the persona prompt as raw text (both also applied right away).
+- **Listening to voices:** ▶ next to a Kokoro voice speaks a sample sentence, and ▶ next to a
+  Chatterbox voice plays the recording it copies, both on the assistant's speaker (in the browser when
+  there is no speaker, e.g. `alveus api`). Kokoro previews need Kokoro to be the running engine.
 
 **On another machine.** After `./install.sh` there, the GUI is available the same way at
 `http://127.0.0.1:8765/` whenever `systemctl --user start alveus`, `alveus talk`, or `alveus api`

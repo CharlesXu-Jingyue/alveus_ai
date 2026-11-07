@@ -40,6 +40,37 @@ profile is a one-line patch; `llm.effort` exists for cloud models, local ones on
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
 
+## 2026-11-07 (night) — a confirmation that never heard the answer; settings apply without a restart; previews on the speaker
+
+- **"Close it" was asked although the model chose not to ask, then counted as declined.** From the saved
+  history (DeepSeek Flash): the model reasoned that closing a window it had just opened needs no
+  question and called `desktop__close_window`; the agent's destructive gate asked anyway (by design:
+  `close_window` is marked destructive, and the gate does not depend on the model). The spoken
+  question was six seconds of raw JSON ("close window with {title_substring: Firefox}"); listening
+  started at 03:25:22 and ended at 03:25:23 with no transcript: a sound shorter than `min_speech_ms`
+  (the tail of its own question or a clipped answer) started a "speech" that 0.7 s of silence then
+  ended, and `rec is None` was returned as `False`, so the model was told "the user declined, do not
+  retry". Fixes: plain-words descriptions (`describe_action`: "close window: Firefox"), a chime before
+  listening, a 0.15 s settle, `patient` recording (blips below `min_speech_ms` do not end the window),
+  yes/no/unclear parsing with one repeat, and silence reported as `no_answer` (the model may ask again)
+  instead of a refusal. GUI confirmations that time out are `no_answer` too. New `tools.no_confirm`
+  (GUI: Don't ask for these) for risky tools the owner trusts; shell commands and sudo always ask.
+  A unit test reproduces the old failure with a 64 ms click before the answer.
+- **Previews could not be heard.** The endpoint answered in 0.2–1.2 s and a simulated click in a clean
+  headless Chrome played; the owner's Chrome did not, cause unknown (tab or site sound, autoplay).
+  ▶ now plays on the assistant's own speaker (`POST /tts/preview` with `play`, `POST /voices/play` for
+  Chatterbox recordings), which is also what the voice will sound like; the browser is the fallback when
+  there is no speaker. Each preview is logged.
+- **Restart-free settings.** `alveus/live.py` applies a saved configuration to the running process
+  (GUI and YAML editor send `apply: true`): instant for names/persona/gender, model settings and
+  switching profiles (new adapter; the history is provider-neutral, so the conversation continues),
+  engine settings that `reconfigure()` takes in place (Kokoro voice/speed/accent on the loaded model,
+  Chatterbox sample/expressiveness/language, Whisper language), VAD, wake names and sensitivity,
+  the hotkey, log level; reload-and-swap for another engine or model (load the new one, swap, free the
+  old; nothing preloaded); tool servers, audio devices and the API address are reported as restart-only.
+  Persona saves rebuild the system prompt at once. Verified on an isolated instance: voice and speed
+  changed in the running process, a microphone change reported for the restart. 74 tests.
+
 ## 2026-11-07 (evening) — settings page redesigned as a tree; a model choice per provider; per-model settings
 
 - **Review (owner asked for one, with UX in mind).** Findings on the old page, worst first:
