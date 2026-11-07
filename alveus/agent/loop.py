@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ..llm import LLMBackend
+from ..llm import LLMBackend, LLMError
 from .mcp_client import ToolHub
 
 log = logging.getLogger(__name__)
@@ -143,6 +143,16 @@ class Agent:
         idx = [i for i, m in enumerate(self.history) if m["role"] == "user"]
         if len(idx) > self.max_history:
             self.history = self.history[idx[-self.max_history]:]
+            # replay data bound to the old prefix (Claude's signed thinking) is invalid now that the
+            # oldest turns are gone; those messages are rebuilt from their text and tool calls
+            for m in self.history:
+                rep = m.get("_replay")
+                if rep:
+                    kept = {k: v for k, v in rep.items() if not (isinstance(v, dict) and v.get("prefix_bound"))}
+                    if kept:
+                        m["_replay"] = kept
+                    else:
+                        m.pop("_replay")
 
     # ------------------------------------------------------------------ run
     async def run(self, user_text: str, *, thinking: bool | None = None,
@@ -161,6 +171,8 @@ class Agent:
             content_parts: list[str] = []
             reasoning_parts: list[str] = []
             tool_calls: list[dict[str, Any]] = []
+            finish: str | None = None
+            replay: dict[str, Any] | None = None
             try:
                 stream = self.llm.stream(messages, tools, thinking=th)
                 async for ev in stream:
@@ -176,29 +188,38 @@ class Agent:
                     elif ev.kind == "tool_call" and ev.tool_call:
                         tool_calls.append(ev.tool_call)
                     elif ev.kind == "done":
+                        finish, replay = ev.finish_reason, ev.replay
                         yield AgentEvent("done", data={"finish": ev.finish_reason, "usage": ev.usage,
                                                        "round": round_no})
+            except LLMError as e:
+                log.warning("LLM error: %s", e)
+                yield AgentEvent("error", text=f"The language model failed: {e}")
+                return
             except Exception as e:
                 log.exception("LLM error")
                 yield AgentEvent("error", text=f"The language model failed: {e}")
                 return
 
             content = "".join(content_parts)
-            # "_reasoning" is kept for the GUI (history view) only; the LLM client strips private keys
-            # before sending, so the model never sees its old reasoning as part of the conversation.
+            # "_reasoning" is kept for the GUI (history view); adapters strip private keys before sending
+            # (providers that need the reasoning back, such as DeepSeek, read it from here).
+            # "_replay" is the provider's own record of the message (e.g. Claude's signed thinking),
+            # sent back verbatim by that provider's adapter only.
             reasoning = "".join(reasoning_parts).strip()
-            extra = {"_reasoning": reasoning} if reasoning else {}
+            extra: dict[str, Any] = {"_reasoning": reasoning} if reasoning else {}
             if self._interrupted:
                 self.history.append({"role": "assistant", "content": content + " [interrupted by the user]", **extra})
                 yield AgentEvent("interrupted", text="Interrupted.")
                 return
+            if replay:
+                extra["_replay"] = replay
             if not tool_calls:
                 self.history.append({"role": "assistant", "content": content, **extra})
-                return
-
-            if round_no >= self.max_rounds:
-                self.history.append({"role": "assistant", "content": content or "(tool limit reached)", **extra})
-                yield AgentEvent("error", text="I reached the tool-call limit for this request.")
+                if finish == "refusal" and not content.strip():
+                    yield AgentEvent("error", text="The model declined to answer that request.")
+                elif finish == "length" and not content.strip():
+                    yield AgentEvent("error", text="The reply hit the length limit before any answer; "
+                                                   "raise Max reply length in the settings.")
                 return
 
             self.history.append({
@@ -211,6 +232,21 @@ class Agent:
                     for tc in tool_calls
                 ],
             })
+            stop = None
+            if finish == "length":   # cut off mid-arguments: never run a truncated call
+                stop = ("Not run: the call was cut off by the output limit.",
+                        "My reply hit the length limit in the middle of a tool call; "
+                        "raise Max reply length in the settings.")
+            elif round_no >= self.max_rounds:
+                stop = ("Not run: the tool-call limit for this request was reached.",
+                        "I reached the tool-call limit for this request.")
+            if stop:
+                # answer every call anyway, so the conversation stays valid for providers that require it
+                for tc in tool_calls:
+                    self.history.append({"role": "tool", "tool_call_id": tc["id"],
+                                         "content": json.dumps({"cancelled": True, "message": stop[0]})})
+                yield AgentEvent("error", text=stop[1])
+                return
             for tc in tool_calls:
                 try:
                     shown_args = json.loads(tc["arguments"]) if tc["arguments"] else {}

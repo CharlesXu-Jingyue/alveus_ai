@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
   "openai>=1.60",           # only for the openai_http STT/TTS backends
+  "anthropic>=2.0",         # Claude profiles (alveus/llm/anthropic_messages.py)
   "pydantic>=2.7",
   "pyyaml>=6",
   "numpy>=1.26",

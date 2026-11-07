@@ -304,13 +304,19 @@ def doctor(warm: bool = typer.Option(False, help="Also load STT/TTS/wake-word mo
     try:
         prof = llm_profile(cfg)
         serve = prof.get("serve") or {}
-        mp = serve.get("model_path")
-        check(f"LLM weights ({prof.name})", mp and Path(mp).exists(), mp or "no serve.model_path")
-        cmd = serve.get("command") or "llama-server"
-        check("llama-server binary", Path(os.path.expanduser(cmd)).exists() or shutil.which(cmd) is not None, cmd)
+        if serve:
+            mp = serve.get("model_path")
+            check(f"LLM weights ({prof.name})", mp and Path(mp).exists(), mp or "no serve.model_path")
+            cmd = serve.get("command") or "llama-server"
+            check("llama-server binary", Path(os.path.expanduser(cmd)).exists() or shutil.which(cmd) is not None, cmd)
+        if prof.get("api_key_env"):
+            from . import credentials
+            src = credentials.source(prof.api_key_env)
+            check(f"API key {prof.api_key_env}", src is not None,
+                  {"env": "from the environment", "file": str(credentials.secrets_path())}.get(src or "", "missing"))
         from .llm import make_llm
         ok, msg = asyncio.run(make_llm(prof).health())
-        check("LLM endpoint", ok, msg)
+        check(f"LLM endpoint ({prof.name}, {'cloud' if prof.remote else 'local'})", ok, msg)
     except Exception as e:  # noqa: BLE001
         check("LLM profile", False, str(e))
     for name, mod in (("faster-whisper", "faster_whisper"), ("kokoro", "kokoro"), ("openwakeword", "openwakeword"),
@@ -353,16 +359,45 @@ def doctor(warm: bool = typer.Option(False, help="Also load STT/TTS/wake-word mo
 # ------------------------------------------------------------------------------ llm
 @llm_app.command("profiles")
 def llm_profiles():
-    """List LLM profiles."""
+    """List LLM profiles: provider, model, where it runs, and whether its weights or key are present."""
+    from . import credentials
+
     cfg = load_config()
-    t = Table(title=f"LLM profiles (default: {cfg.llm.profile})")
-    for c in ("profile", "backend", "model", "base_url", "weights"):
+    t = Table(title=f"LLM profiles (active: {cfg.llm.profile})")
+    for c in ("profile", "provider", "api", "model", "runs", "ready"):
         t.add_column(c)
-    for name, p in (cfg.llm.get("profiles") or {}).items():
+    for name in cfg.llm.get("profiles") or {}:
+        try:
+            p = llm_profile(cfg, name)
+        except KeyError as e:
+            t.add_row(name, "[red]invalid[/red]", "", "", "", str(e)[:60])
+            continue
         mp = (p.get("serve") or {}).get("model_path", "")
-        mark = "[green]✓[/green]" if mp and Path(mp).exists() else ("[red]missing[/red]" if mp else "-")
-        t.add_row(name, p.get("backend"), p.get("model"), p.get("base_url"), f"{mark} {mp}")
+        if mp:
+            ready = ("[green]✓[/green] " if Path(mp).exists() else "[red]missing[/red] ") + mp
+        elif p.get("api_key_env"):
+            src = credentials.source(p.api_key_env)
+            ready = f"[green]✓[/green] {p.api_key_env} ({src})" if src else f"[red]no key[/red] {p.api_key_env}"
+        else:
+            ready = p.get("base_url") or "-"
+        t.add_row(name, p.provider, p.api, str(p.get("model")), "cloud" if p.remote else "local", ready)
     console.print(t)
+
+
+@llm_app.command("key")
+def llm_key(name: str = typer.Argument(..., help="variable name, e.g. ANTHROPIC_API_KEY"),
+            remove: bool = typer.Option(False, "--remove", help="delete the stored key")):
+    """Store an API key in ~/.config/alveus/secrets.env (asked for without echo)."""
+    import getpass
+
+    from . import credentials
+
+    value = "" if remove else getpass.getpass(f"{name}: ")
+    if not remove and not value.strip():
+        console.print("nothing entered, nothing changed")
+        raise typer.Exit(1)
+    credentials.set_secret(name, value)
+    console.print(f"{'removed' if remove else 'stored'} {name} in {credentials.secrets_path()}")
 
 
 @llm_app.command("serve")
@@ -373,8 +408,11 @@ def llm_serve(profile: str = typer.Option(None), host: str = "127.0.0.1", port: 
     prof = llm_profile(cfg, profile)
     serve = prof.get("serve")
     if not serve:
-        console.print(f"profile {prof.name} has no 'serve' section (remote/external server?)")
-        raise typer.Exit(1)
+        # cloud API or a server managed elsewhere: nothing to run here. Exit 0, so systemd neither
+        # restarts the unit nor marks it failed, and the GPU stays free.
+        console.print(f"profile {prof.name} ({prof.label}, {'cloud' if prof.remote else 'external server'}) "
+                      "needs no local LLM server; exiting")
+        raise typer.Exit(0)
     cmd = [os.path.expanduser(serve["command"]), "-m", serve["model_path"], "--host", host, "--port", str(port),
            "--alias", prof["model"], *serve.get("args", []), *(extra.split() if extra else [])]
     console.print("[dim]" + " ".join(cmd) + "[/dim]")
@@ -382,22 +420,34 @@ def llm_serve(profile: str = typer.Option(None), host: str = "127.0.0.1", port: 
 
 
 @llm_app.command("test")
-def llm_test(prompt: str = "Say hello in one sentence.", profile: str = typer.Option(None)):
-    """Send a quick prompt to the active LLM."""
+def llm_test(prompt: str = "Say hello in one sentence.", profile: str = typer.Option(None),
+             show_thinking: bool = typer.Option(False, help="Print the reasoning stream too"),
+             thinking: bool = typer.Option(None, help="Force thinking on/off where the provider allows it")):
+    """Send a quick prompt to the active LLM (or --profile NAME). Cloud profiles cost a request."""
     cfg = load_config()
     prof = llm_profile(cfg, profile)
     from .llm import make_llm
 
     async def main():
+        from .llm import LLMError
+
         llm = make_llm(prof)
+        console.print(f"[dim]{prof.name}: {prof.model} via {prof.label} ({'cloud' if prof.remote else 'local'})[/dim]")
         t0 = time.time()
         n = 0
-        async for ev in llm.stream([{"role": "user", "content": prompt}]):
-            if ev.kind == "content":
-                console.print(ev.text, end="", markup=False)
-                n += 1
-            elif ev.kind == "done":
-                console.print(f"\n[dim]{ev.usage.get('completion_tokens', n)} tokens in {time.time() - t0:.1f}s[/dim]")
+        try:
+            async for ev in llm.stream([{"role": "user", "content": prompt}], thinking=thinking):
+                if ev.kind == "content":
+                    console.print(ev.text, end="", markup=False)
+                    n += 1
+                elif ev.kind == "reasoning" and show_thinking:
+                    console.print(f"[dim]{ev.text}[/dim]", end="", highlight=False, markup=False)
+                elif ev.kind == "done":
+                    console.print(f"\n[dim]{ev.usage.get('completion_tokens', n)} tokens in {time.time() - t0:.1f}s "
+                                  f"(finish: {ev.finish_reason}, usage: {ev.usage})[/dim]")
+        except LLMError as e:
+            console.print(f"\n[red]{e}[/red]")
+            raise typer.Exit(1)
 
     asyncio.run(main())
 

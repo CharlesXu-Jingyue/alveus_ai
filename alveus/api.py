@@ -156,6 +156,50 @@ class LLMCheckIn(BaseModel):
     profile: str
 
 
+class SecretIn(BaseModel):
+    name: str
+    value: str = ""   # empty = remove
+
+
+def _secret_names(cfg) -> dict[str, list[str]]:
+    """API-key variable -> profiles using it (every provider preset's variable is listed too)."""
+    from .config import llm_profile
+    from .llm.providers import PROVIDERS
+    names: dict[str, list[str]] = {p["api_key_env"]: [] for p in PROVIDERS.values() if p.get("api_key_env")}
+    for n in cfg.llm.get("profiles") or {}:
+        try:
+            env = llm_profile(cfg, n).get("api_key_env")
+        except KeyError:
+            continue
+        if env:
+            names.setdefault(env, []).append(n)
+    return names
+
+
+def _secrets_status(cfg) -> dict[str, Any]:
+    from . import credentials
+    from .llm.providers import PROVIDERS
+    label = {p["api_key_env"]: p.get("label", k) for k, p in PROVIDERS.items() if p.get("api_key_env")}
+    return {"path": str(credentials.secrets_path()),
+            "keys": {name: {"source": credentials.source(name), "profiles": profiles, "label": label.get(name, name)}
+                     for name, profiles in _secret_names(cfg).items()}}
+
+
+def _profile_info(cfg) -> dict[str, dict[str, Any]]:
+    from .config import llm_profile
+    from .llm.providers import describe
+    out: dict[str, dict[str, Any]] = {}
+    for n in cfg.llm.get("profiles") or {}:
+        try:
+            p = llm_profile(cfg, n)
+        except KeyError as e:
+            out[n] = {"label": f"{n} (invalid: {e})", "remote": False}
+            continue
+        out[n] = {"label": f"{n} · {describe(p)}", "remote": bool(p.remote), "provider": p.provider,
+                  "model": p.get("model"), "local_server": bool(p.get("serve")), "api_key_env": p.get("api_key_env")}
+    return out
+
+
 # ----------------------------------------------------------------------------- app
 def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
     """`assistant` is a VoiceAssistant (talk mode) or a HeadlessAssistant (api mode)."""
@@ -198,17 +242,23 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
     @app.get("/health")
     async def health() -> dict[str, Any]:
         from .agent.loop import active_names
-        ok, msg = await assistant.agent.llm.health() if assistant.agent else (False, "agent not ready")
+        llm = assistant.agent.llm if assistant.agent else None
+        ok, msg = await llm.health() if llm else (False, "agent not ready")
         name, other = active_names(assistant.cfg)
         if bus.state in ("speaking", "thinking"):
             _settle_state()
+        # the alveus-llm unit only matters when this profile runs its model on a local server it starts
+        local_server = bool((getattr(llm, "profile", None) or {}).get("serve"))
         return {"ok": ok, "llm": msg, "state": bus.state if has_voice else "text-only",
                 "tools": len(assistant.hub.tools) if assistant.hub else 0,
                 "stt": assistant.stt.name, "tts": assistant.tts.name, "name": name, "other_name": other,
                 "voice": has_voice, "version": __version__, "profile": assistant.cfg.llm.profile,
+                "llm_provider": getattr(llm, "provider", None), "llm_model": getattr(llm, "model", None),
+                "llm_remote": bool(getattr(llm, "remote", False)),
                 "tts_warning": getattr(assistant.tts, "warning", None),
                 "managed_by_systemd": bool(os.environ.get("INVOCATION_ID")),
-                "llm_service": _unit_status("alveus-llm.service") if os.environ.get("INVOCATION_ID") else None}
+                "llm_service": _unit_status("alveus-llm.service")
+                if os.environ.get("INVOCATION_ID") and local_server else None}
 
     @app.get("/debug/tasks", include_in_schema=False)
     async def debug_tasks() -> list[dict[str, Any]]:
@@ -424,6 +474,8 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
             "local_yaml": local_text,
             "options": {
                 "llm_profiles": sorted((cfg.llm.get("profiles") or {}).keys()),
+                "llm_profiles_labels": {n: i["label"] for n, i in _profile_info(cfg).items()},
+                "effort_levels": ["low", "medium", "high", "xhigh", "max"],
                 "stt_backends": ["faster_whisper", "parakeet", "openai_http"],
                 "tts_backends": ["kokoro", "chatterbox", "openai_http"],
                 "kokoro_voices": KOKORO_VOICES,
@@ -445,7 +497,31 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
             "env": dict(cfg._env),
             "managed_by_systemd": bool(os.environ.get("INVOCATION_ID")),
             "running_profile": assistant.cfg.llm.profile,
+            "llm_profile_info": _profile_info(cfg),
+            "secrets": _secrets_status(cfg),
         }
+
+    @app.get("/secrets")
+    async def get_secrets() -> dict[str, Any]:
+        """Which API keys are set (never their values) and which profiles use them."""
+        return _secrets_status(load_config())
+
+    @app.put("/secrets")
+    async def put_secret(inp: SecretIn) -> dict[str, Any]:
+        """Store (or with an empty value remove) an API key in ~/.config/alveus/secrets.env.
+        Only variables some profile or provider uses are accepted. Takes effect on the next request."""
+        from . import credentials
+        cfg = load_config()
+        if inp.name not in _secret_names(cfg):
+            raise HTTPException(400, f"{inp.name} is not an API-key variable of any LLM profile")
+        try:
+            credentials.set_secret(inp.name, inp.value)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        llm = assistant.agent.llm if assistant.agent else None
+        if llm is not None and hasattr(llm, "_health"):
+            llm._health.clear()
+        return _secrets_status(cfg)
 
     @app.put("/config")
     async def put_config(inp: ConfigIn) -> dict[str, Any]:
@@ -512,10 +588,14 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
 
     @app.post("/llm/check")
     async def llm_check(inp: LLMCheckIn) -> dict[str, Any]:
-        """Preflight: can the configured server binary load this profile's model file?
-        Starts llama-server on a spare port with the weights on the CPU (mmap, no VRAM),
-        waits for /health, then stops it. Typically 5-20 s; a bad file fails in <1 s."""
+        """Preflight before switching profiles.
+        Local server profile: can the configured server binary load the model file? Starts
+        llama-server on a spare port with the weights on the CPU (mmap, no VRAM), waits for
+        /health, then stops it. Typically 5-20 s; a bad file fails in <1 s.
+        Cloud / external profile: is the API key there and does the endpoint accept it and know
+        the model (no tokens generated)."""
         from .config import llm_profile
+        from .llm import make_llm
         cfg = load_config()
         try:
             prof = llm_profile(cfg, inp.profile)
@@ -523,7 +603,13 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
             raise HTTPException(404, str(e)) from e
         serve = prof.get("serve") or {}
         if not serve:
-            return {"ok": True, "skipped": "profile has no serve section (external server)"}
+            t0 = time.time()
+            try:
+                ok, msg = await make_llm(prof).health()
+            except Exception as e:  # noqa: BLE001
+                ok, msg = False, f"{type(e).__name__}: {e}"
+            return {"ok": ok, "kind": "cloud" if prof.remote else "external", "seconds": round(time.time() - t0, 1),
+                    "detail": msg, **({} if ok else {"error": msg})}
         model_path = serve.get("model_path", "")
         if not Path(model_path).exists():
             return {"ok": False, "error": f"model file not found: {model_path}"}

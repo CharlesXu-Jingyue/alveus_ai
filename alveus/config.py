@@ -113,17 +113,18 @@ def load_config(extra: str | os.PathLike | None = None) -> DotDict:
 
 
 def llm_profile(cfg: DotDict, name: str | None = None) -> DotDict:
-    """Return the active LLM profile merged with llm-level defaults."""
+    """Return an LLM profile resolved for use: provider preset < llm-level defaults < the profile.
+
+    Adds ``name``, ``provider``, ``api``, ``remote`` (requests leave the machine) and ``label``.
+    See alveus/llm/providers.py for the presets and keys."""
+    from .llm.providers import resolve
+
     llm = cfg.llm
     name = name or llm.get("profile")
     profiles = llm.get("profiles") or {}
     if name not in profiles:
         raise KeyError(f"LLM profile '{name}' not found; available: {sorted(profiles)}")
-    prof = dict(profiles[name])
-    for k in ("temperature", "top_p", "max_tokens", "max_tool_rounds"):
-        prof.setdefault(k, llm.get(k))
-    prof["name"] = name
-    return DotDict(prof)
+    return DotDict(resolve(name, dict(profiles[name] or {}), dict(llm)))
 
 
 # ----------------------------------------------------------------------------- editing

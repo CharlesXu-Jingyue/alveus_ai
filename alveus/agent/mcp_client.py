@@ -43,6 +43,15 @@ class ToolInfo:
         }
 
 
+def secret_env_names() -> set[str]:
+    """Variable names that hold LLM API keys (provider presets plus the common ones)."""
+    from ..llm.providers import PROVIDERS
+    names = {p["api_key_env"] for p in PROVIDERS.values() if p.get("api_key_env")}
+    names |= {"ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY",
+              "TOGETHER_API_KEY", "XAI_API_KEY"}
+    return names
+
+
 def hub_env(cfg) -> dict[str, str]:
     """Environment handed to every stdio MCP server: where Alveus lives and which LLM it runs."""
     from ..config import llm_profile
@@ -52,10 +61,17 @@ def hub_env(cfg) -> dict[str, str]:
     try:
         prof = llm_profile(cfg)
         env["ALVEUS_LLM_PROFILE"] = str(prof.get("name", ""))
+        env["ALVEUS_LLM_PROVIDER"] = str(prof.get("provider", ""))
         env["ALVEUS_LLM_MODEL"] = str(prof.get("model", ""))
-        env["ALVEUS_LLM_BASE_URL"] = str(prof.get("base_url", ""))
+        env["ALVEUS_LLM_BASE_URL"] = str(prof.get("base_url") or "")
+        # what the coder tool's "auto" means: the same model in opencode's naming (provider/model).
+        # Empty for local servers: coder.py then uses its local provider (bonsai) with ALVEUS_LLM_MODEL.
+        oc = prof.get("opencode_model") or (
+            f"{prof['opencode_provider']}/{prof.get('model')}" if prof.get("opencode_provider") else "")
+        env["ALVEUS_OPENCODE_AUTO"] = str(oc)
     except KeyError:
         pass
+    # API keys are deliberately not passed on (see alveus/credentials.py)
     return env
 
 
@@ -96,6 +112,18 @@ class ToolHub:
                 self.errors[name] = f"{type(e).__name__}: {e}"
                 log.warning("MCP server '%s' failed to start: %s", name, self.errors[name])
 
+    def server_env(self, cfg: dict[str, Any]) -> dict[str, str]:
+        """Environment for a stdio server: ours, minus LLM API keys (the shell tool could print them;
+        a server that needs them, coder -> opencode, sets inherit_api_keys), plus hub and server vars."""
+        env = dict(os.environ)
+        if not cfg.get("inherit_api_keys", False):
+            for k in secret_env_names():
+                env.pop(k, None)
+        env.update({k: str(v) for k, v in self.env_extra.items()})
+        env.update({k: os.path.expanduser(str(v)) for k, v in (cfg.get("env") or {}).items()})
+        env.setdefault("PYTHONPATH", self.repo_root)
+        return env
+
     async def _connect(self, name: str, cfg: dict[str, Any]) -> None:
         if cfg.get("command"):
             cmd = cfg["command"]
@@ -104,11 +132,7 @@ class ToolHub:
             cmd = list(cmd)
             if cmd[0] == "python":
                 cmd[0] = sys.executable
-            env = dict(os.environ)
-            env.update({k: str(v) for k, v in self.env_extra.items()})
-            env.update({k: os.path.expanduser(str(v)) for k, v in (cfg.get("env") or {}).items()})
-            env.setdefault("PYTHONPATH", self.repo_root)
-            params = StdioServerParameters(command=cmd[0], args=cmd[1:], env=env,
+            params = StdioServerParameters(command=cmd[0], args=cmd[1:], env=self.server_env(cfg),
                                            cwd=cfg.get("cwd") or self.repo_root)
             read, write = await self._stack.enter_async_context(stdio_client(params, errlog=sys.stderr))
         elif cfg.get("url"):

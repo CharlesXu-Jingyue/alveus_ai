@@ -168,6 +168,16 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
 .field .lbl small{display:block;font-weight:400;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.4}
 .field .ctl input[type=text],.field .ctl input[type=number],.field .ctl select,.field .ctl textarea{width:100%;background:var(--bg);border:1px solid var(--rule-2);border-radius:8px;padding:7px 10px;font-size:14px}
 .multi{display:flex;flex-wrap:wrap;gap:6px 14px;padding:6px 0}
+.keys{display:flex;flex-direction:column;gap:8px}
+.keys .key{border:1px solid var(--rule);border-radius:8px;padding:8px 10px;background:var(--bg)}
+.keys .kh{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:13px}
+.keys .kh small{color:var(--muted);flex-basis:100%;font-size:12px}
+.keys .kst{font-size:11.5px;color:var(--muted);margin-left:auto}
+.keys .kst.on{color:var(--ok)}
+.keys .kr{display:flex;gap:8px;margin-top:6px}
+.keys .kr input{flex:1;min-width:0;background:var(--surface);border:1px solid var(--rule-2);border-radius:8px;padding:6px 10px;font-size:13.5px}
+.keys .kr input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.keys .kpath{color:var(--muted);font-size:11.5px;overflow-wrap:anywhere}
 .multi label{display:flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer}
 .multi input{accent-color:var(--accent)}
 .field .ctl textarea{min-height:64px;resize:vertical;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px}
@@ -300,7 +310,7 @@ async function refreshHealth(){
     health = await j('/health');
     name = health.name; $('brandName').textContent = name; $('emptyName').textContent = name;
     $('brandSub').textContent = `${health.profile} · ${health.stt} · ${health.tts}`;
-    $('llm').className = 'llm' + (health.ok?' ok':''); $('llmText').textContent = health.ok ? 'LLM ready' : (health.llm_service && health.llm_service.active!=='active' ? 'LLM service '+health.llm_service.active : 'LLM down');
+    $('llm').className = 'llm' + (health.ok?' ok':''); $('llmText').textContent = health.ok ? (health.llm_remote ? 'LLM ready · cloud' : 'LLM ready') : (health.llm_service && health.llm_service.active!=='active' ? 'LLM service '+health.llm_service.active : 'LLM down');
     $('llmText').title = health.ok ? health.llm : (health.llm_service?.last_error || health.llm);
     $('toolCount').textContent = `${health.tools} tools`;
     if (health.tts_warning && !window._ttsWarned){ window._ttsWarned=true; toast(health.tts_warning, true); }
@@ -541,9 +551,11 @@ const FIELDS = [
  {p:'assistant.streaming_tts', l:'Speak while generating', h:'On: starts talking after the first sentence is ready. Off: waits for the whole reply, then speaks (fewer pauses, longer wait).', t:'bool'},
  {p:'assistant.max_history_turns', l:'Conversation memory (turns)', h:'How many of your recent requests it remembers within a session. More memory = longer context sent to the model each turn.', t:'number', min:1, max:200},
  {g:'Language model', d:'Which model thinks for the assistant, and how it generates text.'},
- {p:'llm.profile', l:'Model profile', h:'bonsai-1bit: smaller and faster. bonsai-ternary: better quality and tool use, more VRAM. Profiles are defined in config/alveus.yaml. Saving checks that the model file loads, then restarts the LLM server.', t:'select', o:'llm_profiles', restart:'llm'},
- {p:'llm.temperature', l:'Temperature', h:'Randomness of the wording. 0 = same answer every time, 0.7 = balanced (recommended), above 1 = more creative but less reliable with tools and facts.', t:'number', step:0.05, min:0, max:2},
- {p:'llm.max_tokens', l:'Max reply length (tokens)', h:'Upper limit per reply, including the model’s hidden reasoning. About 4 tokens per 3 words. Too low cuts answers off mid-thought.', t:'number', min:256, max:32768},
+ {p:'llm.profile', l:'Model profile', h:'Which model thinks for the assistant. Local profiles run on this computer’s GPU (bonsai-1bit: smaller and faster; bonsai-ternary: better quality and tool use, more VRAM). Cloud profiles (claude, chatgpt, deepseek) run at that company, need an API key (below) and cost money per request; with them, what you say — and what the tools read for it, such as file contents and command output — is sent there. Add your own profiles in the settings file under Advanced. Saving first checks that the model loads (local) or that the key and model are accepted (cloud), then restarts. Choosing a cloud profile also stops the local LLM server, which frees the GPU.', t:'select', o:'llm_profiles', restart:'llm'},
+ {p:'secrets', l:'API keys', h:'Only needed for cloud profiles. Saved on this computer in a private file outside the repository (path below), never in the settings file, and never shown again. A key already set in the environment (exported in your shell or in systemd) is used as well. Takes effect from the next request; no restart needed.', t:'secrets'},
+ {p:'llm.effort', l:'Reasoning effort', h:'How long cloud reasoning models think before they answer (Claude, ChatGPT, DeepSeek). Lower = faster and cheaper replies; higher = more careful on hard questions. Empty = the model’s own default (Claude Opus 5.5 and ChatGPT: medium, DeepSeek: high). Not every model has every level. Local models ignore it, and a profile can set its own.', t:'select', o:'effort_levels', nullable:true, nullLabel:'model default'},
+ {p:'llm.temperature', l:'Temperature', h:'Randomness of the wording. 0 = same answer every time, 0.7 = balanced (recommended), above 1 = more creative but less reliable with tools and facts. Claude and ChatGPT do not accept this setting and never receive it.', t:'number', step:0.05, min:0, max:2},
+ {p:'llm.max_tokens', l:'Max reply length (tokens)', h:'Upper limit per reply, including the model’s hidden reasoning. About 4 tokens per 3 words. Too low cuts answers off mid-thought. The cloud profiles set their own limit (16000), because their thinking counts against it.', t:'number', min:256, max:32768},
  {p:'llm.max_tool_rounds', l:'Max tool steps per request', h:'How many times it may call tools (files, web, system…) while working on one request before it must answer.', t:'number', min:1, max:50},
  {g:'Speech', d:'How it hears you and how it sounds.'},
  {p:'stt.backend', l:'Speech-to-text engine', h:'faster_whisper: accurate, many languages. parakeet: fastest, English and European languages. openai_http: use a separate transcription server instead.', t:'select', o:'stt_backends'},
@@ -590,7 +602,7 @@ const FIELDS = [
  {p:'tools.servers.desktop.enabled', l:'Desktop tools', h:'Let it operate the desktop: open apps and files, manage windows, type and press keys, set volume, control music, use the clipboard, take screenshots, show notifications, toggle dark mode and Do Not Disturb, lock the screen.', t:'bool'},
  {p:'tools.servers.web.enabled', l:'Web tools', h:'Let it search the web, read web pages, and check the weather. These are the only tools that send anything over the internet.', t:'bool'},
  {p:'tools.servers.coder.enabled', l:'Coding tool (opencode)', h:'Let it hand programming tasks to the opencode agent, which can read, edit, and run code in a project folder you name.', t:'bool'},
- {p:'tools.servers.coder.env.ALVEUS_OPENCODE_MODEL', l:'Coding model', h:'Which model opencode uses for the delegated coding work. auto: the same local Bonsai model the assistant runs, so it follows the model profile above. opencode-default: whatever you set as default in opencode itself. Or pick any model opencode is signed in to (e.g. deepseek/deepseek-v4-flash) — cloud models are stronger at long coding tasks, but the task text and the project files then leave this computer.', t:'combo', o:'opencode_models', when:{p:'tools.servers.coder.enabled', v:[true]}},
+ {p:'tools.servers.coder.env.ALVEUS_OPENCODE_MODEL', l:'Coding model', h:'Which model opencode uses for the delegated coding work. auto: the same model the assistant runs, so it follows the model profile above (for a cloud profile, opencode must be signed in to that provider: opencode auth login). opencode-default: whatever you set as default in opencode itself. Or pick any model opencode is signed in to (e.g. deepseek/deepseek-v4-flash) — cloud models are stronger at long coding tasks, but the task text and the project files then leave this computer.', t:'combo', o:'opencode_models', when:{p:'tools.servers.coder.enabled', v:[true]}},
  {p:'tools.servers.coder.env.ALVEUS_CODE_DIR', l:'Default coding folder', h:'The project folder opencode works in when you do not name one in your request, e.g. ~/projects/scratch.', t:'text', when:{p:'tools.servers.coder.enabled', v:[true]}},
  {p:'logging.level', l:'Log detail', h:'How much is written to the log (journalctl / logs/alveus.log). WARNING: problems only. INFO: normal activity such as what it heard and which tools it used. DEBUG: everything, including speech it ignored — use when troubleshooting.', t:'select', o:'log_levels'},
 ];
@@ -672,8 +684,10 @@ function fieldRow(f){
   const meta=document.createElement('div'); meta.className='meta';
   let el;
   const setDirty = v => { dirty[f.p]=v; row.classList.add('dirty'); updateSavebar(); refreshVisibility(); if (f.p==='tts.voices_dir') refreshVoices(v); };
+  if (f.t==='secrets'){ ctl.appendChild(secretsBox()); row.append(lbl, ctl, meta); return row; }
   if (f.t==='bool'){ el=document.createElement('button'); el.className='switch'; el.setAttribute('role','switch'); el.setAttribute('aria-checked', String(!!eff)); el.onclick=()=>{ const v=el.getAttribute('aria-checked')!=='true'; el.setAttribute('aria-checked',String(v)); setDirty(v); }; }
-  else if (f.t==='select'){ el=document.createElement('select'); const opts=cfg.options[f.o]||[]; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur); el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o)}</option>`).join(''); el.onchange=()=>setDirty(el.value); }
+  else if (f.t==='select'){ el=document.createElement('select'); const opts=[...(cfg.options[f.o]||[])]; const labels=cfg.options[f.o+'_labels']||{}; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur); if(f.nullable && !opts.includes('')) opts.unshift('');
+    el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o===''?(f.nullLabel||'(default)'):(labels[o]||o))}</option>`).join(''); el.onchange=()=>setDirty(el.value===''&&f.nullable?null:el.value); }
   else if (f.t==='file'){
     el=document.createElement('select'); const cur=eff||'';
     const fill = files => {
@@ -710,6 +724,23 @@ function fieldRow(f){
   if (overridden) meta.querySelector('button').onclick = () => { dirty[f.p]=UNSET; row.classList.add('dirty'); meta.innerHTML='<span class="ov">will reset</span>'; updateSavebar(); refreshVisibility(); };
   row.append(lbl, ctl, meta); return row;
 }
+// API keys: one row per key variable the profiles use; values are write-only (the server never returns them)
+function secretsBox(){
+  const box=document.createElement('div'); box.className='keys';
+  const s=cfg.secrets||{keys:{}, path:''}; const active=(cfg.llm_profile_info||{})[current('llm.profile')]?.api_key_env;
+  const names=Object.keys(s.keys).sort((a,b)=> (b===active)-(a===active) || a.localeCompare(b));
+  box.innerHTML = names.map(n=>{ const k=s.keys[n]; const st = k.source==='env' ? 'set in the environment' : k.source==='file' ? 'saved' : 'not set';
+    return `<div class="key" data-name="${esc(n)}"><div class="kh"><b>${esc(k.label)}</b><code class="mono">${esc(n)}</code><span class="kst${k.source?' on':''}">${esc(st)}</span>${k.profiles.length?`<small>used by ${esc(k.profiles.join(', '))}${n===active?' (the selected profile)':''}</small>`:''}</div>
+      <div class="kr"><input type="password" autocomplete="off" spellcheck="false" aria-label="${esc(n)}" placeholder="${k.source?'new key (replaces it)':'paste the key'}"><button class="btn ksave">Save key</button>${k.source==='file'?'<button class="btn kdel">Remove</button>':''}</div></div>`; }).join('')
+    + `<small class="kpath">Saved in <code class="mono">${esc(s.path)}</code></small>`;
+  box.querySelectorAll('.key').forEach(row => { const n=row.dataset.name, inp=row.querySelector('input');
+    const put = async v => { try{ cfg.secrets = await j('/secrets',{method:'PUT', body:JSON.stringify({name:n, value:v})}); toast(v?`${n} saved`:`${n} removed`); box.replaceWith(secretsBox()); refreshHealth(); }catch(e){ toast(e.message,true);} };
+    row.querySelector('.ksave').onclick = () => { const v=inp.value.trim(); if(!v){ toast('Paste the key first', true); return; } put(v); };
+    inp.onkeydown = e => { if(e.key==='Enter'){ e.preventDefault(); row.querySelector('.ksave').click(); } };
+    const d=row.querySelector('.kdel'); if(d) d.onclick = () => { if(confirm(`Remove ${n} from the key file?`)) put(''); };
+  });
+  return box;
+}
 let restartKind=null;
 function updateSavebar(){ const n=Object.keys(dirty).length; const show = n>0 || yamlDirty || personaDirty || restartKind; $('savebar').classList.toggle('show', !!show);
   $('save').hidden = !(n>0); $('discard').hidden = !(n>0||yamlDirty||personaDirty);
@@ -728,12 +759,15 @@ $('save').onclick = async () => {
   if (llmChange){
     // preflight: make sure the server binary can actually load the new model before touching services
     const target = dirty['llm.profile'] ?? get(cfg.defaults,'llm.profile');
-    $('save').disabled=true; $('saveMsg').innerHTML=`<b>Checking that <code>${esc(target)}</code> loads…</b><small>Reads the model file with llama-cli on the CPU; 10–40 s.</small>`;
+    const cloud = !((cfg.llm_profile_info||{})[target]||{}).local_server;
+    $('save').disabled=true; $('saveMsg').innerHTML = cloud ? `<b>Checking <code>${esc(target)}</code>…</b><small>Asks the provider whether the API key and the model are accepted; nothing is generated.</small>`
+      : `<b>Checking that <code>${esc(target)}</code> loads…</b><small>Reads the model file with llama-server on the CPU; 10–40 s.</small>`;
     try{
       const r = await j('/llm/check',{method:'POST', body:JSON.stringify({profile:target})});
       if (!r.ok){ $('save').disabled=false; updateSavebar(); toast('Model check failed — not saved', true);
-        alert(`The model for profile "${target}" cannot be loaded by your llama-server build:\n\n${r.error}\n\nNothing was changed. If this is a newer Bonsai file, rebuild the PrismML llama.cpp fork (scripts/build_llama.sh) and try again.`); return; }
-      toast(`Model loads (${r.seconds ?? '?'} s)`);
+        alert(cloud ? `Profile "${target}" cannot be used yet:\n\n${r.error}\n\nNothing was changed. If the API key is missing or wrong, enter it under API keys (just below the profile) and save again.`
+          : `The model for profile "${target}" cannot be loaded by your llama-server build:\n\n${r.error}\n\nNothing was changed. If the file is missing, download it to the path in the profile; if it is a newer model file, rebuild llama.cpp (scripts/build_llama.sh) and try again.`); return; }
+      toast(cloud ? `${target}: key and model accepted` : `Model loads (${r.seconds ?? '?'} s)`);
     }catch(e){ $('save').disabled=false; updateSavebar(); toast('Model check error: '+e.message, true); return; }
     prevProfile = cfg.running_profile;
   }

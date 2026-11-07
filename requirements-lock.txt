@@ -1,3 +1,4 @@
+anthropic==2.6.0
 chatterbox-tts==0.1.7
 ctranslate2==4.8.2
 ddgs==9.16.0
