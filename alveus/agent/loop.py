@@ -30,7 +30,10 @@ def voice_is_female(cfg) -> bool:
                          (e.g. f_charles_demo.wav); no sample / other name -> not female
            openai_http-> Kokoro-style voice name prefix if present
     """
-    g = str(cfg.tts.get("voice_gender", "auto")).lower()
+    from ..config import engine_opts
+
+    opts = engine_opts(cfg, "tts")    # the active engine/model's own gender setting, else tts.voice_gender
+    g = str(opts.get("voice_gender") or "auto").lower()
     if g in ("female", "f"):
         return True
     if g in ("male", "m"):
@@ -38,13 +41,12 @@ def voice_is_female(cfg) -> bool:
     backend = cfg.tts.get("backend", "kokoro")
     female_prefixes = ("af_", "bf_", "ef_", "ff_", "hf_", "if_", "jf_", "pf_", "zf_")
     if backend == "kokoro":
-        return str((cfg.tts.get("kokoro") or {}).get("voice", "af_heart")).lower().startswith(female_prefixes)
+        return str(opts.get("voice") or "af_heart").lower().startswith(female_prefixes)
     if backend == "chatterbox":
-        ref = (cfg.tts.get("chatterbox") or {}).get("voice_ref") or ""
-        stem = Path(str(ref)).name.lower()
+        stem = Path(str(opts.get("voice_ref") or "")).name.lower()
         return stem.startswith("f_")
     if backend == "openai_http":
-        return str((cfg.tts.get("openai_http") or {}).get("voice", "")).lower().startswith(female_prefixes)
+        return str(opts.get("voice") or "").lower().startswith(female_prefixes)
     return False
 
 

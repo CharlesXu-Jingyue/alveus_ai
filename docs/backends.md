@@ -115,7 +115,13 @@ Speech recognition and synthesis stay local.
 
 ### Switching
 
-GUI: Settings → Language model → Model profile, then save (check, then restart of both services).
+GUI: Settings → Language model: pick the provider, then the model, then save (check, then restart
+of both services). The model list comes from `GET /llm/models`: the GGUF files under
+`ALVEUS_MODELS` for this computer, the provider's live list for cloud APIs (once the key is in),
+suggestions otherwise. A model without a profile gets one on save, named after the model id
+(`deepseek-flash`; a GGUF file gets `provider: llama_server` and a `serve:` block from
+`LOCAL_SERVE_TEMPLATE` with context length 32768), and its settings (thinking, effort, reply length,
+temperature, context) are stored in that profile, so every model keeps its own.
 The choice is stored as `llm.profile` in `config/local.yaml`, so every later start, including after
 a reboot, uses the model chosen last. Choosing a cloud profile makes `alveus llm serve` exit at once,
 so `alveus-llm` stops and the GPU is free (ComfyUI, bigger speech models). On top of that the
@@ -174,6 +180,17 @@ Test: `alveus tts say "Hello there"`. The chosen voice's gender decides the spok
 Streaming: text is split into sentences (`SentenceBuffer`, min 24 chars, abbreviation- and
 decimal-aware) and each sentence is synthesized while the model continues generating, so
 time-to-first-word ≈ LLM thinking time + first sentence generation + ~0.2 s synthesis.
+
+
+### Per-model settings and previews
+
+Each engine reads its options through `config.engine_opts()`: the engine block, overlaid with the
+selected model's own block (`tts.chatterbox.models.<model>`), with `tts.voices_dir` and
+`tts.voice_gender` as fallbacks. So Chatterbox Turbo and Multilingual can copy different voices, and
+the gender (and with it the assistant's name) follows whichever model is active. Kokoro's accent
+follows the chosen voice (`bf_…` → British) unless `lang_code` is set. In the GUI, ▶ next to a Kokoro
+voice speaks a sample sentence through the running engine (`POST /tts/preview`; another accent
+reuses the loaded model), and ▶ next to a Chatterbox voice plays the recording itself.
 
 ## Voice activity & wake word
 

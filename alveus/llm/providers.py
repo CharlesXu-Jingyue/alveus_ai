@@ -105,6 +105,48 @@ PROVIDERS: dict[str, dict[str, Any]] = {
 
 APIS = ("openai_chat", "openai_responses", "anthropic_messages")
 
+# What the settings page shows per provider (not merged into profiles). group: local | cloud | server.
+# effort_levels: values of the "reasoning effort" option ([] = no such option); thinking_switch: the
+# model's thinking can be turned on/off; sampling: temperature/top-p are accepted; models: suggested
+# models (the live list from the provider wins when it can be fetched).
+PROVIDER_INFO: dict[str, dict[str, Any]] = {
+    "llama_server": {"group": "local", "title": "This computer", "blurb": "A GGUF model on this GPU (llama.cpp)",
+                     "thinking_switch": True, "sampling": True, "effort_levels": [], "local_files": True},
+    "anthropic": {"group": "cloud", "title": "Anthropic", "blurb": "Claude models",
+                  "thinking_switch": False, "sampling": False,
+                  "effort_levels": ["low", "medium", "high", "xhigh", "max"],
+                  "models": [{"id": "claude-opus-5-5", "note": "most capable Opus; good default"},
+                             {"id": "claude-sonnet-5-5", "note": "faster, about half the price of Opus"},
+                             {"id": "claude-haiku-5-5", "note": "fastest and cheapest"},
+                             {"id": "claude-fable-5-1", "note": "most capable Claude; slower and pricier"}]},
+    "openai": {"group": "cloud", "title": "OpenAI", "blurb": "ChatGPT models",
+               "thinking_switch": False, "sampling": False,
+               "effort_levels": ["low", "medium", "high", "xhigh", "max"],
+               "models": [{"id": "gpt-6.1-sol", "note": "near-flagship quality at lower cost; good default"},
+                          {"id": "gpt-6-astra", "note": "flagship for complex reasoning and coding"},
+                          {"id": "gpt-6.1-terra", "note": "fast and efficient"},
+                          {"id": "gpt-6-luna", "note": "cheapest, for high volume"}]},
+    "deepseek": {"group": "cloud", "title": "DeepSeek", "blurb": "DeepSeek models; low prices",
+                 "thinking_switch": True, "sampling": True, "effort_levels": ["low", "high", "max"],
+                 "models": [{"id": "deepseek-v4-pro", "note": "stronger reasoning"},
+                            {"id": "deepseek-flash", "note": "faster and cheaper"}]},
+    "openrouter": {"group": "cloud", "title": "OpenRouter", "blurb": "Models of many vendors behind one key",
+                   "thinking_switch": False, "sampling": True, "effort_levels": []},
+    "vllm": {"group": "server", "title": "vLLM", "blurb": "A vLLM server you run", "needs_base_url": True,
+             "thinking_switch": True, "sampling": True, "effort_levels": []},
+    "ollama": {"group": "server", "title": "Ollama", "blurb": "Models pulled with Ollama", "needs_base_url": True,
+               "thinking_switch": False, "sampling": True, "effort_levels": []},
+    "openai_compat": {"group": "server", "title": "Other server", "blurb": "Anything speaking the OpenAI chat API",
+                      "needs_base_url": True, "thinking_switch": True, "sampling": True, "effort_levels": []},
+}
+
+# What a new local profile gets (the settings page creates one per GGUF file)
+LOCAL_SERVE_TEMPLATE: dict[str, Any] = {
+    "command": "${ALVEUS_LLAMA_SERVER}",
+    "context": 32768,
+    "args": ["-ngl", "99", "--jinja", "--reasoning-format", "deepseek", "-fa", "on"],
+}
+
 # old `backend:` values (before providers existed) -> provider
 _LEGACY_BACKENDS = {
     "openai": "openai_compat", "openai_compat": "openai_compat", "llama_server": "openai_compat",

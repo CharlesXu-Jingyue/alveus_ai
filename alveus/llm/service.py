@@ -94,3 +94,46 @@ def reconcile_local_server(cfg, prof) -> str | None:
         log.warning("could not %s %s: %s", action, UNIT, e)
         return None
     return action
+
+
+# ------------------------------------------------------------------ llama-server arguments
+_CTX_FLAGS = ("-c", "--ctx-size")
+_NGL_FLAGS = ("-ngl", "--n-gpu-layers", "--gpu-layers")
+
+
+def _flag_value(args: list[str], flags: tuple[str, ...]) -> str | None:
+    for i, a in enumerate(args):
+        if a in flags and i + 1 < len(args):
+            return args[i + 1]
+    return None
+
+
+def _set_flag(args: list[str], flags: tuple[str, ...], value: str) -> list[str]:
+    out = list(args)
+    for i, a in enumerate(out):
+        if a in flags and i + 1 < len(out):
+            out[i + 1] = value
+            return out
+    return [*out, flags[0], value]
+
+
+def server_args(serve) -> list[str]:
+    """``serve.args`` with the structured settings applied: ``context`` (-c) and ``gpu_layers``
+    (-ngl) win over the same flags written in ``args``."""
+    args = [str(a) for a in (serve.get("args") or [])]
+    if serve.get("context"):
+        args = _set_flag(args, _CTX_FLAGS, str(int(serve["context"])))
+    if serve.get("gpu_layers") is not None:
+        args = _set_flag(args, _NGL_FLAGS, str(int(serve["gpu_layers"])))
+    return args
+
+
+def context_of(serve) -> int | None:
+    """Effective context length of a local profile (for the settings page)."""
+    if not serve:
+        return None
+    v = serve.get("context") or _flag_value([str(a) for a in (serve.get("args") or [])], _CTX_FLAGS)
+    try:
+        return int(v) if v else None
+    except (TypeError, ValueError):
+        return None

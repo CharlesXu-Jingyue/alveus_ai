@@ -92,9 +92,12 @@ llm:
     #   api_key_env: MY_SERVER_KEY   # omit for servers without keys
 
 # ---------------------------------------------------------------- Speech to text
+# Engines keep their own settings; an engine with several models can also keep settings per model
+# under <engine>.models.<model> (e.g. faster_whisper.models.large-v3.compute_type), which win over the
+# engine's own. The GUI stores model-specific choices there. Same scheme for tts below.
 stt:
   backend: faster_whisper        # faster_whisper | parakeet | openai_http
-  device: cuda
+  device: cuda                   # cuda | cpu
   faster_whisper:
     model: large-v3-turbo        # or: distil-large-v3, medium, small
     compute_type: float16
@@ -109,19 +112,23 @@ stt:
 # ---------------------------------------------------------------- Text to speech
 tts:
   backend: kokoro                # kokoro | chatterbox | openai_http
-  device: cuda
-  # auto = infer from the voice: Kokoro voice prefix (af_/bf_ female, am_/bm_ male) or, for
-  # chatterbox, the cloned sample's file name starting with f_ / m_. Or force: female | male
+  device: cuda                   # cuda | cpu
+  # Fallbacks for engines/models that set none themselves (each engine or model may set its own
+  # voice_gender / voices_dir). voice_gender auto = infer from the voice: Kokoro voice prefix
+  # (af_/bf_ female, am_/bm_ male) or, for chatterbox, the cloned sample's file name starting with
+  # f_ / m_. Or force: female | male. The gender decides which name the assistant uses.
   voice_gender: auto
   # Folder holding voice samples (WAV) for cloning. The GUI lists its files as choices.
   voices_dir: ${ALVEUS_HOME}/voices
   kokoro:
     voice: af_heart              # see: alveus tts voices
     speed: 1.0
-    lang_code: a                 # a = American English, b = British
+    lang_code: null              # null = follow the voice (af_/am_ American, bf_/bm_ British); or a | b
   chatterbox:
     model: turbo                 # turbo (English, fastest) | standard (English, expressive) |
                                  # multilingual (23 languages incl. zh/ja/ko/de/fr/es, auto-detected per sentence)
+    # Settings below apply to every model; models.<model>.<key> overrides them for one model, e.g.
+    #   models: { multilingual: { voice_ref: f_mei.wav, language: auto }, turbo: { voice_ref: m_charles_demo.wav } }
     voice_ref: null              # WAV to clone: a file name inside voices_dir or an absolute path; name it f_*.wav / m_*.wav
     language: auto               # multilingual only: auto = detect per sentence, or a fixed code like zh
     fallback_language: en        # used when auto-detection is unsure

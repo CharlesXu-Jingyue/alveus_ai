@@ -92,20 +92,34 @@ travels only over the local loopback connection to the assistant process). Leave
 if your account has passwordless sudo. A voice request that needs sudo says so aloud and shows the
 same card in the browser, since a password cannot be spoken.
 
-**Settings tab.** A search box at the top of the side navigation filters the form by label, hint,
-value or config key (Escape clears it). Below it, a form over every commonly changed option (names, model profile, speech engines and
-voice, activation mode and names, hotkey, VAD timing, chimes, tool safety, log level). Each row shows
-whether the value is overridden on this machine and offers *reset to default*. **Save** writes the
-changes to `config/local.yaml`; nothing is applied until you press **Restart assistant** (or
-**Restart LLM + assistant** when the model profile changed). Changing the model profile first runs
-a check: for a local profile a load test of the new weights with your llama-server binary
-(5–20 s), for a cloud profile a question to the provider whether the API key and model are accepted
-(nothing is generated); if it fails, nothing is saved and the error is shown. API keys for cloud
-profiles are entered right below the profile; they are saved immediately to
-`~/.config/alveus/secrets.env`, never shown again, and used from the next request. If the LLM service still fails to come up after a
-restart, the page shows the server's error and offers to revert to the previous profile. The page reconnects by itself, usually
-in 10–40 s while models reload. The *Advanced* section edits `local.yaml` and the persona prompt as
-raw text.
+**Settings tab.** The form follows how the parts depend on each other. A choice (speech engine,
+voice engine, model, wake mode, language-model provider) shows its options as cards with one line
+each; the chosen option's own settings open in a panel right below it, and inside that the next
+level: *Voice → Chatterbox → Multilingual → voice to copy, gender, language*. Settings that belong to
+one model are stored for that model only (`<engine>.models.<model>.…`), so you can give Turbo one
+voice and Multilingual another, and switching back restores them. Each row has a one-line hint;
+*More* opens the details. Rows changed on this machine say *changed · reset*; reset removes the
+machine's value, after which the inherited one applies (the engine's setting, or the default).
+
+- **Language model:** pick where the model runs (this computer, Anthropic, OpenAI, DeepSeek,
+  OpenRouter, or your own vLLM / Ollama / OpenAI-compatible server), then the model. For this
+  computer the list is the GGUF files in the models folder (`ALVEUS_MODELS`); drop another file there
+  and it appears. For cloud providers it is the provider's live list once the key is in, otherwise a
+  short suggested list; *another model id…* takes anything. Each model keeps its own settings
+  (thinking, reasoning effort, reply length, temperature, context length for local models), shown only
+  where that provider supports them. Picking a model that was never set up creates its profile on save
+  (e.g. `deepseek-flash`). The API key field sits in the provider's panel and saves at once.
+- **Pickers instead of typing:** microphones and speakers come from PipeWire; languages by name;
+  Kokoro voices with accent and gender; ▶ plays a Kokoro voice (while Kokoro is the running engine)
+  or the recording a Chatterbox model copies; *Record* captures a keyboard shortcut.
+- **Saving:** **Save & restart** writes `config/local.yaml` and restarts what is needed (the LLM
+  server too when the model changes); **Save without restart** keeps the running assistant as it is.
+  Changing the model first runs a check: for a local model a load test of the weights with your
+  llama-server binary (5–40 s), for a cloud model a question to the provider whether the key and the
+  model are accepted (nothing is generated); if it fails, nothing is saved. If the LLM service still
+  fails to come up after a restart, the page shows the server's error and offers to revert. Leaving the
+  page with unsaved changes asks first. The *Advanced* section edits `local.yaml` and the persona
+  prompt as raw text.
 
 **On another machine.** After `./install.sh` there, the GUI is available the same way at
 `http://127.0.0.1:8765/` whenever `systemctl --user start alveus`, `alveus talk`, or `alveus api`

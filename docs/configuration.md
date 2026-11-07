@@ -5,7 +5,8 @@
 Settings are merged in this order (later wins):
 
 1. `config/alveus.yaml` – defaults, versioned.
-2. `config/local.yaml` – this machine only, git-ignored, written by `install.sh`.
+2. `config/local.yaml` – this machine only, git-ignored, written by `install.sh` and the GUI
+   (`$ALVEUS_LOCAL_CONFIG` points elsewhere, e.g. for a test instance).
 3. `$ALVEUS_CONFIG` – optional extra file path.
 4. Environment shortcuts: `ALVEUS_LLM_PROFILE`, `ALVEUS_STT_BACKEND`, `ALVEUS_TTS_BACKEND`.
 
@@ -63,6 +64,7 @@ Changes take effect on the next start (`systemctl --user restart alveus`).
 | `profiles.<name>.serve.command` | | server binary for `alveus llm serve`; a profile without `serve` needs no local server (`alveus-llm` then exits and frees the GPU) |
 | `profiles.<name>.serve.model_path` | | GGUF path (checked by `doctor`) |
 | `profiles.<name>.serve.args` | | extra llama-server args; `--host/--port/-m/--alias` are added automatically |
+| `profiles.<name>.serve.context`, `.gpu_layers` | | context length (`-c`) and GPU layers (`-ngl`); win over the same flags in `args` (the GUI's *Context length* writes `context`) |
 | preset keys | | `thinking_param`, `reasoning_replay`, `max_tokens_field` (openai_chat); `reasoning_summary`, `store` (openai_responses); `thinking_display`, `fallbacks`, `prompt_cache` (anthropic_messages); see `providers.py` and backends.md |
 
 Shipped profiles: local `bonsai-1bit` (default), `bonsai-ternary`, `qwen-local` (weights not
@@ -74,6 +76,31 @@ llama-server flags used and why: `-ngl 99` all layers on GPU; `-c 32768` context
 262144 if you need long documents, VRAM permitting); `--jinja` real chat template (required for
 tool calling); `--reasoning-format deepseek` separates thinking; `-fa on` flash attention;
 sampling `--temp 0.7 --top-p 0.95 --top-k 20` as recommended by the model card.
+
+## Engines with several models: `<engine>.models.<model>`
+
+In `stt` and `tts`, each engine has its own block (`tts.kokoro`, `tts.chatterbox`, …). An engine with
+several models (Whisper sizes, Chatterbox Turbo/Standard/Multilingual) can also keep settings per
+model in `<engine>.models.<model>`; they win over the engine block, which wins over section-wide
+fallbacks (`tts.voices_dir`, `tts.voice_gender`). An explicit `null` counts (e.g. `voice_ref: null`
+= the built-in voice for that model only). The GUI stores model-specific choices this way:
+
+```yaml
+tts:
+  backend: chatterbox
+  chatterbox:
+    model: multilingual
+    voices_dir: ~/local/data/alveus-ai/voices    # shared by all Chatterbox models
+    voice_ref: m_charles_demo.wav                 # used by models that set none
+    models:
+      multilingual: { voice_ref: f_mei.wav, language: auto }
+      turbo: { voice_gender: male }
+stt:
+  faster_whisper:
+    model: large-v3
+    models:
+      large-v3: { compute_type: int8_float16 }   # the big model in half the VRAM
+```
 
 ## `stt`
 
@@ -93,15 +120,17 @@ sampling `--temp 0.7 --top-p 0.95 --top-k 20` as recommended by the model card.
 | key | default | meaning |
 |---|---|---|
 | `backend` | `kokoro` | `kokoro` \| `chatterbox` \| `openai_http` (override: `ALVEUS_TTS_BACKEND`) |
-| `device` | `cuda` | |
-| `voice_gender` | `auto` | `auto` infers from the voice: Kokoro voice prefix (`af_`/`bf_` female, `am_`/`bm_` male), or for Chatterbox the cloned sample's file name (`f_*.wav` / `m_*.wav`); or `female`/`male`. Decides Alveus vs Aurea |
+| `device` | `cuda` | `cuda` or `cpu` |
+| `voice_gender` | `auto` | fallback for engines/models that set no `voice_gender` of their own. `auto` infers from the voice: Kokoro voice prefix (`af_`/`bf_` female, `am_`/`bm_` male), or for Chatterbox the cloned sample's file name (`f_*.wav` / `m_*.wav`); or `female`/`male`. Decides Alveus vs Aurea |
+| `<engine>.voice_gender`, `<engine>.models.<model>.voice_gender` | | the same per engine or model (the GUI sets these) |
 | `kokoro.voice` | `af_heart` | see `alveus tts voices` (28 English voices) |
 | `kokoro.speed` | `1.0` | |
-| `kokoro.lang_code` | `a` | `a` American, `b` British English |
-| `chatterbox.model` | `turbo` | `turbo` or `standard` |
-| `voices_dir` | `${ALVEUS_HOME}/voices` | folder of WAV samples for cloning; the GUI's sample picker lists its files (set per machine in `local.yaml`) |
-| `chatterbox.voice_ref` | `null` | a file name inside `voices_dir`, or an absolute path, of a 5–15 s WAV to clone; name it `f_…wav` or `m_…wav` so the gender (and name) is inferred. A missing file falls back to the built-in voice with a warning |
-| `chatterbox.exaggeration`, `.cfg_weight` | `0.5`, `0.5` | standard model only |
+| `kokoro.lang_code` | `null` | `null` follows the voice (`af_`/`am_` American, `bf_`/`bm_` British); or force `a` / `b` |
+| `chatterbox.model` | `turbo` | `turbo` (English, fastest), `standard` (English, expressive), `multilingual` (23 languages) |
+| `voices_dir`, `chatterbox.voices_dir` | `${ALVEUS_HOME}/voices` | folder of WAV samples for cloning; the GUI's sample picker lists its files (set per machine in `local.yaml`) |
+| `chatterbox.voice_ref` | `null` | a file name inside the voices folder, or an absolute path, of a 5–15 s WAV to clone; name it `f_…wav` or `m_…wav` so the gender (and name) is inferred. A missing file falls back to the built-in voice with a warning |
+| `chatterbox.language`, `.fallback_language` | `auto`, `en` | multilingual only: `auto` detects each sentence's language |
+| `chatterbox.exaggeration`, `.cfg_weight` | `0.5`, `0.5` | standard and multilingual: expressiveness and pacing |
 | `openai_http.base_url`, `.model`, `.voice` | | any `/v1/audio/speech` server (e.g. Kokoro-FastAPI on :8880) |
 
 ## `audio`

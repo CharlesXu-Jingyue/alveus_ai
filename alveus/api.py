@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel
 
 from . import __version__
-from .config import (REPO_ROOT, load_config, patch_local_yaml, read_local_yaml, write_local_yaml)
+from .config import (LOCAL_YAML, REPO_ROOT, load_config, patch_local_yaml, read_local_yaml, write_local_yaml)
 
 log = logging.getLogger(__name__)
 WEB_DIR = Path(__file__).parent / "web"
@@ -154,6 +154,12 @@ class RestartIn(BaseModel):
 
 class LLMCheckIn(BaseModel):
     profile: str
+    definition: dict[str, Any] | None = None   # a profile not saved yet (the settings page creates them)
+
+
+class PreviewIn(BaseModel):
+    voice: str
+    text: str = ""
 
 
 class SecretIn(BaseModel):
@@ -195,8 +201,38 @@ def _profile_info(cfg) -> dict[str, dict[str, Any]]:
         except KeyError as e:
             out[n] = {"label": f"{n} (invalid: {e})", "remote": False}
             continue
-        out[n] = {"label": f"{n} · {describe(p)}", "remote": bool(p.remote), "provider": p.provider,
-                  "model": p.get("model"), "local_server": bool(p.get("serve")), "api_key_env": p.get("api_key_env")}
+        out[n] = _profile_summary(p)
+        out[n]["label"] = f"{n} · {describe(p)}"
+    return out
+
+
+def _profile_summary(p) -> dict[str, Any]:
+    """What the settings page shows and edits for one resolved profile (effective values)."""
+    from .llm.service import context_of
+    serve = p.get("serve") or {}
+    mp = serve.get("model_path")
+    return {"remote": bool(p.get("remote")), "provider": p.get("provider"), "model": p.get("model"),
+            "local_server": bool(serve), "api_key_env": p.get("api_key_env"), "base_url": p.get("base_url"),
+            "model_path": os.path.expanduser(mp) if mp else None, "file_exists": bool(mp and Path(os.path.expanduser(mp)).exists()),
+            "temperature": p.get("temperature"), "top_p": p.get("top_p"), "max_tokens": p.get("max_tokens"),
+            "effort": p.get("effort"), "thinking": p.get("thinking"), "context": context_of(serve),
+            "top_k": (p.get("extra_body") or {}).get("top_k")}
+
+
+def _providers_info(cfg) -> dict[str, Any]:
+    """Provider cards for the settings page: what each offers, its key status, and the effective
+    defaults a new profile of that provider would get."""
+    from . import credentials
+    from .llm.providers import LOCAL_SERVE_TEMPLATE, PROVIDER_INFO, PROVIDERS, resolve
+    out = {}
+    for name, info in PROVIDER_INFO.items():
+        preset = PROVIDERS[name]
+        env = preset.get("api_key_env")
+        d = _profile_summary(resolve("_new", {"provider": name, "model": "_"}, dict(cfg.llm)))
+        out[name] = {**info, "label": preset.get("label", name), "api_key_env": env,
+                     "key_source": credentials.source(env) if env else None,
+                     "base_url": preset.get("base_url"), "defaults": d,
+                     **({"serve_template": LOCAL_SERVE_TEMPLATE} if info.get("local_files") else {})}
     return out
 
 
@@ -492,14 +528,51 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "audio_backends": ["auto", "pipewire", "sounddevice"],
                 "opencode_models": ["auto", "opencode-default", *_opencode_models()],
             },
-            "paths": {"local_yaml": str(REPO_ROOT / "config" / "local.yaml"), "persona": str(PERSONA),
+            "paths": {"local_yaml": str(LOCAL_YAML), "persona": str(PERSONA),
                       "defaults": str(REPO_ROOT / "config" / "alveus.yaml")},
             "env": dict(cfg._env),
             "managed_by_systemd": bool(os.environ.get("INVOCATION_ID")),
             "running_profile": assistant.cfg.llm.profile,
             "llm_profile_info": _profile_info(cfg),
+            "llm_providers": _providers_info(cfg),
             "secrets": _secrets_status(cfg),
+            "running": {"tts": getattr(assistant.tts, "name", None), "kokoro_voice": getattr(assistant.tts, "voice", None),
+                        "chatterbox_model": getattr(assistant.tts, "variant", None)},
         }
+
+    @app.get("/llm/models")
+    async def llm_models(provider: str, base_url: str = "", api_key_env: str = "") -> dict[str, Any]:
+        """Models a provider offers (GGUF files for llama_server; the live list, else suggestions)."""
+        from .llm.catalog import provider_models
+        from .llm.providers import PROVIDER_INFO
+        if provider not in PROVIDER_INFO:
+            raise HTTPException(404, f"unknown provider {provider}")
+        return await provider_models(load_config(), provider, base_url or None, api_key_env or None)
+
+    @app.get("/audio/devices")
+    async def audio_devices() -> dict[str, Any]:
+        """Microphones and speakers PipeWire knows: {sources, sinks: [{name, label}]}; name is what
+        audio.input_device / output_device take."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _pipewire_devices)
+
+    @app.post("/tts/preview")
+    async def tts_preview(inp: PreviewIn) -> Response:
+        """Speak a sample sentence with another voice of the running engine and return WAV (played
+        in the browser). Kokoro only: its voices switch per call; other engines would need a reload."""
+        tts = assistant.tts
+        if getattr(tts, "name", "") != "kokoro":
+            raise HTTPException(409, "voice preview works while Kokoro is the active voice engine")
+        from .tts.kokoro_tts import KOKORO_VOICES
+        if inp.voice not in KOKORO_VOICES:
+            raise HTTPException(404, f"unknown Kokoro voice {inp.voice}")
+        from .agent.loop import active_names
+        text = inp.text or f"Hello, I am {active_names(assistant.cfg)[0]}. This is how I sound."
+        loop = asyncio.get_running_loop()
+        audio = await loop.run_in_executor(None, lambda: tts.synthesize(text, voice=inp.voice))
+        buf = io.BytesIO()
+        sf.write(buf, audio, tts.sample_rate, format="WAV", subtype="PCM_16")
+        return Response(buf.getvalue(), media_type="audio/wav")
 
     @app.get("/secrets")
     async def get_secrets() -> dict[str, Any]:
@@ -574,6 +647,14 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return {"stopping": units}
 
+    @app.get("/voices/file")
+    async def voice_file(name: str, dir: str = "") -> FileResponse:
+        """One voice sample from the voices folder, to listen to it in the browser."""
+        d = Path(os.path.expanduser(dir or load_config().tts.get("voices_dir") or ""))
+        if not name or name not in _list_voices(str(d)):
+            raise HTTPException(404, "no such sample in the voices folder")
+        return FileResponse(d / name)
+
     @app.get("/voices")
     async def voices(dir: str = "") -> dict[str, Any]:
         """List WAV voice samples in a folder (defaults to tts.voices_dir)."""
@@ -598,7 +679,14 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
         from .llm import make_llm
         cfg = load_config()
         try:
-            prof = llm_profile(cfg, inp.profile)
+            if inp.definition is not None:
+                from .config import DotDict
+                from .llm.providers import resolve
+                prof = DotDict(resolve(inp.profile, dict(inp.definition), dict(cfg.llm)))
+                prof = DotDict(json.loads(json.dumps(prof).replace("${ALVEUS_MODELS}", cfg._env["ALVEUS_MODELS"])
+                                          .replace("${ALVEUS_LLAMA_SERVER}", cfg._env["ALVEUS_LLAMA_SERVER"])))
+            else:
+                prof = llm_profile(cfg, inp.profile)
         except KeyError as e:
             raise HTTPException(404, str(e)) from e
         serve = prof.get("serve") or {}
@@ -689,6 +777,26 @@ def _list_voices(voices_dir: str | None) -> list[str]:
     if not d.is_dir():
         return []
     return sorted(f.name for f in d.iterdir() if f.suffix.lower() in (".wav", ".flac", ".mp3") and f.is_file())
+
+
+def _pipewire_devices() -> dict[str, Any]:
+    try:
+        out = subprocess.run(["pw-dump"], capture_output=True, text=True, timeout=5, check=False).stdout
+        nodes = json.loads(out or "[]")
+    except Exception as e:  # noqa: BLE001
+        return {"sources": [], "sinks": [], "error": f"pw-dump unavailable: {e}"}
+    res: dict[str, list[dict[str, str]]] = {"sources": [], "sinks": []}
+    for o in nodes:
+        p = ((o.get("info") or {}).get("props") or {})
+        cls, name = str(p.get("media.class", "")), p.get("node.name")
+        if not name:
+            continue
+        label = p.get("node.description") or p.get("node.nick") or name
+        if cls == "Audio/Source":
+            res["sources"].append({"name": name, "label": label})
+        elif cls == "Audio/Sink":
+            res["sinks"].append({"name": name, "label": label})
+    return res
 
 
 def _units(what: str) -> list[str]:

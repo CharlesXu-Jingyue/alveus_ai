@@ -414,8 +414,9 @@ def llm_serve(profile: str = typer.Option(None), host: str = "127.0.0.1", port: 
         console.print(f"profile {prof.name} ({prof.label}, {'cloud' if prof.remote else 'external server'}) "
                       "needs no local LLM server; exiting")
         raise typer.Exit(0)
+    from .llm.service import server_args
     cmd = [os.path.expanduser(serve["command"]), "-m", serve["model_path"], "--host", host, "--port", str(port),
-           "--alias", prof["model"], *serve.get("args", []), *(extra.split() if extra else [])]
+           "--alias", prof["model"], *server_args(serve), *(extra.split() if extra else [])]
     console.print("[dim]" + " ".join(cmd) + "[/dim]")
     os.execvp(cmd[0], cmd)
 

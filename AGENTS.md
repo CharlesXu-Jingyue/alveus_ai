@@ -120,9 +120,15 @@ If a key does show up in output anyway, stop, tell the owner to revoke it, and d
   tools `annot(destructive=True)` — that is what triggers the spoken/GUI confirmation.
 - Config patch semantics (`alveus/config.py`): a `null` leaf stores an explicit null (e.g. language
   auto-detect); `{"$unset": true}` removes the machine override. The GUI relies on this.
-- GUI settings are declared in the `FIELDS` array in `alveus/web/index.html` (`when:` makes a field
-  depend on another; `nullable:` lets empty mean null; `t:'file'` is the voices picker). Write
-  field hints in plain language; the owner reads them and asks when they are vague.
+- GUI settings are declared in `SECTIONS` in `alveus/web/index.html`: a tree where `t:'choice'`
+  items show cards and render the chosen option's `branch[value]` (or `each(value)`) in a nested
+  panel; paths may use `{v}` for the chosen value, `fb:` lists inherited values. Model-specific
+  settings go under `<engine>.models.<model>` (resolved by `config.engine_opts`) or the LLM profile.
+  The language model is a custom block (`llmBlock`: provider → model → that profile's settings).
+  `h:` is one plain-language line, `more:` the details; the owner reads them and asks when vague.
+- To test the GUI, run a text-only instance on port 8799 with `ALVEUS_LOCAL_CONFIG` pointing at a
+  copy of `local.yaml` and **`INVOCATION_ID` unset** (otherwise its "Save & restart" restarts the real
+  systemd services), and drive headless Chrome over DevTools; close each tab you open.
 - Docs are part of the deliverable: update `docs/*.md`, rebuild the handbook, commit.
 
 ## Traps already hit (details in docs/troubleshooting.md)

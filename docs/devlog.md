@@ -40,6 +40,48 @@ profile is a one-line patch; `llm.effort` exists for cloud models, local ones on
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
 
+## 2026-11-07 (evening) — settings page redesigned as a tree; a model choice per provider; per-model settings
+
+- **Review (owner asked for one, with UX in mind).** Findings on the old page, worst first:
+  (1) dependent fields never hid: `.field{display:grid}` beat the `hidden` attribute, so all three
+  speech-to-text and all three voice engines' options showed at once (same bug hid nothing in the
+  save bar); (2) flat where the settings are nested: engine → model → that model's voice, folder,
+  gender and language, with gender and voices folder global although only one engine used each;
+  (3) no way to pick a model within a provider (DeepSeek Flash, Claude Sonnet, a new GGUF): only
+  predefined profiles; (4) typing where picking is possible: device names from `wpctl status`,
+  language codes, `af_bella`-style voice ids, pynput shortcut syntax; (5) a paragraph of hint under
+  every row (the page was 9,000 px); (6) no way to hear a voice before choosing it; (7) Kokoro's accent
+  was a separate setting that silently mismatched British voices; (8) save, then a separate restart
+  button, with nothing saying what a change restarts.
+- **New structure.** `SECTIONS` is a tree: choices render as cards with one line each, and the
+  chosen option's own settings open in a nested panel, recursively (Voice → Chatterbox → Multilingual
+  → voice to copy / gender / language). Model-specific values are stored under
+  `<engine>.models.<model>` and resolved by `config.engine_opts()` (engine block < model block, with
+  `tts.voices_dir` / `tts.voice_gender` as fallbacks); every model keeps its own. Sections: Assistant,
+  Language model, Listening, Voice, Activation, Audio, Tools & safety, System, Advanced.
+- **Language model.** Provider cards (this computer, Anthropic, OpenAI, DeepSeek, OpenRouter, vLLM,
+  Ollama, other server; key status on each), the API key in the provider's panel, then a model list
+  from `GET /llm/models` (GGUF files under `ALVEUS_MODELS`; the provider's live list with a key, else
+  suggestions; *another model id…*), then that model's settings, shown only where the provider
+  supports them (`PROVIDER_INFO`: effort levels, thinking switch, sampling; context length and top-k
+  for local files via `serve.context`). Picking an unknown model creates its profile on save; the
+  preflight checks unsaved profiles too (`definition`).
+- **Pickers.** PipeWire devices (`GET /audio/devices`), languages by name, Kokoro voices with accent
+  and gender, ▶ for a Kokoro sample (`POST /tts/preview`, any accent on the loaded model) and for
+  the Chatterbox recording (`GET /voices/file`), *Record* for the shortcut, the automatic gender shown
+  with its reason. Kokoro's accent now follows the voice (`lang_code: null`).
+- **Saving.** One *Save & restart* (restarts the LLM server too when the model changes), *Save
+  without restart*, a warning when leaving with unsaved edits, *changed · reset* per row (reset =
+  use the inherited value). One-line hints with *More*; the page is ~6,500 px with everything open.
+- **Verified** on a text-only instance with its own `local.yaml` copy (`ALVEUS_LOCAL_CONFIG`, new) and
+  `INVOCATION_ID` unset, in headless Chrome over DevTools: no JS errors; engine/model switching shows
+  the right nested settings; a Chinese language set for Chatterbox Multilingual lands in
+  `tts.chatterbox.models.multilingual.language`; picking DeepSeek Flash with low effort saved a new
+  `deepseek-flash` profile after a passing preflight, and one real request with it succeeded; the
+  local list shows both GGUF files and the missing Qwen file; Kokoro preview of a British voice
+  while an American one was loaded (3.4 s WAV); path traversal on `/voices/file` refused; phone width
+  without horizontal scroll; light theme. 65 tests.
+
 ## 2026-11-07 (later) — first live cloud runs (DeepSeek); the local server follows the profile; key hygiene
 
 - **Live DeepSeek.** With the owner's disposable key (entered by them; never seen by the session):

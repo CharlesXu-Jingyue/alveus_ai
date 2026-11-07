@@ -2,7 +2,8 @@
 
 Layers (later wins):
   1. config/alveus.yaml   (defaults, in repo)
-  2. config/local.yaml    (machine-specific, git-ignored; written by install.sh)
+  2. config/local.yaml    (machine-specific, git-ignored; written by install.sh and the GUI;
+                           $ALVEUS_LOCAL_CONFIG points elsewhere, e.g. for a test instance)
   3. $ALVEUS_CONFIG       (optional extra file)
   4. environment overrides: ALVEUS_LLM_PROFILE, ALVEUS_STT_BACKEND, ALVEUS_TTS_BACKEND
 
@@ -78,7 +79,7 @@ def _load_yaml(p: Path) -> dict:
 def load_config(extra: str | os.PathLike | None = None) -> DotDict:
     cfg_dir = REPO_ROOT / "config"
     merged: dict = {}
-    for p in (cfg_dir / "alveus.yaml", cfg_dir / "local.yaml"):
+    for p in (cfg_dir / "alveus.yaml", local_yaml_path()):
         merged = _deep_merge(merged, _load_yaml(p))
     extra = extra or os.environ.get("ALVEUS_CONFIG")
     if extra:
@@ -112,6 +113,31 @@ def load_config(extra: str | os.PathLike | None = None) -> DotDict:
     return DotDict(merged)
 
 
+# section-wide settings an engine inherits when it sets none itself
+_SECTION_FALLBACKS = {"tts": ("voices_dir", "voice_gender")}
+
+
+def engine_opts(cfg: DotDict, section: str, engine: str | None = None) -> dict:
+    """Options of an engine in ``stt`` / ``tts`` (default: the active ``backend``).
+
+    Layers (later wins): section-wide fallbacks (``tts.voices_dir``, ``tts.voice_gender``) < the
+    engine block (``tts.chatterbox``) < the selected model's own block
+    (``tts.chatterbox.models.<model>``). So every model of an engine keeps its own voice, gender,
+    language, … while settings shared by its models live on the engine. An explicit ``null`` in a
+    model block wins too (e.g. ``voice_ref: null`` = the built-in voice for that model only)."""
+    sec = cfg.get(section) or {}
+    engine = engine or sec.get("backend")
+    block = dict(sec.get(engine) or {})
+    models = block.pop("models", None)
+    model = block.get("model")
+    if isinstance(models, dict) and isinstance(models.get(model), dict):
+        block.update(models[model])
+    for k in _SECTION_FALLBACKS.get(section, ()):
+        if block.get(k) is None and sec.get(k) is not None:
+            block[k] = sec[k]
+    return block
+
+
 def llm_profile(cfg: DotDict, name: str | None = None) -> DotDict:
     """Return an LLM profile resolved for use: provider preset < llm-level defaults < the profile.
 
@@ -128,7 +154,11 @@ def llm_profile(cfg: DotDict, name: str | None = None) -> DotDict:
 
 
 # ----------------------------------------------------------------------------- editing
-LOCAL_YAML = REPO_ROOT / "config" / "local.yaml"
+def local_yaml_path() -> Path:
+    return Path(os.environ.get("ALVEUS_LOCAL_CONFIG") or REPO_ROOT / "config" / "local.yaml").expanduser()
+
+
+LOCAL_YAML = local_yaml_path()
 
 
 def read_local_yaml() -> str:
