@@ -36,7 +36,7 @@ change with a descriptive message (see `git log` for the style).
 | machine-specific config (git-ignored) | `config/local.yaml` — read it first; defaults are `config/alveus.yaml` |
 | models (`ALVEUS_MODELS`) | `~/local/model/bonsai/Bonsai-27B-Q1_0.gguf`, `~/local/model/bonsai-ternary/Ternary-Bonsai-27B-PQ2_0.gguf` |
 | llama.cpp (PrismML fork, **prism** branch, relocatable build) | `~/local/lib/llama.cpp-bonsai/build/bin/llama-server` |
-| voice samples for cloning | `~/local/repo/alveus-ai/voices/` (`tts.voices_dir`, git-ignored): `m_charles_demo.wav` plus eight curated female voices (`f_*_ja`, `f_*_zh`) with `.txt` transcripts; sources and terms in `voices/SOURCES.md` |
+| voice samples for cloning | `~/local/repo/alveus-ai/voices/` (`tts.voices_dir`, git-ignored): `m_charles_demo.wav` plus six curated female voices (`f_*_ja`, `f_*_zh`) with `.txt` transcripts; sources and terms in `voices/SOURCES.md` |
 | Qwen3-TTS | own env `.venv-qwen3tts/` (venv on the alveus Python, transformers 4.57.3), weights `/mnt/data/models/tts/Qwen3-TTS-12Hz-1.7B-Base` (`tts.qwen3.weights_dir`) |
 | systemd user units | `~/.config/systemd/user/alveus-llm.service`, `alveus.service` (rendered from `systemd/*.in` by `scripts/install_services.sh`) |
 | logs | `journalctl --user -u alveus -f`, `logs/alveus.log` |

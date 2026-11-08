@@ -40,7 +40,12 @@ profile is a one-line patch; `llm.effort` exists for cloud models, local ones on
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
 
-## 2026-11-07 (late afternoon) — Qwen3-TTS as a third voice engine; eight curated female voices
+## 2026-11-07 (late afternoon) — Qwen3-TTS as a third voice engine; curated female voices
+
+- Follow-up: the owner listened and removed Xiaoyu and Wanqing (TTS-SCDuFSC): not good enough. They
+  were three short read sentences (cycling-forum lines, 2–5 s each) joined with pauses, so the
+  prosody was flat and choppy; better sources are single continuous 8–12 s utterances. Six voices
+  remain: Ayaka, Hina, Yuzu, Mio, Shiori, Feiyu.
 
 - Owner: add Qwen3-TTS 1.7B as a TTS engine; download and curate female voice samples from 朱花
   (aiseiyou.com), japanese-anime-speech, da-fei-yu-girl-voice-zh and TTS-SCDuFSC, and name them.

@@ -254,8 +254,6 @@ all female, each with its words in a `.txt` file:
 | `f_mio_ja` | Mio, Japanese; gentle, mid pitch | japanese-anime-speech (CC0) |
 | `f_shiori_ja` | Shiori, Japanese; lower, calm, polite | japanese-anime-speech (CC0) |
 | `f_feiyu_zh` | Feiyu (大肥鱼), Chinese; young, warm, caring | da-fei-yu-girl-voice-zh (CC-BY-NC 4.0) |
-| `f_xiaoyu_zh` | Xiaoyu, Chinese; bright studio voice | TTS-SCDuFSC speaker F004 (CC-BY-NC-ND 4.0) |
-| `f_wanqing_zh` | Wanqing, Chinese; lower, relaxed studio voice | TTS-SCDuFSC speaker F003 (CC-BY-NC-ND 4.0) |
 
 They copy best with Qwen3-TTS, which speaks all of them in English too; Chatterbox Multilingual
 copies them as well. With your own recording, *Write it down* (Settings → Voice → Qwen3-TTS → Its
