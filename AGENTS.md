@@ -7,7 +7,8 @@ it, what the owner cares about, and the traps that have already cost time. Writt
 
 Alveus (also called **Aurea** when its voice is female) is a fully local, voice-driven AI
 assistant for the owner's Linux workstation. Speech in → local LLM with tools → speech out, plus a
-browser GUI. Nothing leaves the machine except the web tools. Repo: `~/local/repo/alveus-ai`,
+browser GUI. Nothing leaves the machine except the web tools, unless a cloud LLM profile is selected
+(then the conversation goes to that provider). Repo: `~/local/repo/alveus-ai`,
 conda env `alveus`, Python 3.12. Everything is committed to git on `master`; commit after each
 change with a descriptive message (see `git log` for the style).
 
@@ -35,11 +36,13 @@ change with a descriptive message (see `git log` for the style).
 | machine-specific config (git-ignored) | `config/local.yaml` — read it first; defaults are `config/alveus.yaml` |
 | models (`ALVEUS_MODELS`) | `~/local/model/bonsai/Bonsai-27B-Q1_0.gguf`, `~/local/model/bonsai-ternary/Ternary-Bonsai-27B-PQ2_0.gguf` |
 | llama.cpp (PrismML fork, **prism** branch, relocatable build) | `~/local/lib/llama.cpp-bonsai/build/bin/llama-server` |
-| voice samples for cloning | `~/local/data/alveus-ai/voices/` (`tts.voices_dir`) |
+| voice samples for cloning | `~/local/repo/alveus-ai/voices/` (`tts.voices_dir`, git-ignored): `m_charles_demo.wav` plus six curated female voices (`f_*_ja`, `f_*_zh`) with `.txt` transcripts; sources and terms in `voices/SOURCES.md` |
+| Qwen3-TTS | own env `.venv-qwen3tts/` (venv on the alveus Python, transformers 4.57.3), weights `/mnt/data/models/tts/Qwen3-TTS-12Hz-1.7B-Base` (`tts.qwen3.weights_dir`) |
 | systemd user units | `~/.config/systemd/user/alveus-llm.service`, `alveus.service` (rendered from `systemd/*.in` by `scripts/install_services.sh`) |
 | logs | `journalctl --user -u alveus -f`, `logs/alveus.log` |
 | GUI + API | http://127.0.0.1:8765/ (served by the `alveus` service), API docs at `/docs`, handbook at `/handbook` |
 | LLM server | http://127.0.0.1:8080/v1 (OpenAI-compatible) |
+| API keys for cloud LLM profiles | `~/.config/alveus/secrets.env` (mode 600, outside the repo; `ALVEUS_SECRETS` overrides); GUI writes it via `PUT /secrets`, CLI `alveus llm key NAME` |
 | opencode config (coder tool) | `~/.config/opencode/opencode.jsonc`, provider `bonsai` |
 | ComfyUI (image generation, not yet wired to Alveus) | checkout `~/local/lib/ComfyUI`, conda env `comfy` (torch cu130), user unit `comfyui.service` on http://127.0.0.1:8188, `RequiresMountsFor=/mnt/data` |
 | ComfyUI models | `/mnt/data/comfy/models/{checkpoints,diffusion_models,text_encoders,vae,loras,controlnet,model_patches}` via `extra_model_paths.yaml`; `/mnt/data` is the NTFS "Data" drive (fstab by label, `ntfs3`, uid 1000) |
@@ -52,7 +55,10 @@ downloads on `/mnt/data`); device names (`nvmeXn1`) change between boots, so fst
 
 ## Current configuration (check `config/local.yaml`, it may have moved on)
 
-LLM profile `bonsai-ternary` (Ternary-Bonsai-27B, ~89 tok/s). STT faster-whisper large-v3-turbo,
+LLM profile `deepseek` (deepseek-v4-pro, disposable test key with ~$10 credit, chosen by the
+owner on 2026-11-07); the local `bonsai-ternary` (Ternary-Bonsai-27B, ~89 tok/s) is one click
+away. Profiles = provider + model (`alveus/llm/providers.py`); `claude` and `chatgpt` have no key
+yet, `qwen-local` has no weights. On a cloud profile the assistant keeps `alveus-llm` stopped. STT faster-whisper large-v3-turbo,
 language fixed to `en` unless the owner cleared it. TTS **Chatterbox multilingual** with the cloned
 sample `m_demo_charles.wav`; voice gender `auto` (inferred from the `m_`/`f_` file prefix) → the
 assistant currently calls itself Alveus. Activation: `mode: both` (names in the transcript plus the custom openWakeWord models
@@ -84,17 +90,55 @@ curl -s localhost:8765/health | python -m json.tool
 - Keep `config/local.yaml` intact: it holds the owner's choices. Change it via
   `alveus.config.patch_local_yaml()` or the GUI, not by hand-editing in bulk.
 
+## API keys: never look at them
+
+Cloud LLM keys live in `~/.config/alveus/secrets.env` (or the environment). The owner puts them
+there through the GUI or `alveus llm key` in their own terminal. A session working on Alveus must:
+
+- never read, print, grep, copy or summarize `~/.config/alveus/secrets.env`, nor run anything that
+  prints environments (`env`, `printenv`, `set`, `systemctl --user show-environment`,
+  `/proc/*/environ`, `ps e`) or request headers;
+- check whether a key is set only by its source: `alveus llm profiles`, `alveus doctor`,
+  `GET /secrets`, or `python -c "from alveus import credentials as c; print(c.source('NAME'))"`;
+- never ask the owner to paste a key into the chat, and never export a key in the shell running
+  the session (Claude Code itself reads `ANTHROPIC_API_KEY`);
+- use the key only by running Alveus (`alveus llm test --profile NAME`, `alveus chat --profile NAME`,
+  a test instance); outputs show replies and masked errors, not keys;
+- treat cloud requests as paid: say beforehand when a test makes more than a few requests. The
+  current test key is a disposable DeepSeek key with about $10 of credit (2026-11-07).
+
+If a key does show up in output anyway, stop, tell the owner to revoke it, and do not repeat it.
+
 ## Conventions
 
 - One backend per file under `alveus/llm|stt|tts/`, registered in that package's `__init__`
-  factory; heavy imports happen inside `load()`.
+  factory; heavy imports happen inside `load()`. LLM: one adapter per wire protocol
+  (`openai_chat`, `openai_responses`, `anthropic_messages`); providers are presets, not classes.
+  The history stays provider-neutral; provider-specific data rides in `_replay` (see `llm/base.py`).
+- API keys never go in YAML, never into `os.environ`, never into tool servers' environment
+  (`alveus/credentials.py`, `ToolHub.server_env`).
 - MCP servers: `from .common import FastMCP, annot, j, run`; return JSON strings; mark irreversible
   tools `annot(destructive=True)` — that is what triggers the spoken/GUI confirmation.
 - Config patch semantics (`alveus/config.py`): a `null` leaf stores an explicit null (e.g. language
   auto-detect); `{"$unset": true}` removes the machine override. The GUI relies on this.
-- GUI settings are declared in the `FIELDS` array in `alveus/web/index.html` (`when:` makes a field
-  depend on another; `nullable:` lets empty mean null; `t:'file'` is the voices picker). Write
-  field hints in plain language; the owner reads them and asks when they are vague.
+- GUI settings are declared in `SECTIONS` in `alveus/web/index.html`: a tree where `t:'choice'`
+  items show cards and render the chosen option's `branch[value]` (or `each(value)`) in a nested
+  panel; paths may use `{v}` for the chosen value, `fb:` lists inherited values. Model-specific
+  settings go under `<engine>.models.<model>` (resolved by `config.engine_opts`) or the LLM profile.
+  The language model is a custom block (`llmBlock`: provider → model → that profile's settings).
+  `h:` is one plain-language line, `more:` the details; the owner reads them and asks when vague.
+- Settings apply without a restart (`alveus/live.py`, `PUT /config` with `apply: true`). A component
+  that reads configuration only at start must be handled there (or get a `reconfigure(opts)` method
+  returning False when it needs a reload); otherwise list its prefix in `live.RESTART`.
+- The system prompt = `config/instructions.md` (directions and boundaries; `{personality}` slot) + the
+  chosen personality (`config/personalities/*.md`, the owner's own in `personalities/`), built by
+  `alveus/personality.py`. Rules go in the instructions, manner in a personality; shipped personality
+  files are never written by the GUI (edits become copies in `personalities/`).
+- The confirmation gate is in the agent (`Agent._execute`), not the model: tools marked destructive
+  always ask unless listed in `tools.no_confirm`. Silence is `{"ok": False, "reason": "no_answer"}`.
+- To test the GUI, run a text-only instance on port 8799 with `ALVEUS_LOCAL_CONFIG` pointing at a
+  copy of `local.yaml` and **`INVOCATION_ID` unset** (otherwise its "Save & restart" restarts the real
+  systemd services), and drive headless Chrome over DevTools; close each tab you open.
 - Docs are part of the deliverable: update `docs/*.md`, rebuild the handbook, commit.
 
 ## Traps already hit (details in docs/troubleshooting.md)
@@ -128,6 +172,17 @@ curl -s localhost:8765/health | python -m json.tool
 - The `alveus.service` unit must not block on the LLM; the GUI has to stay reachable to fix things.
 - uvicorn captures SIGTERM for itself, so `systemctl stop` used to hang until SIGKILL (90 s);
   `cli.talk` now owns the signal handlers and `serve()` disables uvicorn's. `TimeoutStopSec=15`.
+- `alveus/web/index.html` contains intentional NUL bytes (markdown placeholders), so `file` calls it
+  "data", plain `grep` skips it (use `grep -a`) and some editors choke; patch it byte-safely.
+- `google-chrome --headless --dump-dom` dumps before the GUI's async code runs (and
+  `--virtual-time-budget` hangs on the `/events` stream). To check the rendered GUI, drive headless
+  Chrome over the DevTools protocol (`--remote-debugging-port`, Node 22's built-in WebSocket,
+  `Runtime.evaluate` after a few seconds) against a text-only test instance on another port.
+- qwen-tts pins transformers 4.57 and breaks on 5.x (`check_model_inputs`): it runs only in its worker
+  process with `.venv-qwen3tts`; never install it into the alveus env. The root disk has ~12 GB free:
+  put model weights on `/mnt/data` (the Qwen weights are there).
+- The snap `ffmpeg` (`/snap/bin/ffmpeg`) cannot read `/tmp` (snap confinement: "No such file");
+  use the conda env's `~/miniconda3/envs/alveus/bin/ffmpeg`.
 - Anything that drains the speaker queue must keep the `None` end marker (`StreamSpeaker.abort`);
   dropping it hung every reply stopped after generation had finished. `/debug/tasks` finds such hangs.
 

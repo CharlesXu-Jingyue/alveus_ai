@@ -20,7 +20,7 @@ def test_normalize_history_exposes_reasoning():
 
 
 def test_payload_strips_private_keys():
-    llm = OpenAICompatLLM.__new__(OpenAICompatLLM)
-    llm.model, llm.temperature, llm.top_p, llm.max_tokens, llm.extra_body, llm.thinking = "m", 0.5, 1.0, 10, {}, None
-    body = llm._payload([{"role": "assistant", "content": "x", "_reasoning": "secret"}], None, None)
+    llm = OpenAICompatLLM({"name": "t", "model": "m", "base_url": "http://127.0.0.1:1/v1", "temperature": 0.5})
+    body = llm._payload([{"role": "assistant", "content": "x", "_reasoning": "secret",
+                          "_replay": {"anthropic": {"content": []}}}], None, None)
     assert body["messages"] == [{"role": "assistant", "content": "x"}]

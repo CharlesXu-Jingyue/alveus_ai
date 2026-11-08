@@ -57,6 +57,7 @@ header{display:flex;align-items:center;gap:14px;padding:0 18px;height:58px;borde
 .btn.danger{color:var(--danger);border-color:var(--danger)}
 .menu-wrap{position:relative}
 .menu{position:absolute;right:0;top:calc(100% + 6px);min-width:280px;background:var(--surface);border:1px solid var(--rule-2);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:6px;z-index:30;display:flex;flex-direction:column;gap:2px}
+[hidden]{display:none !important}   /* author display rules (.btn, .row, …) must never beat the hidden attribute */
 .menu[hidden]{display:none}
 .menu button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;border:0;background:none;border-radius:7px;padding:8px 10px;color:var(--ink);font:inherit}
 .menu button:hover{background:var(--rule)}
@@ -157,33 +158,76 @@ details.think .t{white-space:pre-wrap;border-left:2px solid var(--rule-2);paddin
 .snav .find{margin:0 0 8px}
 .snav .find input{width:100%;box-sizing:border-box;font:inherit;font-size:13.5px;padding:7px 10px;border:1px solid var(--rule-2);border-radius:8px;background:var(--surface);color:var(--ink)}
 .snav .find small{display:block;color:var(--muted);font-size:12px;padding:4px 2px 0}
-.field.nomatch{display:none}
 section.grp{margin:0 0 34px}
 section.grp h2{font-family:"Chakra Petch","IBM Plex Sans",sans-serif;font-size:20px;font-weight:700;letter-spacing:.01em;margin:0 0 4px;scroll-margin-top:20px}
 section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
 .card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
-.field{display:grid;grid-template-columns:minmax(180px,1fr) minmax(220px,1.4fr) 92px;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--rule)}
-.field:last-child{border-bottom:0}
-.field .lbl{font-weight:500}
-.field .lbl small{display:block;font-weight:400;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.4}
-.field .ctl input[type=text],.field .ctl input[type=number],.field .ctl select,.field .ctl textarea{width:100%;background:var(--bg);border:1px solid var(--rule-2);border-radius:8px;padding:7px 10px;font-size:14px}
 .multi{display:flex;flex-wrap:wrap;gap:6px 14px;padding:6px 0}
 .multi label{display:flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer}
 .multi input{accent-color:var(--accent)}
-.field .ctl textarea{min-height:64px;resize:vertical;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px}
-.field .ctl input:focus,.field .ctl select:focus,.field .ctl textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.field.dirty .ctl input,.field.dirty .ctl select,.field.dirty .ctl textarea{border-color:var(--warm)}
+/* settings rows: label + one-line hint on the left, control on the right */
+#form .nomatch{display:none}
+.row{display:grid;grid-template-columns:minmax(190px,1fr) minmax(240px,1.25fr);gap:6px 20px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--rule)}
+.card > :last-child, .branch > :last-child, .rowwrap > .row:last-child{border-bottom:0}
+.row .lbl b, .chead .lbl b{font-weight:500}
+.lbl small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.4}
+.lbl details{font-size:12.5px;color:var(--muted);margin-top:3px}
+.lbl summary{cursor:pointer;color:var(--accent-ink);font-size:12px;list-style:none;display:inline}
+.lbl summary::-webkit-details-marker{display:none}
+.lbl details[open] summary{display:none}
+.lbl details p{margin:0;line-height:1.45}
+.chg{margin-left:8px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;color:var(--accent-ink);white-space:nowrap}
+.chg button{border:0;background:none;color:inherit;text-decoration:underline;font:inherit;padding:0;cursor:pointer}
+.chg button:hover{color:var(--danger)}
+.ctl input[type=text],.ctl input[type=number],.ctl input[type=password],.ctl input[type=search],.ctl select{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--rule-2);border-radius:8px;padding:7px 10px;font-size:14px;color:var(--ink)}
+.ctl input:focus,.ctl select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.row.dirty .ctl input,.row.dirty .ctl select{border-color:var(--warm)}
+.ctl .inl{display:flex;gap:8px;align-items:center}
+.ctl .inl > input,.ctl .inl > select{flex:1;min-width:0}
+.ctl .sub{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.ctl .note-v{font-size:13px;overflow-wrap:anywhere}
+.ctl .note-v .bad,.hint-line.warn b{color:var(--danger)}
+.btn.play{min-width:34px;justify-content:center}
+/* choices: option cards, and the chosen option's own settings in a nested panel */
+.choice{padding:13px 16px;border-bottom:1px solid var(--rule)}
+.choice.dirty > .opts .opt.sel{border-color:var(--warm);box-shadow:0 0 0 2px color-mix(in srgb,var(--warm) 30%,transparent) inset}
+.chead{display:grid;grid-template-columns:minmax(190px,1fr) minmax(240px,1.25fr);gap:6px 20px;align-items:center;margin:0 0 10px}
+.chead:only-child{margin:0}
+.choice > .chead:not(:has(.ctl)){grid-template-columns:1fr}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:8px}
+.opt{text-align:left;border:1px solid var(--rule-2);background:var(--bg);border-radius:10px;padding:9px 11px 10px;display:flex;flex-direction:column;gap:3px;color:var(--ink);position:relative;cursor:pointer;font:inherit}
+.opt b{font-weight:600;font-size:14px;padding-right:44px}
+.opt small{color:var(--muted);font-size:12px;line-height:1.35}
+.opt:hover{border-color:var(--accent)}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent) inset}
+.opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.opt .ob{position:absolute;top:9px;right:10px;font-size:10.5px;color:var(--muted);font-family:"IBM Plex Mono",ui-monospace,monospace}
+.opt .ob.ok{color:var(--ok)}
+.opts.prov{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.opts.prov .opt{padding:8px 10px}
+.ogroup{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:12px 0 6px}
+.chead + .ogroup{margin-top:0}
+.branch{margin-top:12px;border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:10px;background:color-mix(in srgb,var(--surface) 55%,var(--bg))}
+.branch .bh{font-size:12px;font-weight:600;color:var(--accent-ink);padding:10px 16px 2px;letter-spacing:.02em}
+.branch .branch{background:var(--surface)}
+.branch > .row,.branch > .rowwrap > .row{padding:10px 16px}
+.branch > .choice{padding:12px 16px}
+.hint-line{font-size:12.5px;color:var(--muted);padding:6px 16px 0}
+.hint-line.warn{color:var(--warm)}
+.rowwrap{border-bottom:1px solid var(--rule)}
+.rowwrap > .row{border-bottom:0}
+.rowwrap > .branch{margin:0 16px 13px}
+@media (max-width:720px){ .row,.chead{grid-template-columns:1fr} .opts,.opts.prov{grid-template-columns:1fr 1fr} .opt b{padding-right:0} .opt .ob{position:static} .ctl .inl{flex-wrap:wrap} .ctl .inl > input[type=password]{flex-basis:100%} }
 .switch{position:relative;width:42px;height:24px;border-radius:12px;background:var(--rule-2);border:0;transition:background .15s}
 .switch[aria-checked="true"]{background:var(--accent)}
 .switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
 .switch[aria-checked="true"]::after{left:21px}
-.field .meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--muted);text-align:right;line-height:1.5}
-.field .meta .ov{color:var(--accent-ink)}
-.field .meta button{border:0;background:none;color:var(--muted);text-decoration:underline;font-size:11px;padding:0;font-family:inherit}
-.field .meta button:hover{color:var(--danger)}
-.field.restart-llm .lbl::after{content:"restarts LLM server";display:inline-block;margin-left:8px;font-size:10px;color:var(--warm);border:1px solid var(--warm);border-radius:4px;padding:0 4px;vertical-align:middle;font-weight:500;letter-spacing:.02em}
 .editor{background:var(--code-bg);border:1px solid var(--rule-2);border-radius:10px;width:100%;min-height:220px;padding:12px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;line-height:1.5;resize:vertical}
 .editor:focus{outline:none;border-color:var(--accent)}
+.pedit .ptext{padding:11px 16px}
+.pedit .ptext .lbl{margin-bottom:8px}
+.pedit .editor{min-height:170px;font-family:inherit;font-size:13.5px;line-height:1.55}
+.pedit .pbtns{display:flex;gap:8px;flex-wrap:wrap}
 .adv-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 0 0;font-size:13px;color:var(--muted);flex-wrap:wrap}
 .savebar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--rule);box-shadow:0 -6px 24px rgba(0,0,0,.06);transform:translateY(110%);transition:transform .2s ease}
 .savebar.show{transform:none}
@@ -200,7 +244,7 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
 .overlay .sub{color:#AEBDC1;font-size:14px;max-width:46ch}
 @media (max-width:760px){
   .settings{grid-template-columns:1fr} .snav{position:static;flex-direction:row;flex-wrap:wrap} .snav .note{display:none}
-  .field{grid-template-columns:1fr;gap:8px} .field .meta{text-align:left}
+  .row,.chead{grid-template-columns:1fr;gap:8px}
   header{gap:8px;padding:0 12px} .brand small,.llm{display:none}
 }
 </style>
@@ -260,7 +304,7 @@ section.grp .desc{color:var(--muted);font-size:13.5px;margin:0 0 14px}
 <div class="savebar" id="savebar"><div class="in">
   <div class="msg-s" id="saveMsg"><b>Unsaved changes</b><small>Saved settings are written to config/local.yaml. A restart applies them.</small></div>
   <button class="btn" id="discard">Discard</button>
-  <button class="btn primary" id="save">Save changes</button>
+  <button class="btn primary" id="save">Save &amp; restart</button>
   <button class="btn" id="restartA" hidden>Restart assistant</button>
   <button class="btn" id="restartB" hidden>Restart LLM + assistant</button>
 </div></div>
@@ -300,7 +344,7 @@ async function refreshHealth(){
     health = await j('/health');
     name = health.name; $('brandName').textContent = name; $('emptyName').textContent = name;
     $('brandSub').textContent = `${health.profile} · ${health.stt} · ${health.tts}`;
-    $('llm').className = 'llm' + (health.ok?' ok':''); $('llmText').textContent = health.ok ? 'LLM ready' : (health.llm_service && health.llm_service.active!=='active' ? 'LLM service '+health.llm_service.active : 'LLM down');
+    $('llm').className = 'llm' + (health.ok?' ok':''); $('llmText').textContent = health.ok ? (health.llm_remote ? 'LLM ready · cloud' : 'LLM ready') : (health.llm_service && health.llm_service.active!=='active' ? 'LLM service '+health.llm_service.active : 'LLM down');
     $('llmText').title = health.ok ? health.llm : (health.llm_service?.last_error || health.llm);
     $('toolCount').textContent = `${health.tools} tools`;
     if (health.tts_warning && !window._ttsWarned){ window._ttsWarned=true; toast(health.tts_warning, true); }
@@ -533,104 +577,218 @@ function showTab(t){ $('chat').classList.toggle('active', t==='chat'); $('settin
 $('tabChat').onclick=()=>showTab('chat'); $('tabSettings').onclick=()=>showTab('settings');
 
 // ---------- settings
-const FIELDS = [
- {g:'Assistant', d:'Who the assistant is and how it speaks to you.'},
- {p:'assistant.name', l:'Name', h:'The name it uses for itself with a male or neutral voice. Saying this name also wakes it.', t:'text'},
- {p:'assistant.female_name', l:'Female-voice name', h:'The name it uses for itself when the voice is female. Saying this name also wakes it.', t:'text'},
- {p:'assistant.user_name', l:'Your name', h:'How the assistant addresses you.', t:'text'},
- {p:'assistant.streaming_tts', l:'Speak while generating', h:'On: starts talking after the first sentence is ready. Off: waits for the whole reply, then speaks (fewer pauses, longer wait).', t:'bool'},
- {p:'assistant.max_history_turns', l:'Conversation memory (turns)', h:'How many of your recent requests it remembers within a session. More memory = longer context sent to the model each turn.', t:'number', min:1, max:200},
- {g:'Language model', d:'Which model thinks for the assistant, and how it generates text.'},
- {p:'llm.profile', l:'Model profile', h:'bonsai-1bit: smaller and faster. bonsai-ternary: better quality and tool use, more VRAM. Profiles are defined in config/alveus.yaml. Saving checks that the model file loads, then restarts the LLM server.', t:'select', o:'llm_profiles', restart:'llm'},
- {p:'llm.temperature', l:'Temperature', h:'Randomness of the wording. 0 = same answer every time, 0.7 = balanced (recommended), above 1 = more creative but less reliable with tools and facts.', t:'number', step:0.05, min:0, max:2},
- {p:'llm.max_tokens', l:'Max reply length (tokens)', h:'Upper limit per reply, including the model’s hidden reasoning. About 4 tokens per 3 words. Too low cuts answers off mid-thought.', t:'number', min:256, max:32768},
- {p:'llm.max_tool_rounds', l:'Max tool steps per request', h:'How many times it may call tools (files, web, system…) while working on one request before it must answer.', t:'number', min:1, max:50},
- {g:'Speech', d:'How it hears you and how it sounds.'},
- {p:'stt.backend', l:'Speech-to-text engine', h:'faster_whisper: accurate, many languages. parakeet: fastest, English and European languages. openai_http: use a separate transcription server instead.', t:'select', o:'stt_backends'},
- {p:'stt.faster_whisper.model', l:'Whisper model size', h:'Bigger = more accurate but slower and more VRAM. large-v3-turbo is the best balance on a GPU; small/base for weak machines.', t:'select', o:'whisper_models', when:{p:'stt.backend', v:['faster_whisper']}},
- {p:'stt.faster_whisper.language', l:'Spoken language', h:'Language you speak, as a two-letter code (en, de, zh, fr…). Leave empty to detect it automatically on every utterance (a little slower) — required if you want to talk to it in more than one language.', t:'text', nullable:true, when:{p:'stt.backend', v:['faster_whisper']}},
- {p:'stt.faster_whisper.compute_type', l:'Whisper precision', h:'float16 is standard on a GPU. int8_float16 uses about half the VRAM with slightly lower accuracy.', t:'text', when:{p:'stt.backend', v:['faster_whisper']}},
- {p:'stt.parakeet.model', l:'Parakeet model', h:'v3 understands 25 European languages; v2 is English-only and slightly faster.', t:'select', o:'parakeet_models', when:{p:'stt.backend', v:['parakeet']}},
- {p:'stt.openai_http.base_url', l:'Transcription server address', h:'Where the external speech-to-text server is, e.g. http://127.0.0.1:8001/v1 (whisper.cpp server, speaches, or a hosted API).', t:'text', when:{p:'stt.backend', v:['openai_http']}},
- {p:'stt.openai_http.model', l:'Transcription model name', h:'The model identifier that server expects in requests, e.g. whisper-1. It is passed through unchanged; check the server’s documentation.', t:'text', when:{p:'stt.backend', v:['openai_http']}},
- {p:'tts.backend', l:'Text-to-speech engine', h:'kokoro: fast, 28 preset voices. chatterbox: most natural, can clone a voice from a recording, needs more VRAM. openai_http: use a separate speech server instead.', t:'select', o:'tts_backends'},
- {p:'tts.voice_gender', l:'Voice gender', h:'Decides which name it calls itself: female → the female-voice name, otherwise the main name. auto reads it from the voice: Kokoro voice names (af_/bf_ = female, am_/bm_ = male), or for Chatterbox the cloned sample’s file name, which must start with f_ or m_ (e.g. m_charles_demo.wav). Otherwise set it here.', t:'select', o:'voice_genders'},
- {p:'tts.kokoro.voice', l:'Kokoro voice', h:'Prefix tells you the voice: af/am = American female/male, bf/bm = British female/male. Preview with: alveus tts say "hello".', t:'select', o:'kokoro_voices', when:{p:'tts.backend', v:['kokoro']}},
- {p:'tts.kokoro.speed', l:'Speaking speed', h:'1.0 = normal. 1.2 is brisk, 0.9 is relaxed.', t:'number', step:0.05, min:0.5, max:2, when:{p:'tts.backend', v:['kokoro']}},
- {p:'tts.chatterbox.model', l:'Chatterbox model', h:'turbo: English, fastest. standard: English, adds an expressiveness control. multilingual: 23 languages including Chinese, Japanese, Korean, German, French, Spanish; picks the language of each sentence automatically.', t:'select', o:'chatterbox_models', when:{p:'tts.backend', v:['chatterbox']}},
- {p:'tts.chatterbox.language', l:'Spoken output language', h:'auto: detect from each sentence (Chinese characters, kana, Cyrillic… are recognised directly; Latin-script text is identified statistically). Or fix one language code, e.g. zh.', t:'select', o:'chatterbox_languages', when:{p:'tts.chatterbox.model', v:['multilingual']}},
- {p:'tts.chatterbox.fallback_language', l:'Fallback language', h:'Used when a sentence is too short or ambiguous to identify (numbers, names, single words).', t:'select', o:'chatterbox_languages', when:{p:'tts.chatterbox.model', v:['multilingual']}},
- {p:'tts.voices_dir', l:'Voices folder', h:'Folder with WAV recordings for voice cloning. Differs per machine; the picker below lists what it finds there. Create the folder and drop 5–15 s recordings in it, named f_… or m_….', t:'text', when:{p:'tts.backend', v:['chatterbox']}},
- {p:'tts.chatterbox.voice_ref', l:'Voice sample to clone', h:'Chatterbox has no preset voices; to change the voice, give it a clean 5–15 second WAV recording of the speaker to imitate. Choices are the files in the voices folder above; name them f_… or m_… (e.g. m_demo_charles.wav) so the voice gender — and the name it uses — is picked up automatically. Choose “built-in voice” for none.', t:'file', o:'voice_samples', nullable:true, when:{p:'tts.backend', v:['chatterbox']}},
- {p:'tts.chatterbox.exaggeration', l:'Expressiveness', h:'0 = flat, 0.5 = natural, 1 = dramatic. Standard and multilingual models.', t:'number', step:0.05, min:0, max:1, when:{p:'tts.chatterbox.model', v:['standard','multilingual']}},
- {p:'tts.openai_http.base_url', l:'Speech server address', h:'Where the external text-to-speech server is, e.g. http://127.0.0.1:8880/v1 for Kokoro-FastAPI.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
- {p:'tts.openai_http.model', l:'Speech model name', h:'The model identifier that server expects in requests, e.g. kokoro or tts-1. Passed through unchanged.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
- {p:'tts.openai_http.voice', l:'Voice name', h:'A voice that server offers, e.g. af_heart on Kokoro-FastAPI.', t:'text', when:{p:'tts.backend', v:['openai_http']}},
- {g:'Activation', d:'How you get its attention.'},
- {p:'activation.wake_word.mode', l:'Wake mode', h:'names: say one of its names in your sentence (“Aurea, what time is it?”), no training needed. oww: a trained wake-word model listens for a fixed phrase, reacts faster. both: either works.', t:'select', o:'activation_modes'},
- {p:'activation.wake_word.names', l:'Names', h:'Words that count as addressing the assistant. Comma-separated.', t:'list'},
- {p:'activation.wake_word.name_aliases', l:'Name aliases', h:'Ways the speech recognizer tends to misspell the names (e.g. “Aria” for Aurea). Also accepted as a wake name. Comma-separated.', t:'list'},
- {p:'activation.wake_word.oww_model', l:'Wake-word models', h:'The phrases the wake-word models listen for; tick several to listen for all of them at once (e.g. alveus and aurea). Built-in: hey_jarvis, alexa, hey_mycroft… Custom models trained with scripts/train_wakeword.sh appear here too. Only used in oww or both mode.', t:'multi', o:'oww_models', when:{p:'activation.wake_word.mode', v:['oww','both']}},
- {p:'activation.wake_word.threshold', l:'Wake-word sensitivity threshold', h:'How sure the wake-word model must be before it triggers, from 0 to 1. Lower = wakes more easily but more false alarms; higher = you may need to repeat yourself. 0.5 is a good start; tune with: alveus wakeword-test.', t:'number', step:0.05, min:0.1, max:0.95, when:{p:'activation.wake_word.mode', v:['oww','both']}},
- {p:'activation.wake_word.follow_up_window_s', l:'Follow-up window (seconds)', h:'After it answers, you can keep talking without saying its name for this long. 0 turns the feature off.', t:'number', min:0, max:60},
- {p:'activation.hotkey.enabled', l:'Keyboard shortcut', h:'A global key combination that makes it listen, like pressing a talk button.', t:'bool'},
- {p:'activation.hotkey.combo', l:'Shortcut keys', h:'Written in pynput style: <ctrl>+<alt>+<space>, <ctrl>+<shift>+a, <cmd>+<space>.', t:'text', when:{p:'activation.hotkey.enabled', v:[true]}},
- {p:'activation.hotkey.mode', l:'Shortcut behaviour', h:'toggle: press once to start listening, it stops when you pause. hold: listens only while the keys are held down.', t:'select', o:'hotkey_modes', when:{p:'activation.hotkey.enabled', v:[true]}},
- {g:'Audio', d:'Microphone, speaker, and how it decides you have finished talking.'},
- {p:'audio.backend', l:'Audio system', h:'auto picks PipeWire when available (normal on modern Linux desktops); sounddevice is the fallback for other systems.', t:'select', o:'audio_backends'},
- {p:'audio.input_device', l:'Microphone', h:'Which microphone to use. Empty = the system default. Otherwise a PipeWire device name from “wpctl status”.', t:'text', nullable:true},
- {p:'audio.output_device', l:'Speaker', h:'Which output to use. Empty = the system default.', t:'text', nullable:true},
- {p:'audio.vad.end_silence_ms', l:'Pause that ends your sentence (ms)', h:'How long you must stay silent before it answers. Shorter = snappier but may cut you off mid-sentence; longer = more patient. 700 is a good default.', t:'number', min:200, max:3000, step:50},
- {p:'audio.vad.threshold', l:'Voice detection sensitivity', h:'How clearly a sound must be speech to count, from 0 to 1. Lower = picks up quieter or farther voices but also more background noise.', t:'number', step:0.05, min:0.1, max:0.95},
- {p:'audio.chimes', l:'Listening chime', h:'Play a short two-tone chime when it starts listening for your request.', t:'bool'},
- {p:'audio.barge_in', l:'Allow interrupting it', h:'While it is thinking or speaking, the keyboard shortcut, the Listen button (and the wake-word model, if enabled) cut the reply off — generation and speech — so you can talk.', t:'bool'},
- {g:'Tools & safety', d:'What the assistant is allowed to do on this computer.'},
- {p:'tools.confirm_destructive', l:'Ask before risky actions', h:'Before deleting or moving files, killing processes, changing services, shutting down, or running dangerous shell commands, it describes the action and waits for your yes. Strongly recommended.', t:'bool'},
- {p:'tools.servers.files.env.ALVEUS_FS_ROOTS', l:'Folders it may access', h:'The file and shell tools can only read, write, and run commands inside these folders. Separate several with a colon, e.g. ~:/data.', t:'text'},
- {p:'tools.servers.desktop.enabled', l:'Desktop tools', h:'Let it operate the desktop: open apps and files, manage windows, type and press keys, set volume, control music, use the clipboard, take screenshots, show notifications, toggle dark mode and Do Not Disturb, lock the screen.', t:'bool'},
- {p:'tools.servers.web.enabled', l:'Web tools', h:'Let it search the web, read web pages, and check the weather. These are the only tools that send anything over the internet.', t:'bool'},
- {p:'tools.servers.coder.enabled', l:'Coding tool (opencode)', h:'Let it hand programming tasks to the opencode agent, which can read, edit, and run code in a project folder you name.', t:'bool'},
- {p:'tools.servers.coder.env.ALVEUS_OPENCODE_MODEL', l:'Coding model', h:'Which model opencode uses for the delegated coding work. auto: the same local Bonsai model the assistant runs, so it follows the model profile above. opencode-default: whatever you set as default in opencode itself. Or pick any model opencode is signed in to (e.g. deepseek/deepseek-v4-flash) — cloud models are stronger at long coding tasks, but the task text and the project files then leave this computer.', t:'combo', o:'opencode_models', when:{p:'tools.servers.coder.enabled', v:[true]}},
- {p:'tools.servers.coder.env.ALVEUS_CODE_DIR', l:'Default coding folder', h:'The project folder opencode works in when you do not name one in your request, e.g. ~/projects/scratch.', t:'text', when:{p:'tools.servers.coder.enabled', v:[true]}},
- {p:'logging.level', l:'Log detail', h:'How much is written to the log (journalctl / logs/alveus.log). WARNING: problems only. INFO: normal activity such as what it heard and which tools it used. DEBUG: everything, including speech it ignored — use when troubleshooting.', t:'select', o:'log_levels'},
-];
-let cfg=null, dirty={}, persona='', personaDirty=false, yamlDirty=false;
-const UNSET = {"$unset": true};   // remove the machine override so the default applies again
+// The form is a tree. A choice (engine, model, provider, mode) shows its options as cards; the chosen
+// option's own settings appear in a nested panel right below it, and so on down: engine > model >
+// that model's settings. Settings that belong to one model are stored under that model
+// (tts.chatterbox.models.<model>.…, stt.faster_whisper.models.<model>.…, llm.profiles.<profile>.…),
+// so switching away and back keeps them. Item paths may contain {v}: the value of the enclosing choice.
+const UNSET = {"$unset": true};   // remove the machine override so the inherited value applies again
 const isUnset = v => v && typeof v==='object' && v.$unset===true;
 const get = (o,p) => p.split('.').reduce((a,k)=> (a && a[k]!==undefined) ? a[k] : undefined, o);
-// value as it will be after saving: pending edit wins over the effective config
+const same = (a,b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+let cfg=null, dirty={}, instructions='', instrDirty=false, yamlDirty=false, searchQuery='';
+let pers={items:[], active:null, default:'calm'}, persEdits={};   // personalities, and unsaved edits by id
+let newProfiles={}, llmUI=null, modelLists={}, devices=null, voiceFiles={}, voiceTexts={}, restartKind=null, prevProfile=null;
+// value as it will be after saving: pending edit wins over the saved configuration
 const current = p => (p in dirty) ? (isUnset(dirty[p]) ? get(cfg.defaults||{}, p) : dirty[p]) : get(cfg.effective, p);
-let _voicesTimer=null;
-function refreshVoices(dir){
-  clearTimeout(_voicesTimer);
-  _voicesTimer = setTimeout(async () => {
-    try{ const r = await j('/voices?dir='+encodeURIComponent(dir||'')); const sel=document.querySelector('.field[data-path="tts.chatterbox.voice_ref"] select'); if (sel && sel._fill) sel._fill(r.files);
-      if (dir && !r.exists) toast('Voices folder not found: '+dir, true); }catch(e){}
-  }, 400);
+const tpl = (s, scope) => typeof s==='string' ? s.replace(/\{(\w+)\}/g, (_,k) => scope[k] ?? '') : s;
+function valueOf(F){
+  let v = current(F.p);
+  if (v===undefined) for (const q of F.fb||[]){ const w = typeof q==='function' ? q() : current(q); if (w!==undefined){ v=w; break; } }
+  return v;
 }
-function refreshVisibility(){
-  for (const f of FIELDS){ if(!f.when) continue; const row=document.querySelector(`.field[data-path="${f.p}"]`); if(!row) continue;
-    const v = current(f.when.p); row.hidden = !f.when.v.some(x => String(x)===String(v)); }
-  if (searchQuery) applySearch();
+function inheritedOf(F){   // what applies once this machine's own value is removed
+  let v = get(cfg.defaults||{}, F.p);
+  if (v===undefined) for (const q of F.fb||[]){ const w = typeof q==='function' ? q() : current(q); if (w!==undefined){ v=w; break; } }
+  return v;
 }
-function fmt(v){ if(v===undefined) return '—'; if(v===null) return 'empty'; if(Array.isArray(v)) return v.join(', '); return String(v); }
+function fmt(v){ if(v===undefined) return '—'; if(v===null) return 'empty / automatic'; if(Array.isArray(v)) return v.join(', '); return String(v); }
 
+const LANGS = {en:'English', zh:'Chinese', de:'German', es:'Spanish', fr:'French', it:'Italian', ja:'Japanese', ko:'Korean',
+  pt:'Portuguese', ru:'Russian', nl:'Dutch', pl:'Polish', sv:'Swedish', da:'Danish', no:'Norwegian', fi:'Finnish', tr:'Turkish',
+  ar:'Arabic', he:'Hebrew', hi:'Hindi', el:'Greek', ms:'Malay', sw:'Swahili', cs:'Czech', uk:'Ukrainian', ro:'Romanian',
+  hu:'Hungarian', vi:'Vietnamese', th:'Thai', id:'Indonesian', ca:'Catalan', fa:'Persian', bg:'Bulgarian', hr:'Croatian', sk:'Slovak'};
+const langOpts = (codes, autoLabel) => [{v:null, l:autoLabel}, ...codes.filter(c => c!=='auto').map(c => ({v:c, l:`${LANGS[c]||c} (${c})`})).sort((a,b)=>a.l.localeCompare(b.l))];
+const kokoroLabel = v => { const accent = {a:'American', b:'British'}[v[0]] || v[0]; const g = {f:'female', m:'male'}[v[1]] || '';
+  const n = v.slice(3); return `${n.charAt(0).toUpperCase()+n.slice(1)} — ${accent} English, ${g}`; };
+const genderAuto = (voice, engine) => { const s = String(voice||'').split('/').pop().toLowerCase();
+  if (engine==='chatterbox') return s.startsWith('f_') ? 'female (f_ file)' : s ? 'male (not an f_ file)' : 'male (built-in voice)';
+  return /^[a-z]f_/.test(s) ? 'female (voice name)' : /^[a-z]m_/.test(s) ? 'male (voice name)' : 'male'; };
+const GENDERS = (engine, voice) => [{v:'auto', l:`automatic → ${genderAuto(voice(), engine)}`}, {v:'female', l:'female'}, {v:'male', l:'male'}];
+
+// ---- what the form shows. t: text | number | bool | select | multi | list | combo | lang | voice | sample |
+// device | hotkey | note | choice | llm. h = one line, more = details on demand, fb = inherited values.
+const SPEAK_MODELS = {turbo:'Turbo', standard:'Standard', multilingual:'Multilingual'};
+const chatterboxModel = m => [
+  {t:'sample', p:`tts.chatterbox.models.${m}.voice_ref`, fb:['tts.chatterbox.voice_ref'], l:'Voice to copy',
+   h:'A 5–15 s recording of the voice it should sound like, from the voices folder. ▶ plays the recording.',
+   more:'Chatterbox has no preset voices: it imitates the recording you pick. Use a clean recording of one speaker without music. Name files f_… or m_… (e.g. m_charles_demo.wav) so the voice gender, and with it the name the assistant uses, is picked up automatically. “Built-in voice” uses Chatterbox’s own default voice.'},
+  {t:'select', p:`tts.chatterbox.models.${m}.voice_gender`, fb:['tts.chatterbox.voice_gender','tts.voice_gender'], l:'Voice gender',
+   h:'Decides which of its names it uses (female voice → the female-voice name).', o: () => GENDERS('chatterbox', () => valueOf({p:`tts.chatterbox.models.${m}.voice_ref`, fb:['tts.chatterbox.voice_ref']}))},
+  ...(m==='multilingual' ? [
+    {t:'lang', p:`tts.chatterbox.models.${m}.language`, fb:['tts.chatterbox.language'], l:'Spoken language', codes:'chatterbox_languages', auto:'automatic, per sentence', autoValue:'auto',
+     h:'Automatic speaks each sentence in its own language; or fix one.', more:'Chinese characters, kana, Cyrillic and other scripts are recognised directly; Latin-script text is identified statistically.'},
+    {t:'lang', p:`tts.chatterbox.models.${m}.fallback_language`, fb:['tts.chatterbox.fallback_language'], l:'Fallback language', codes:'chatterbox_languages',
+     h:'For sentences too short to identify (numbers, names, single words).'}] : []),
+  ...(m!=='turbo' ? [
+    {t:'number', p:`tts.chatterbox.models.${m}.exaggeration`, fb:['tts.chatterbox.exaggeration'], l:'Expressiveness', step:0.05, min:0, max:1, h:'0 = flat, 0.5 = natural, 1 = dramatic.'},
+    {t:'number', p:`tts.chatterbox.models.${m}.cfg_weight`, fb:['tts.chatterbox.cfg_weight'], l:'Pacing', step:0.05, min:0, max:1,
+     h:'Lower = slower, more deliberate delivery; 0.5 is the default.'}] : []),
+];
+const QWEN_MODELS = {'1_7b':'1.7B', '0_6b':'0.6B'};
+const qwen3Model = m => [
+  {t:'sample', p:`tts.qwen3.models.${m}.voice_ref`, fb:['tts.qwen3.voice_ref'], l:'Voice to copy', none:'none chosen: the first recording in the folder',
+   h:'A 5–15 s recording from the voices folder. ▶ plays it.',
+   more:'Qwen3-TTS has no voice of its own: it copies the recording you pick, in any of its 10 languages. Name files f_… or m_… so the voice gender, and with it the name the assistant uses, is picked up automatically.'},
+  {t:'words', of:`tts.qwen3.models.${m}.voice_ref`, offb:['tts.qwen3.voice_ref'], l:'Its words', h:'What the recording says, in NAME.txt beside it.',
+   more:'With the words, sentences in the recording’s own language are spoken by continuing the recording: the closest copy. Sentences in other languages copy only the timbre (that keeps the voice better across languages), and so does a recording without its words.'},
+  {t:'select', p:`tts.qwen3.models.${m}.voice_gender`, fb:['tts.qwen3.voice_gender','tts.voice_gender'], l:'Voice gender',
+   h:'Decides which of its names it uses (female voice → the female-voice name).', o: () => GENDERS('chatterbox', () => valueOf({p:`tts.qwen3.models.${m}.voice_ref`, fb:['tts.qwen3.voice_ref']}) || firstSample())},
+  {t:'lang', p:`tts.qwen3.models.${m}.language`, fb:['tts.qwen3.language'], l:'Spoken language', codes:'qwen3_languages', auto:'automatic, per sentence', autoValue:'auto',
+   h:'Automatic speaks each sentence in its own language; or fix one.'},
+  {t:'lang', p:`tts.qwen3.models.${m}.fallback_language`, fb:['tts.qwen3.fallback_language'], l:'Fallback language', codes:'qwen3_languages',
+   h:'For sentences too short to identify (numbers, names, single words).'},
+  {t:'number', p:`tts.qwen3.models.${m}.temperature`, fb:['tts.qwen3.temperature'], l:'Variation', step:0.05, min:0.3, max:1.3,
+   h:'Lower = steadier and flatter, higher = livelier but less predictable; 0.9 is the default.'},
+];
+const WHISPER = [
+  {v:'large-v3-turbo', l:'large-v3-turbo', d:'best balance (recommended)'}, {v:'large-v3', l:'large-v3', d:'most accurate, slower'},
+  {v:'distil-large-v3', l:'distil-large-v3', d:'English only, fast'}, {v:'medium', l:'medium', d:'smaller and faster'},
+  {v:'small', l:'small', d:'for weak GPUs or the CPU'}, {v:'base', l:'base', d:'smallest; lowest accuracy'}];
+const SECTIONS = [
+ {id:'assistant', title:'Assistant', desc:'Who the assistant is and how it talks to you.', items:[
+  {t:'text', p:'assistant.name', l:'Name', h:'Its name with a male or neutral voice. Saying it wakes the assistant.'},
+  {t:'text', p:'assistant.female_name', l:'Female-voice name', h:'Its name when the voice is female. Saying it wakes the assistant too.'},
+  {t:'text', p:'assistant.user_name', l:'Your name', h:'How it addresses you.'},
+  {t:'choice', p:'assistant.personality', l:'Personality', h:'How it sounds: tone, word choice, humour. What it does and may do stays the same.',
+   more:'What it may do, how replies are shaped, tools and confirmations are its instructions (under Advanced); they hold for every personality. Edit a personality’s words below. Editing one that comes with Alveus saves your own copy; “Restore original” brings back the shipped words. “Save as new” keeps the words as another personality to choose.',
+   opts: () => pers.items.map(P => ({v:P.id, l:P.label, d:P.description || (P.shipped ? '' : 'your own')})),
+   each: id => [{t:'persona', id}], panel: id => { const P=persById(id); return P ? `${P.label}: its words` : 'Personality'; }},
+  {t:'bool', p:'assistant.streaming_tts', l:'Speak while generating', h:'Starts talking after the first sentence instead of waiting for the whole reply.'},
+  {t:'number', p:'assistant.max_history_turns', l:'Conversation memory (turns)', min:1, max:200, h:'How many of your recent requests it keeps in mind.',
+   more:'More memory means a longer context sent to the model on every turn: slower on local models, more tokens on cloud models.'},
+ ]},
+ {id:'llm', title:'Language model', desc:'The model that understands you, decides which tools to use, and writes the replies.', items:[
+  {t:'llm'},
+  {t:'number', p:'llm.max_tool_rounds', l:'Max tool steps per request', min:1, max:50, h:'For every model: how many tool calls it may make on one request before it must answer.'},
+ ]},
+ {id:'stt', title:'Listening', desc:'How your speech becomes text.', items:[
+  {t:'choice', p:'stt.backend', l:'Speech recognition', h:'The engine that writes down what you say.', opts:[
+    {v:'faster_whisper', l:'Whisper', d:'Accurate, about 100 languages'},
+    {v:'parakeet', l:'Parakeet', d:'Fastest; English and 25 European languages'},
+    {v:'openai_http', l:'Other server', d:'A transcription server you run'}], branch:{
+   faster_whisper:[
+    {t:'choice', style:'select', p:'stt.faster_whisper.model', l:'Model size', h:'Bigger = more accurate, slower, more VRAM.', opts:WHISPER, each: m => [
+      {t:'select', p:`stt.faster_whisper.models.${m}.compute_type`, fb:['stt.faster_whisper.compute_type'], l:'Precision',
+       h:'float16 is standard on a GPU; int8_float16 halves the VRAM with slightly lower accuracy.',
+       o:[{v:'float16', l:'float16'}, {v:'int8_float16', l:'int8_float16 (less VRAM)'}, {v:'int8', l:'int8 (CPU)'}]}], panel: v => `Only for ${v}`},
+    {t:'lang', p:'stt.faster_whisper.language', l:'Your language', auto:'detect automatically', codes:Object.keys(LANGS),
+     h:'Detect automatically lets you switch languages freely; a fixed language is a little faster and more reliable.'}],
+   parakeet:[
+    {t:'choice', p:'stt.parakeet.model', l:'Model', opts:[
+      {v:'nemo-parakeet-tdt-0.6b-v3', l:'TDT v3', d:'25 European languages'},
+      {v:'nemo-parakeet-tdt-0.6b-v2', l:'TDT v2', d:'English only, slightly faster'},
+      {v:'nemo-parakeet-ctc-0.6b', l:'CTC', d:'English only, simplest'}]}],
+   openai_http:[
+    {t:'text', p:'stt.openai_http.base_url', l:'Server address', h:'e.g. http://127.0.0.1:8001/v1 (whisper.cpp server, speaches).'},
+    {t:'text', p:'stt.openai_http.model', l:'Model name', h:'The model id that server expects, e.g. whisper-1.'},
+    {t:'lang', p:'stt.openai_http.language', l:'Your language', auto:'detect automatically', codes:Object.keys(LANGS)}]}},
+  {t:'select', p:'stt.device', l:'Run on', h:'GPU is far faster; CPU frees VRAM.', o:[{v:'cuda', l:'GPU (cuda)'}, {v:'cpu', l:'CPU'}]},
+ ]},
+ {id:'tts', title:'Voice', desc:'How the assistant sounds.', items:[
+  {t:'choice', p:'tts.backend', l:'Voice engine', h:'The engine that speaks the replies.', opts:[
+    {v:'kokoro', l:'Kokoro', d:'Fast; 28 built-in English voices'},
+    {v:'chatterbox', l:'Chatterbox', d:'Most natural; copies a voice from a recording; more VRAM'},
+    {v:'qwen3', l:'Qwen3-TTS', d:'Copies a voice; 10 languages incl. Chinese and Japanese; about 4 GB VRAM'},
+    {v:'openai_http', l:'Other server', d:'A speech server you run'}], branch:{
+   kokoro:[
+    {t:'voice', p:'tts.kokoro.voice', l:'Voice', h:'▶ speaks a sample sentence on the speaker (while Kokoro is running).'},
+    {t:'select', p:'tts.kokoro.voice_gender', fb:['tts.voice_gender'], l:'Voice gender', h:'Decides which of its names it uses.',
+     o: () => GENDERS('kokoro', () => current('tts.kokoro.voice'))},
+    {t:'number', p:'tts.kokoro.speed', l:'Speaking speed', step:0.05, min:0.5, max:2, h:'1.0 = normal, 1.2 brisk, 0.9 relaxed.'}],
+   chatterbox:[
+    {t:'text', p:'tts.chatterbox.voices_dir', fb:['tts.voices_dir'], l:'Voices folder', kind:'voicesdir',
+     h:'Folder with the recordings to copy; shared by all Chatterbox models.', more:'Create the folder and drop 5–15 s WAV recordings in it, named f_… or m_…. The voice choice below lists what it finds.'},
+    {t:'choice', p:'tts.chatterbox.model', l:'Model', h:'Each model keeps its own voice and settings.', opts:[
+      {v:'turbo', l:'Turbo', d:'English, fastest'}, {v:'standard', l:'Standard', d:'English, adjustable expressiveness'},
+      {v:'multilingual', l:'Multilingual', d:'23 languages, chosen per sentence'}], each: chatterboxModel, panel: v => `${SPEAK_MODELS[v]||v} settings (only for this model)`}],
+   qwen3:[
+    {t:'text', p:'tts.qwen3.voices_dir', fb:['tts.voices_dir'], l:'Voices folder', kind:'voicesdir',
+     h:'Folder with the recordings to copy; the same as Chatterbox’s unless set here.', more:'Drop 5–15 s recordings of one speaker without music in it, named f_… or m_…, each with its words in a .txt file of the same name if you have them (“Write it down” below makes one).'},
+    {t:'choice', p:'tts.qwen3.model', l:'Model', h:'Each model keeps its own voice and settings.', opts:[
+      {v:'1_7b', l:'1.7B', d:'Best quality; about 4 GB VRAM'}, {v:'0_6b', l:'0.6B', d:'Faster and lighter; 2.5 GB download on first use'}],
+     each: qwen3Model, panel: v => `${QWEN_MODELS[v]||v} settings (only for this model)`},
+    {t:'text', p:'tts.qwen3.weights_dir', l:'Model folder', nullable:true, h:'Where the model weights are kept; a missing model is downloaded there. Empty = the Hugging Face cache.'},
+    {t:'text', p:'tts.qwen3.python', l:'Its Python environment', h:'Qwen3-TTS runs in its own small environment (scripts/install_qwen3_tts.sh).',
+     more:'qwen-tts needs an older transformers than the rest of Alveus, so it runs as a separate worker process with this Python. Choosing another engine ends the worker and frees its memory.'}],
+   openai_http:[
+    {t:'text', p:'tts.openai_http.base_url', l:'Server address', h:'e.g. http://127.0.0.1:8880/v1 for Kokoro-FastAPI.'},
+    {t:'text', p:'tts.openai_http.model', l:'Model name', h:'e.g. kokoro or tts-1, as the server expects.'},
+    {t:'text', p:'tts.openai_http.voice', l:'Voice name', h:'A voice that server offers, e.g. af_heart.'},
+    {t:'select', p:'tts.openai_http.voice_gender', fb:['tts.voice_gender'], l:'Voice gender', h:'Decides which of its names it uses.',
+     o: () => GENDERS('openai_http', () => current('tts.openai_http.voice'))}]}},
+  {t:'select', p:'tts.device', l:'Run on', h:'GPU is far faster; CPU frees VRAM.', o:[{v:'cuda', l:'GPU (cuda)'}, {v:'cpu', l:'CPU'}]},
+ ]},
+ {id:'activation', title:'Activation', desc:'How you get its attention.', items:[
+  {t:'choice', p:'activation.wake_word.mode', l:'Wake up by', opts:[
+    {v:'names', l:'Its name', d:'“Aurea, what time is it?” No training needed'},
+    {v:'oww', l:'Wake-word model', d:'A trained phrase; reacts fastest'},
+    {v:'both', l:'Either', d:'Name or wake-word model'}], panel: v => ({names:'Names', oww:'Wake-word models', both:'Names and wake-word models'})[v], branch:{
+   names: [{t:'list', p:'activation.wake_word.names', l:'Names', h:'Words that count as addressing it. Comma-separated.'},
+           {t:'list', p:'activation.wake_word.name_aliases', l:'Misheard spellings', h:'How speech recognition tends to write the names (e.g. “Aria”). Also accepted.'}],
+   oww:   [{t:'multi', p:'activation.wake_word.oww_model', o:'oww_models', l:'Wake-word models', h:'Tick several to listen for all of them.', more:'Built-in: hey_jarvis, alexa, hey_mycroft… Custom models trained with scripts/train_wakeword.sh appear here too.'},
+           {t:'number', p:'activation.wake_word.threshold', l:'Sensitivity threshold', step:0.05, min:0.1, max:0.95, h:'Lower wakes more easily but falsely more often; tune with alveus wakeword-test.'}],
+   both:  [{t:'list', p:'activation.wake_word.names', l:'Names', h:'Words that count as addressing it. Comma-separated.'},
+           {t:'list', p:'activation.wake_word.name_aliases', l:'Misheard spellings', h:'How speech recognition tends to write the names.'},
+           {t:'multi', p:'activation.wake_word.oww_model', o:'oww_models', l:'Wake-word models', h:'Tick several to listen for all of them.'},
+           {t:'number', p:'activation.wake_word.threshold', l:'Sensitivity threshold', step:0.05, min:0.1, max:0.95, h:'Lower wakes more easily but falsely more often.'}]}},
+  {t:'number', p:'activation.wake_word.follow_up_window_s', l:'Follow-up window (s)', min:0, max:60, h:'After it answers you can keep talking without its name this long. 0 = off.'},
+  {t:'number', p:'activation.confirm_wait_s', l:'Time to answer a question (s)', min:3, max:60, h:'How long it waits for your yes or no before a risky action. Silence means “not now”.'},
+  {t:'bool', p:'activation.hotkey.enabled', l:'Keyboard shortcut', h:'A global key combination works like a talk button.', on:[
+    {t:'hotkey', p:'activation.hotkey.combo', l:'Keys', h:'Click Record, then press the combination.'},
+    {t:'select', p:'activation.hotkey.mode', l:'Behaviour', o:[{v:'toggle', l:'press once; it stops when you pause'}, {v:'hold', l:'listen while the keys are held'}]}]},
+ ]},
+ {id:'audio', title:'Audio', desc:'Microphone, speaker, and when it decides you have finished.', items:[
+  {t:'device', p:'audio.input_device', kind:'sources', l:'Microphone', h:'System default follows your desktop’s sound settings.'},
+  {t:'device', p:'audio.output_device', kind:'sinks', l:'Speaker', h:'System default follows your desktop’s sound settings.'},
+  {t:'number', p:'audio.vad.end_silence_ms', l:'Pause that ends your sentence (ms)', min:200, max:3000, step:50, h:'Shorter is snappier but may cut you off; 700 is a good default.'},
+  {t:'number', p:'audio.vad.threshold', l:'Voice detection sensitivity', step:0.05, min:0.1, max:0.95, h:'Lower picks up quieter voices, and more background noise.'},
+  {t:'bool', p:'audio.chimes', l:'Listening chime', h:'A short chime when it starts listening.'},
+  {t:'bool', p:'audio.barge_in', l:'Allow interrupting it', h:'The shortcut, the Listen button or the wake word cut a reply off.'},
+  {t:'select', p:'audio.backend', l:'Audio system', h:'Automatic picks PipeWire on modern Linux desktops.', o:[{v:'auto', l:'automatic'}, {v:'pipewire', l:'PipeWire'}, {v:'sounddevice', l:'sounddevice (PortAudio)'}]},
+ ]},
+ {id:'tools', title:'Tools & safety', desc:'What the assistant may do on this computer.', items:[
+  {t:'bool', p:'tools.confirm_destructive', l:'Ask before risky actions', h:'Deleting, killing processes, shutting down… wait for your yes. Strongly recommended.', on:[
+    {t:'multi', p:'tools.no_confirm', o:'destructive_tools', l:'Don’t ask for these', h:'Actions you trust it to do without the question.',
+     more:'Each is still a deliberate choice by the model. Shell commands that look risky (rm, kill, shutdown…) and anything with sudo always ask, whatever is ticked here.'}]},
+  {t:'text', p:'tools.servers.files.env.ALVEUS_FS_ROOTS', l:'Folders it may access', h:'Files and shell tools stay inside these. Separate several with a colon, e.g. ~:/data.'},
+  {t:'bool', p:'tools.servers.desktop.enabled', l:'Desktop tools', h:'Open apps and files, manage windows, type, volume, music, clipboard, screenshots.'},
+  {t:'bool', p:'tools.servers.web.enabled', l:'Web tools', h:'Search the web, read pages, weather. The only tools that go online.'},
+  {t:'bool', p:'tools.servers.coder.enabled', l:'Coding tool (opencode)', h:'Hand programming tasks to opencode in a project folder.', on:[
+    {t:'combo', p:'tools.servers.coder.env.ALVEUS_OPENCODE_MODEL', o:'opencode_models', l:'Coding model',
+     h:'auto = the assistant’s own model; or any model opencode is signed in to.',
+     more:'auto follows the language model above (for a cloud model opencode must be signed in to that provider: opencode auth login). opencode-default = the default set in opencode itself. Cloud models are stronger at long coding tasks, but the task and the project files then leave this computer.'},
+    {t:'text', p:'tools.servers.coder.env.ALVEUS_CODE_DIR', l:'Default coding folder', h:'Where opencode works when you name no project, e.g. ~/projects/scratch.'}]},
+ ]},
+ {id:'system', title:'System', desc:'Logging.', items:[
+  {t:'select', p:'logging.level', l:'Log detail', h:'What goes to journalctl and logs/alveus.log.', o:[{v:'WARNING', l:'problems only'}, {v:'INFO', l:'normal activity (recommended)'}, {v:'DEBUG', l:'everything, for troubleshooting'}]},
+ ]},
+];
+
+// ---- loading and rendering
 async function loadSettings(force){
   if (cfg && !force) return;
-  try{ cfg = await j('/config'); persona = (await j('/persona')).text; }catch(e){ toast('Could not load config: '+e.message, true); return; }
-  dirty={}; personaDirty=false; yamlDirty=false; renderSettings(); updateSavebar();
+  try{ cfg = await j('/config'); instructions = (await j('/instructions')).text; pers = await j('/personalities'); }catch(e){ toast('Could not load config: '+e.message, true); return; }
+  dirty={}; newProfiles={}; instrDirty=false; persEdits={}; yamlDirty=false; modelLists={}; voiceFiles={}; voiceTexts={};
+  llmUI = {provider: (profSummary(cfg.effective.llm.profile)||{}).provider || 'llama_server', baseUrl:{}};
+  if (!devices) j('/audio/devices').then(d => { devices=d; rerender(); }).catch(()=>{ devices={sources:[], sinks:[]}; });
+  renderSettings(); updateSavebar();
 }
-let searchQuery='';
-// Filter the settings form: a row stays when its label, hint, current value or config path contains the text;
-// groups (and their nav links) with no remaining rows are hidden. Composes with the `when:` visibility.
-function applySearch(){
-  const q=searchQuery.trim().toLowerCase(); let n=0;
-  document.querySelectorAll('#form .field').forEach(row => { const hit = !q || (row.textContent+' '+row.dataset.path).toLowerCase().includes(q); row.classList.toggle('nomatch', !hit); if (hit && !row.hidden) n++; });
-  document.querySelectorAll('#form section.grp').forEach(sec => {
-    const rows=[...sec.querySelectorAll('.field')];
-    const show = !q || (rows.length ? rows.some(r => !r.classList.contains('nomatch') && !r.hidden) : sec.textContent.toLowerCase().includes(q));
-    sec.hidden = !show; const link=document.querySelector(`#snav a[href="#${sec.id}"]`); if (link) link.hidden = !show; });
-  const c=$('sfindN'); if (c) c.textContent = q ? `${n} setting${n===1?'':'s'} match` : '';
+function rerender(){
+  if (!cfg) return;
+  const sc=$('settings'), top=sc.scrollTop, act=document.activeElement, key=act && act.dataset ? act.dataset.focus : null;
+  renderSettings(); sc.scrollTop = top;
+  if (key){ const el=document.querySelector(`[data-focus="${CSS.escape(key)}"]`); if (el) el.focus({preventScroll:true}); }
 }
 function renderSettings(){
   const form=$('form'), nav=$('snav'); form.innerHTML=''; nav.innerHTML='';
@@ -638,109 +796,503 @@ function renderSettings(){
   find.innerHTML=`<input type="search" id="sfind" placeholder="Search settings…" aria-label="Search settings"><small id="sfindN"></small>`;
   nav.appendChild(find); const sf=find.querySelector('input'); sf.value=searchQuery;
   sf.oninput=()=>{ searchQuery=sf.value; applySearch(); }; sf.onkeydown=e=>{ if(e.key==='Escape'){ sf.value=''; searchQuery=''; applySearch(); } };
-  let card=null;
-  for (const f of FIELDS){
-    if (f.g){ const sec=document.createElement('section'); sec.className='grp'; sec.id='g-'+f.g.replace(/\W+/g,'-'); sec.innerHTML=`<h2>${esc(f.g)}</h2><p class="desc">${esc(f.d||'')}</p>`; card=document.createElement('div'); card.className='card'; sec.appendChild(card); form.appendChild(sec);
-      const a=document.createElement('a'); a.href='#'+sec.id; a.textContent=f.g; a.onclick=e=>{e.preventDefault(); sec.scrollIntoView({behavior:'smooth',block:'start'});}; nav.appendChild(a); continue; }
-    card.appendChild(fieldRow(f));
+  for (const S of SECTIONS){
+    const sec=document.createElement('section'); sec.className='grp'; sec.id='g-'+S.id;
+    sec.innerHTML=`<h2>${esc(S.title)}</h2><p class="desc">${esc(S.desc)}</p>`;
+    const card=document.createElement('div'); card.className='card'; sec.appendChild(card);
+    renderItems(S.items, card, {}); form.appendChild(sec);
+    navLink(nav, sec, S.title);
   }
-  // advanced
-  const sec=document.createElement('section'); sec.className='grp'; sec.id='g-Advanced';
-  sec.innerHTML = `<h2>Advanced</h2><p class="desc">Two text files behind the settings above. You only need these for options the form does not show, or to fine-tune how the assistant behaves.</p>
-    <h3 style="font-size:15px;margin:14px 0 4px">This machine’s settings file</h3>
-    <p class="desc" style="margin-bottom:8px">Everything you change in the form is stored here (<code class="mono">config/local.yaml</code>). It lists only what differs from the built-in defaults in <code class="mono">config/alveus.yaml</code>, so an empty file means “all defaults”. You can add any option from the defaults file, for example a new model profile or an extra tool server.</p>
-    <textarea class="editor" id="yamlEd" spellcheck="false"></textarea>
-    <div class="adv-row"><span>Saving here replaces the whole file. Changes in the form above are merged into it when you save them.</span><button class="btn" id="saveYaml">Save settings file</button></div>
-    <h3 style="font-size:15px;margin:22px 0 4px">Personality and instructions</h3>
-    <p class="desc" style="margin-bottom:8px">The instructions the assistant reads before every conversation (<code class="mono">config/persona.md</code>): who it is, how it should talk, when to use tools, what to ask before doing. Edit it in plain language. The words in braces are filled in automatically: {name} is its name for the current voice, {other_name} the alternative it also answers to, {voice_gender} is male or female, {user_name} is you, {date}, {hostname} and {os} describe today and this computer.</p>
-    <textarea class="editor" id="personaEd" spellcheck="false"></textarea>
-    <div class="adv-row"><span>Takes effect after the assistant restarts.</span><button class="btn" id="savePersona">Save instructions</button></div>`;
-  form.appendChild(sec);
-  const a=document.createElement('a'); a.href='#g-Advanced'; a.textContent='Advanced'; a.onclick=e=>{e.preventDefault(); sec.scrollIntoView({behavior:'smooth'});}; nav.appendChild(a);
-  const note=document.createElement('div'); note.className='note'; note.innerHTML=`Running: <b>${esc(cfg.running_profile)}</b><br>${cfg.managed_by_systemd?'Managed by systemd — restarts work from here.':'Not under systemd — restart <code>alveus talk</code> yourself after saving.'}<br><br>Models: <code>${esc(cfg.env.ALVEUS_MODELS)}</code>`; nav.appendChild(note);
-  $('yamlEd').value = cfg.local_yaml; $('personaEd').value = persona;
-  refreshVisibility(); applySearch();
-  $('yamlEd').oninput=()=>{yamlDirty=true; updateSavebar();}; $('personaEd').oninput=()=>{personaDirty=true; updateSavebar();};
-  $('saveYaml').onclick = async () => { try{ const r=await j('/config',{method:'PUT', body:JSON.stringify({yaml:$('yamlEd').value})}); toast('local.yaml saved'); yamlDirty=false; await loadSettings(true); needRestart('assistant'); }catch(e){ toast(e.message,true);} };
-  $('savePersona').onclick = async () => { try{ await j('/persona',{method:'PUT', body:JSON.stringify({text:$('personaEd').value})}); toast('Persona saved'); personaDirty=false; needRestart('assistant'); updateSavebar(); }catch(e){ toast(e.message,true);} };
+  renderAdvanced(form, nav);
+  applySearch();
 }
-function fieldRow(f){
-  const eff = get(cfg.effective, f.p), loc = get(cfg.local, f.p); const overridden = loc!==undefined;
-  const row=document.createElement('div'); row.className='field'+(f.restart==='llm'?' restart-llm':''); row.dataset.path=f.p;
-  const lbl=document.createElement('div'); lbl.className='lbl'; lbl.innerHTML=`${esc(f.l)}${f.h?`<small>${esc(f.h)}</small>`:''}`;
-  const ctl=document.createElement('div'); ctl.className='ctl';
-  const meta=document.createElement('div'); meta.className='meta';
-  let el;
-  const setDirty = v => { dirty[f.p]=v; row.classList.add('dirty'); updateSavebar(); refreshVisibility(); if (f.p==='tts.voices_dir') refreshVoices(v); };
-  if (f.t==='bool'){ el=document.createElement('button'); el.className='switch'; el.setAttribute('role','switch'); el.setAttribute('aria-checked', String(!!eff)); el.onclick=()=>{ const v=el.getAttribute('aria-checked')!=='true'; el.setAttribute('aria-checked',String(v)); setDirty(v); }; }
-  else if (f.t==='select'){ el=document.createElement('select'); const opts=cfg.options[f.o]||[]; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur); el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o)}</option>`).join(''); el.onchange=()=>setDirty(el.value); }
-  else if (f.t==='file'){
-    el=document.createElement('select'); const cur=eff||'';
-    const fill = files => {
-      const curName = cur.split('/').pop();
-      const known = files.includes(cur) || files.includes(curName);
-      el.innerHTML = `<option value="">built-in voice (no sample)</option>` + files.map(x=>`<option value="${esc(x)}"${(x===cur||x===curName)?' selected':''}>${esc(x)}</option>`).join('')
-        + (cur && !known ? `<option value="${esc(cur)}" selected>${esc(cur)} — NOT FOUND in folder</option>` : '') + `<option value="__custom__">other path…</option>`;
-      if (cur && !known) row.classList.add('dirty');
-    };
-    fill(cfg.options[f.o]||[]);
-    el.onchange=()=>{ if(el.value==='__custom__'){ const v=prompt('Path to a WAV file:', cur||''); if(v){ const o=document.createElement('option'); o.value=v; o.textContent=v; el.appendChild(o); el.value=v; setDirty(v);} else el.value=cur; return; } setDirty(el.value===''?null:el.value); };
-    el.dataset.refill='1'; el._fill = fill;
+function navLink(nav, sec, title){ const a=document.createElement('a'); a.href='#'+sec.id; a.textContent=title;
+  a.onclick=e=>{e.preventDefault(); sec.scrollIntoView({behavior:'smooth',block:'start'});}; nav.appendChild(a); }
+function renderItems(items, parent, scope){ for (const it of items) parent.appendChild(renderItem(it, scope)); }
+function renderItem(it, scope){
+  const F = {...it, p: tpl(it.p, scope), fb: (it.fb||[]).map(q => tpl(q, scope))};
+  if (F.t==='llm') return llmBlock();
+  if (F.t==='choice') return choiceRow(F, scope);
+  if (F.t==='persona') return personaEditor(F.id);
+  return fieldRow(F, scope);
+}
+function changedTag(F){
+  if (!F.p) return '';
+  if (F.p in dirty) return `<span class="chg">${isUnset(dirty[F.p]) ? 'will use the inherited value' : 'unsaved'}</span>`;
+  if (get(cfg.local, F.p)!==undefined) return `<span class="chg">changed · <button type="button" title="Remove this machine’s value; then it is: ${esc(fmt(inheritedOf(F)))}">reset</button></span>`;
+  return '';
+}
+function shell(F, cls='row'){
+  const r=document.createElement('div'); r.className=cls+((F.p && F.p in dirty)?' dirty':''); if (F.p) r.dataset.path=F.p;
+  const lbl=document.createElement('div'); lbl.className='lbl';
+  lbl.innerHTML=`<b>${esc(F.l||'')}</b>${changedTag(F)}${F.h?`<small>${esc(F.h)}</small>`:''}${F.more?`<details><summary>More</summary><p>${esc(F.more)}</p></details>`:''}`;
+  const rb=lbl.querySelector('.chg button'); if (rb) rb.onclick=()=>{ resetVal(F); };
+  r.appendChild(lbl);
+  return [r, lbl];
+}
+function setVal(F, v, re=false){
+  const sv = get(cfg.effective, F.p);
+  if (sv!==undefined && same(v, sv)) delete dirty[F.p];   // back to what is saved: nothing to do
+  else dirty[F.p]=v;
+  if (re) rerender(); else { const row=document.querySelector(`[data-path="${CSS.escape(F.p)}"]`); if (row){ row.classList.toggle('dirty', F.p in dirty); const t=row.querySelector('.lbl .chg'); if (t) t.outerHTML=changedTag(F); else if (F.p in dirty) row.querySelector('.lbl b').insertAdjacentHTML('afterend', changedTag(F)); } }
+  updateSavebar();
+}
+function resetVal(F){ if (get(cfg.local, F.p)===undefined) delete dirty[F.p]; else dirty[F.p]=UNSET; rerender(); updateSavebar(); }
+const optVal = v => JSON.stringify(v ?? null);
+function selectEl(F, opts, cur, onPick){
+  const el=document.createElement('select'); el.dataset.focus=F.p;
+  const list=[...opts]; if (cur!==undefined && !list.some(o => same(o.v, cur))) list.unshift({v:cur, l:`${fmt(cur)} (not in the list)`});
+  el.innerHTML = list.map(o=>`<option value="${esc(optVal(o.v))}"${same(o.v,cur)?' selected':''}>${esc(o.l)}</option>`).join('');
+  el.onchange=()=>onPick(JSON.parse(el.value));
+  return el;
+}
+function fieldRow(F, scope){
+  const [r] = shell(F); const ctl=document.createElement('div'); ctl.className='ctl'; r.appendChild(ctl);
+  const v = F.p ? valueOf(F) : undefined; let el;
+  if (F.t==='bool'){
+    el=document.createElement('button'); el.type='button'; el.className='switch'; el.setAttribute('role','switch'); el.setAttribute('aria-checked', String(!!v)); el.dataset.focus=F.p;
+    el.setAttribute('aria-label', F.l); el.onclick=()=>setVal(F, !(el.getAttribute('aria-checked')==='true'), true);
+    ctl.appendChild(el);
+    if (v && F.on){ const wrap=document.createElement('div'); wrap.className='rowwrap'; wrap.appendChild(r); wrap.appendChild(branchPanel(F.on, scope, '')); return wrap; }
+    return r;
   }
-  else if (f.t==='combo'){
-    // dropdown of known values plus a free-text escape hatch
-    el=document.createElement('select'); const opts=[...(cfg.options[f.o]||[])]; const cur = eff===undefined||eff===null?'':String(eff); if(cur && !opts.includes(cur)) opts.unshift(cur);
-    el.innerHTML = opts.map(o=>`<option value="${esc(o)}"${String(o)===cur?' selected':''}>${esc(o)}</option>`).join('') + `<option value="__custom__">type another…</option>`;
-    el.onchange=()=>{ if(el.value==='__custom__'){ const v=prompt('Value (e.g. provider/model):', cur||''); if(v && v.trim()){ const o=document.createElement('option'); o.value=v.trim(); o.textContent=v.trim(); el.insertBefore(o, el.lastElementChild); el.value=v.trim(); setDirty(v.trim()); } else el.value=cur; return; } setDirty(el.value); };
-  }
-  else if (f.t==='multi'){
-    // checkboxes over the option list (plus any configured value the list does not know); saved as a YAML list
-    el=document.createElement('div'); el.className='multi'; const opts=[...(cfg.options[f.o]||[])];
-    const cur = Array.isArray(eff) ? eff.map(String) : String(eff??'').split(',').map(s=>s.trim()).filter(Boolean);
+  if (F.t==='select'){ const opts = typeof F.o==='function' ? F.o() : (Array.isArray(F.o) ? F.o : (cfg.options[F.o]||[]).map(x=>({v:x, l:String(x)})));
+    el=selectEl(F, opts, v, x=>setVal(F, x, true)); }
+  else if (F.t==='lang'){ const codes = Array.isArray(F.codes) ? F.codes : (cfg.options[F.codes]||[]);
+    const opts = F.auto ? langOpts(codes, F.auto) : langOpts(codes, '').slice(1);
+    if (F.autoValue) opts[0].v = F.autoValue;
+    el=selectEl(F, opts, v ?? (F.auto ? null : v), x=>setVal(F, x)); }
+  else if (F.t==='voice'){ const opts=(cfg.options.kokoro_voices||[]).map(x=>({v:x, l:kokoroLabel(x)}));
+    el=document.createElement('div'); el.className='inl'; const s=selectEl(F, opts, v, x=>setVal(F, x, true)); el.appendChild(s);
+    const running = cfg.running && cfg.running.tts==='kokoro';
+    const b=playBtn(running ? (speakerHere() ? 'Hear this voice on the speaker' : 'Hear this voice') : 'Preview works while Kokoro is the running voice engine', !running, async () => {
+      const r=await fetch('/tts/preview',{method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({voice: JSON.parse(s.value), play: speakerHere()})});
+      if (!r.ok){ let d=''; try{ d=(await r.json()).detail }catch{} throw new Error(d||r.status); }
+      return (r.headers.get('content-type')||'').includes('json') ? await r.json() : {url: URL.createObjectURL(await r.blob())}; });
+    el.appendChild(b); }
+  else if (F.t==='sample'){ el=sampleControl(F, v); }
+  else if (F.t==='words'){ el=wordsControl(F); }
+  else if (F.t==='device'){ el=deviceControl(F, v); }
+  else if (F.t==='hotkey'){ el=hotkeyControl(F, v); }
+  else if (F.t==='combo'){ const opts=[...(cfg.options[F.o]||[])].map(x=>({v:x, l:x})); opts.push({v:'__custom__', l:'type another…'});
+    el=selectEl(F, opts, v, x=>{ if (x==='__custom__'){ const t=prompt('Value (e.g. provider/model):', v||''); if (t && t.trim()) setVal(F, t.trim(), true); else rerender(); return; } setVal(F, x, true); }); }
+  else if (F.t==='multi'){ el=document.createElement('div'); el.className='multi'; const opts=[...(cfg.options[F.o]||[])];
+    const cur = Array.isArray(v) ? v.map(String) : String(v??'').split(',').map(s=>s.trim()).filter(Boolean);
     for (const c of cur) if(!opts.includes(c)) opts.push(c);
     el.innerHTML = opts.map(o=>`<label><input type="checkbox" value="${esc(o)}"${cur.includes(o)?' checked':''}> ${esc(o)}</label>`).join('');
-    el.querySelectorAll('input').forEach(i => i.onchange = () => setDirty([...el.querySelectorAll('input:checked')].map(x=>x.value)));
-  }
-  else if (f.t==='list'){ el=document.createElement('input'); el.type='text'; el.value=Array.isArray(eff)?eff.join(', '):(eff||''); el.oninput=()=>setDirty(el.value.split(',').map(s=>s.trim()).filter(Boolean)); }
-  else if (f.t==='number'){ el=document.createElement('input'); el.type='number'; if(f.step) el.step=f.step; if(f.min!==undefined) el.min=f.min; if(f.max!==undefined) el.max=f.max; el.value=eff??''; el.oninput=()=>{ setDirty(el.value==='' ? UNSET : Number(el.value)); }; }
-  else { el=document.createElement('input'); el.type='text'; el.value=eff??''; if(f.nullable) el.placeholder='(empty)'; el.oninput=()=>setDirty(el.value==='' ? (f.nullable ? null : UNSET) : el.value); }
+    el.querySelectorAll('input').forEach(i => i.onchange = () => setVal(F, [...el.querySelectorAll('input:checked')].map(x=>x.value))); }
+  else if (F.t==='list'){ el=document.createElement('input'); el.type='text'; el.dataset.focus=F.p; el.value=Array.isArray(v)?v.join(', '):(v||''); el.oninput=()=>setVal(F, el.value.split(',').map(s=>s.trim()).filter(Boolean)); }
+  else if (F.t==='number'){ el=document.createElement('input'); el.type='number'; el.dataset.focus=F.p; if(F.step) el.step=F.step; if(F.min!==undefined) el.min=F.min; if(F.max!==undefined) el.max=F.max;
+    el.value=v??''; el.placeholder = v===undefined || v===null ? 'provider default' : ''; el.oninput=()=>{ if (el.value==='') { if (F.p in dirty || get(cfg.local,F.p)!==undefined) resetVal(F); return; } setVal(F, Number(el.value)); }; }
+  else if (F.t==='note'){ el=document.createElement('div'); el.className='note-v'; el.innerHTML = F.html ? F.html() : esc(F.text()); }
+  else { el=document.createElement('input'); el.type='text'; el.dataset.focus=F.p; el.value=v??''; if(F.nullable) el.placeholder='(empty)';
+    el.oninput=()=>{ setVal(F, el.value==='' ? (F.nullable ? null : UNSET) : el.value); if (F.kind==='voicesdir') refreshSamples(el.value); }; }
   ctl.appendChild(el);
-  const defv = get(cfg.defaults, f.p);
-  meta.innerHTML = overridden ? `<span class="ov">changed here</span><br>default: ${esc(fmt(defv))}<br><button>reset to default</button>` : `default`;
-  if (overridden) meta.querySelector('button').onclick = () => { dirty[f.p]=UNSET; row.classList.add('dirty'); meta.innerHTML='<span class="ov">will reset</span>'; updateSavebar(); refreshVisibility(); };
-  row.append(lbl, ctl, meta); return row;
+  return r;
 }
-let restartKind=null;
-function updateSavebar(){ const n=Object.keys(dirty).length; const show = n>0 || yamlDirty || personaDirty || restartKind; $('savebar').classList.toggle('show', !!show);
-  $('save').hidden = !(n>0); $('discard').hidden = !(n>0||yamlDirty||personaDirty);
-  if (n>0) $('saveMsg').innerHTML = `<b>${n} unsaved change${n>1?'s':''}</b><small>Written to config/local.yaml on save. A restart applies them.</small>`;
-  else if (yamlDirty||personaDirty) $('saveMsg').innerHTML = `<b>Unsaved editor changes</b><small>Use the Save button next to the editor.</small>`;
-  else if (restartKind) $('saveMsg').innerHTML = `<b>Saved.</b><small>Restart to apply${restartKind==='llm'?' (the model profile changed, so the LLM server restarts too)':''}.</small>`;
-  $('restartA').hidden = !(restartKind==='assistant'); $('restartB').hidden = !(restartKind==='llm');
-  if (!cfg?.managed_by_systemd){ $('restartA').hidden = $('restartB').hidden = true; }
+function branchPanel(items, scope, title){
+  const p=document.createElement('div'); p.className='branch';
+  if (title) p.innerHTML=`<div class="bh">${esc(title)}</div>`;
+  renderItems(items, p, scope); return p;
 }
-function needRestart(kind){ restartKind = (restartKind==='llm'||kind==='llm') ? 'llm' : 'assistant'; updateSavebar(); }
-$('discard').onclick = () => loadSettings(true);
-let prevProfile=null;
-$('save').onclick = async () => {
-  const patch={}; let llmChange=false;
-  for (const [p,v] of Object.entries(dirty)){ const parts=p.split('.'); let cur=patch; for(const k of parts.slice(0,-1)) cur=cur[k]??(cur[k]={}); cur[parts.at(-1)]=v; if (p==='llm.profile') llmChange=true; }
-  if (llmChange){
-    // preflight: make sure the server binary can actually load the new model before touching services
-    const target = dirty['llm.profile'] ?? get(cfg.defaults,'llm.profile');
-    $('save').disabled=true; $('saveMsg').innerHTML=`<b>Checking that <code>${esc(target)}</code> loads…</b><small>Reads the model file with llama-cli on the CPU; 10–40 s.</small>`;
+function choiceRow(F, scope){
+  const v = valueOf(F); const wrap=document.createElement('div'); wrap.className='choice'+((F.p in dirty)?' dirty':''); wrap.dataset.path=F.p;
+  const [head] = shell(F, 'chead'); wrap.appendChild(head);
+  const OPTS = typeof F.opts==='function' ? F.opts() : F.opts, opt = OPTS.find(o => same(o.v, v));
+  if (F.style==='select'){
+    const ctl=document.createElement('div'); ctl.className='ctl'; head.appendChild(ctl);
+    ctl.appendChild(selectEl(F, OPTS.map(o=>({v:o.v, l: o.d ? `${o.l} — ${o.d}` : o.l})), v, x=>setVal(F, x, true)));
+  } else {
+    const opts=document.createElement('div'); opts.className='opts'; opts.setAttribute('role','radiogroup'); opts.setAttribute('aria-label', F.l);
+    for (const o of OPTS){ const b=document.createElement('button'); b.type='button'; const sel=same(o.v, v);
+      b.className='opt'+(sel?' sel':''); b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(sel)); b.dataset.focus=F.p+'='+o.v;
+      b.innerHTML=`<b>${esc(o.l)}</b>${o.d?`<small>${esc(o.d)}</small>`:''}`; b.onclick=()=>setVal(F, o.v, true); opts.appendChild(b); }
+    wrap.appendChild(opts);
+  }
+  const kids = F.each ? F.each(v) : (F.branch||{})[v];
+  if (kids && kids.length) wrap.appendChild(branchPanel(kids, {...scope, v}, F.panel ? F.panel(v) : `${opt ? opt.l : v} settings`));
+  return wrap;
+}
+// ▶ plays on the assistant's own speaker when there is one (that is the sound being chosen, and no
+// browser autoplay rule or tab mute can get in the way); otherwise in the browser. Second click stops.
+function playBtn(title, disabled, start){
+  const b=document.createElement('button'); b.type='button'; b.className='btn play'; b.textContent='▶'; b.title=title; b.setAttribute('aria-label', title); b.disabled=disabled;
+  let audio=null, timer=null;
+  const done=()=>{ audio=null; clearTimeout(timer); timer=null; b.textContent='▶'; };
+  b.onclick=async()=>{
+    if (audio || timer){ if (audio) audio.pause(); else j('/stop',{method:'POST'}).catch(()=>{}); done(); return; }
+    b.disabled=true; b.textContent='…';
+    try{ const r=await start();
+      if (r.url){ audio=new Audio(r.url); audio.onended=done; await audio.play(); }
+      else timer=setTimeout(done, (r.seconds||1)*1000+300);
+      b.textContent='■'; }
+    catch(e){ done(); toast(e.message || 'could not play it', true); }
+    b.disabled=false; };
+  return b;
+}
+const speakerHere = () => !!(health && health.voice);
+function samplesDir(){ const e=current('tts.backend'); return current(`tts.${e==='qwen3'?'qwen3':'chatterbox'}.voices_dir`) ?? current('tts.voices_dir') ?? ''; }
+const firstSample = () => { const d=samplesDir(); return (voiceFiles[d] || (d===cfg.effective.tts.voices_dir ? cfg.options.voice_samples||[] : []))[0] || ''; };
+const textsIn = dir => voiceTexts[dir] || (dir===cfg.effective.tts.voices_dir ? cfg.options.voice_texts||[] : []);
+let _samplesTimer=null;
+function refreshSamples(dir){ clearTimeout(_samplesTimer); _samplesTimer=setTimeout(async () => {
+  try{ const r=await j('/voices?dir='+encodeURIComponent(dir||'')); voiceFiles[dir]=r.files; voiceTexts[dir]=r.texts||[]; document.querySelectorAll('.ctl [data-kind="sample"]').forEach(x => x._fill && x._fill(r.files));
+    if (dir && !r.exists) toast('Voices folder not found: '+dir, true); }catch(e){} }, 400); }
+function sampleControl(F, v){
+  const el=document.createElement('div'); el.className='inl'; const s=document.createElement('select'); s.dataset.kind='sample'; s.dataset.focus=F.p; el.appendChild(s);
+  const dir=samplesDir(); const cur=v||'';
+  const fill = files => { const name=cur.split('/').pop(); const known = files.includes(cur) || files.includes(name);
+    s.innerHTML = `<option value="">${esc(F.none || 'built-in voice (no recording)')}</option>` + files.map(x=>`<option value="${esc(x)}"${(x===cur||x===name)?' selected':''}>${esc(x)}</option>`).join('')
+      + (cur && !known ? `<option value="${esc(cur)}" selected>${esc(cur)} — not in the folder</option>` : '') + `<option value="__custom__">another file…</option>`; };
+  s._fill = fill; fill(voiceFiles[dir] || (dir===cfg.effective.tts.voices_dir ? cfg.options.voice_samples||[] : []));
+  if (!voiceFiles[dir]) refreshSamples(dir);
+  s.onchange=()=>{ if (s.value==='__custom__'){ const t=prompt('Path to a WAV file:', cur); if (t) setVal(F, t, true); else rerender(); return; } setVal(F, s.value===''?null:s.value, true); };
+  el.appendChild(playBtn('Play this recording', !cur, async () => speakerHere()
+    ? await j('/voices/play',{method:'POST', body:JSON.stringify({name:s.value, dir})})
+    : {url:`/voices/file?name=${encodeURIComponent(s.value)}&dir=${encodeURIComponent(dir)}`}));
+  return el;
+}
+// whether the chosen recording has its words (NAME.txt); offers to write them down with the speech recognizer
+function wordsControl(F){
+  const el=document.createElement('div'); el.className='inl';
+  const name=String(valueOf({p:F.of, fb:F.offb}) || firstSample()).split('/').pop(), dir=samplesDir(), texts=textsIn(dir);
+  const s=document.createElement('small'); s.className='sub'; el.appendChild(s);
+  if (!name){ s.textContent='The voices folder has no recordings yet.'; return el; }
+  if (texts.includes(name)){ s.textContent=`${name.replace(/\.[^.]+$/,'')}.txt is there: in its own language the voice is copied closely.`; return el; }
+  s.textContent='No words yet: only the timbre is copied.';
+  const b=document.createElement('button'); b.type='button'; b.className='btn'; b.textContent='Write it down';
+  b.title='Let the speech recognizer write down what the recording says and save it beside it'; el.appendChild(b);
+  b.onclick=async()=>{ b.disabled=true; b.textContent='Listening…';
+    try{ const r=await j('/voices/transcribe',{method:'POST', body:JSON.stringify({name, dir})}); voiceTexts[dir]=[...texts, name];
+      toast('Saved its words: “'+r.text.slice(0,70)+(r.text.length>70?'…':'')+'” (fix them in the .txt file if needed)'); rerender(); }
+    catch(e){ toast(e.message, true); b.disabled=false; b.textContent='Write it down'; } };
+  return el;
+}
+function deviceControl(F, v){
+  const list = (devices && devices[F.kind]) || [];
+  const opts=[{v:null, l:'system default'}, ...list.map(d=>({v:d.name, l:d.label}))];
+  const s=selectEl(F, opts, v ?? null, x=>setVal(F, x, true));
+  if (v && !list.some(d=>d.name===v) && devices) s.options[0].textContent = `${v} (not connected now)`;
+  if (!devices){ const w=document.createElement('div'); w.className='inl'; w.appendChild(s); const sm=document.createElement('small'); sm.className='sub'; sm.textContent='looking for devices…'; w.appendChild(sm); return w; }
+  return s;
+}
+const KEYMAP = {' ':'<space>', Enter:'<enter>', Tab:'<tab>', Backspace:'<backspace>', Delete:'<delete>', Home:'<home>', End:'<end>',
+  PageUp:'<page_up>', PageDown:'<page_down>', ArrowUp:'<up>', ArrowDown:'<down>', ArrowLeft:'<left>', ArrowRight:'<right>', Insert:'<insert>'};
+function hotkeyControl(F, v){
+  const el=document.createElement('div'); el.className='inl';
+  const i=document.createElement('input'); i.type='text'; i.value=v||''; i.dataset.focus=F.p; i.oninput=()=>setVal(F, i.value);
+  const b=document.createElement('button'); b.type='button'; b.className='btn'; b.textContent='Record';
+  b.onclick=()=>{ i.value=''; i.placeholder='press the keys… (Esc cancels)'; b.textContent='Listening…'; i.focus();
+    const h=e=>{ if (['Control','Alt','Shift','Meta','AltGraph'].includes(e.key)) return; e.preventDefault(); e.stopPropagation(); window.removeEventListener('keydown', h, true);
+      b.textContent='Record'; i.placeholder='';
+      if (e.key==='Escape'){ i.value=v||''; return; }
+      const mods=[e.ctrlKey&&'<ctrl>', e.altKey&&'<alt>', e.shiftKey&&'<shift>', e.metaKey&&'<cmd>'].filter(Boolean);
+      const k = KEYMAP[e.key] || (/^F\d{1,2}$/.test(e.key) ? `<${e.key.toLowerCase()}>` : (e.key.length===1 ? e.key.toLowerCase() : `<${e.key.toLowerCase()}>`));
+      i.value=[...mods, k].join('+'); setVal(F, i.value); };
+    window.addEventListener('keydown', h, true); };
+  el.append(i, b); return el;
+}
+
+// ---- language model: provider > model > that model's settings (one profile per model)
+function profSummary(name){
+  if (!cfg) return null;
+  if (newProfiles[name]){ const d=newProfiles[name]; const I=cfg.llm_providers[d.provider]||{};
+    const mp = d.serve ? String(d.serve.model_path||'').replace('${ALVEUS_MODELS}', cfg.env.ALVEUS_MODELS) : null;
+    return {...(I.defaults||{}), provider:d.provider, model:d.model, local_server:!!d.serve, model_path:mp, file_exists:true,
+            context:d.serve ? d.serve.context : null, base_url:d.base_url ?? (I.defaults||{}).base_url, isNew:true}; }
+  return (cfg.llm_profile_info||{})[name] || null;
+}
+function profilesOf(prov){ const all={...(cfg.llm_profile_info||{})}; for (const n in newProfiles) all[n]=profSummary(n);
+  return Object.entries(all).filter(([,s]) => s && s.provider===prov).sort((a,b)=>a[0].localeCompare(b[0])); }
+function uniqueName(prov, id){
+  const base=String(id).toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'') || 'model';
+  const taken = n => n in (cfg.llm_profile_info||{}) || n in newProfiles;
+  if (!taken(base)) return base; let n=`${prov}-${base}`; for (let k=2; taken(n); k++) n=`${prov}-${base}-${k}`; return n;
+}
+function setProfile(name){ if (name===cfg.effective.llm.profile) delete dirty['llm.profile']; else dirty['llm.profile']=name; rerender(); updateSavebar(); }
+function newProfile(prov, def){ const name=uniqueName(prov, def.model); newProfiles[name]=def; setProfile(name); }
+function pickItem(prov, it){
+  const I=cfg.llm_providers[prov];
+  if (it.profile) return setProfile(it.profile);
+  if (it.file) return newProfile(prov, {provider:prov, model:it.file.id, serve:{...I.serve_template, model_path:it.file.portable}});
+  if (it.id) return newProfile(prov, {provider:prov, model:it.id, ...(I.group==='cloud' ? {max_tokens:16000} : {}),
+                                       ...(I.needs_base_url ? {base_url: baseUrlFor(prov)} : {})});
+}
+function baseUrlFor(prov){ const I=cfg.llm_providers[prov]; if (llmUI.baseUrl[prov]!==undefined) return llmUI.baseUrl[prov];
+  const p=profilesOf(prov)[0]; return (p && p[1].base_url) || I.base_url || ''; }
+async function loadModels(prov, force){
+  if (modelLists[prov] && !force) return; modelLists[prov]={loading:true};
+  const I=cfg.llm_providers[prov]; const q=new URLSearchParams({provider:prov}); if (I.needs_base_url) q.set('base_url', baseUrlFor(prov));
+  try{ modelLists[prov]=await j('/llm/models?'+q); }catch(e){ modelLists[prov]={models:[], error:e.message}; }
+  if (llmUI.provider===prov){ autoPick(prov); rerender(); }
+}
+function autoPick(prov){
+  const cur=profSummary(current('llm.profile')); if (cur && cur.provider===prov) return;
+  const own=profilesOf(prov); if (own.length) return setProfile((own.find(([n])=>n===cfg.effective.llm.profile)||own[0])[0]);
+  const items=modelItems(prov).filter(i=>i.file||i.id); if (items.length) pickItem(prov, items[0]);
+}
+function chooseProvider(prov){ llmUI.provider=prov; const own=profilesOf(prov);
+  if (own.length) autoPick(prov); else if (modelLists[prov] && !modelLists[prov].loading) autoPick(prov); else loadModels(prov);
+  rerender(); }
+function modelItems(prov){
+  const list=modelLists[prov]; const own=profilesOf(prov); const items=[];
+  if (prov==='llama_server'){
+    for (const f of (list&&list.models)||[]){ const pr=own.find(([,s])=>s.model_path===f.path);
+      items.push({key: pr ? 'p:'+pr[0] : 'f:'+f.path, label:`${f.file} · ${f.size_gb} GB`, profile: pr && pr[0], file: pr ? null : f}); }
+    for (const [n,s] of own) if (!items.some(i=>i.profile===n)) items.push({key:'p:'+n, label:`${String(s.model_path||s.model).split('/').pop()} · file missing`, profile:n});
+  } else {
+    const notes={}; for (const m of (list&&list.models)||[]) notes[m.id]=m.note;
+    for (const [n,s] of own) items.push({key:'p:'+n, label:`${s.model}${notes[s.model]?' — '+notes[s.model]:''}`, profile:n});
+    for (const m of (list&&list.models)||[]) if (!own.some(([,s])=>s.model===m.id)) items.push({key:'m:'+m.id, label:`${m.id}${m.note?' — '+m.note:''}${m.name?' · '+m.name:''}`, id:m.id});
+  }
+  return items;
+}
+function llmBlock(){
+  const P=cfg.llm_providers, prov=llmUI.provider, I=P[prov]||{}, name=current('llm.profile'), S=profSummary(name);
+  const wrap=document.createElement('div'); wrap.className='choice'+(('llm.profile' in dirty)?' dirty':''); wrap.dataset.path='llm.profile';
+  const [head]=shell({l:'Where the model runs', h:'Pick a provider, then a model; every model keeps its own settings. Cloud providers need an API key and bill per request.'}, 'chead'); wrap.appendChild(head);
+  const opts=document.createElement('div'); opts.className='opts prov'; opts.setAttribute('role','radiogroup'); opts.setAttribute('aria-label','Provider');
+  for (const g of ['local','cloud','server']) for (const n of Object.keys(P).filter(n=>P[n].group===g)){
+    const p=P[n], sel=n===prov; const b=document.createElement('button'); b.type='button';
+    b.className='opt'+(sel?' sel':''); b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(sel)); b.dataset.focus='prov='+n;
+    const badge = g==='local' ? '<span class="ob">GPU</span>' : g==='server' ? '<span class="ob">server</span>'
+      : p.key_source ? '<span class="ob ok">key ✓</span>' : '<span class="ob">no key</span>';
+    b.innerHTML=`<b>${esc(p.title)}</b><small>${esc(p.blurb)}</small>${badge}`; b.onclick=()=>chooseProvider(n); opts.appendChild(b); }
+  wrap.appendChild(opts);
+  const panel=document.createElement('div'); panel.className='branch';
+  panel.innerHTML=`<div class="bh">${esc(I.title||prov)}</div>`;
+  const run=cfg.effective.llm.profile, RS=profSummary(run);
+  if (RS && name!==run) panel.insertAdjacentHTML('beforeend', `<div class="hint-line">Running now: <b>${esc(RS.model)}</b> (${esc((P[RS.provider]||{}).title||RS.provider)}). The new choice applies after saving.</div>`);
+  if (I.group==='cloud') panel.insertAdjacentHTML('beforeend', `<div class="hint-line warn">With a cloud model, what you say, and what the tools read for it (file contents, command output), is sent to ${esc(I.title)}.</div>`);
+  if (I.api_key_env) panel.appendChild(keyRow(prov));
+  if (I.needs_base_url) panel.appendChild(baseUrlRow(prov));
+  panel.appendChild(modelRow(prov, name, S));
+  if (S && S.provider===prov) panel.appendChild(modelSettings(name, S, I));
+  wrap.appendChild(panel);
+  return wrap;
+}
+function keyRow(prov){
+  const I=cfg.llm_providers[prov], env=I.api_key_env, src=((cfg.secrets||{}).keys||{})[env]?.source ?? I.key_source;
+  const [r]=shell({l:'API key', h: src==='env' ? `${env} is set in the environment.` : src ? 'Saved on this computer, outside the repository; never shown again.' : `Needed for ${I.title} models. Saved on this computer only.`});
+  const ctl=document.createElement('div'); ctl.className='ctl'; r.appendChild(ctl);
+  ctl.innerHTML=`<div class="inl"><input type="password" autocomplete="off" spellcheck="false" aria-label="${esc(env)}" placeholder="${src?'new key (replaces it)':'paste the key'}"><button type="button" class="btn ksave">Save key</button>${src==='file'?'<button type="button" class="btn kdel">Remove</button>':''}</div><small class="sub">${src?'✓ ':''}<code class="mono">${esc(env)}</code> ${src?(src==='env'?'from the environment':'saved'):'not set'}</small>`;
+  const inp=ctl.querySelector('input');
+  const put=async v=>{ try{ cfg.secrets=await j('/secrets',{method:'PUT', body:JSON.stringify({name:env, value:v})}); I.key_source=(cfg.secrets.keys[env]||{}).source;
+    toast(v?`${env} saved`:`${env} removed`); delete modelLists[prov]; loadModels(prov, true); rerender(); refreshHealth(); }catch(e){ toast(e.message,true);} };
+  ctl.querySelector('.ksave').onclick=()=>{ const v=inp.value.trim(); if(!v){ toast('Paste the key first', true); return; } put(v); };
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); ctl.querySelector('.ksave').click(); } };
+  const d=ctl.querySelector('.kdel'); if (d) d.onclick=()=>{ if (confirm(`Remove ${env} from this computer?`)) put(''); };
+  return r;
+}
+function baseUrlRow(prov){
+  const [r]=shell({l:'Server address', h:'Where the server answers, e.g. http://127.0.0.1:8000/v1.'});
+  const ctl=document.createElement('div'); ctl.className='ctl'; r.appendChild(ctl);
+  const w=document.createElement('div'); w.className='inl'; const i=document.createElement('input'); i.type='text'; i.value=baseUrlFor(prov); i.dataset.focus='baseurl='+prov;
+  const b=document.createElement('button'); b.type='button'; b.className='btn'; b.textContent='List models';
+  i.oninput=()=>{ llmUI.baseUrl[prov]=i.value.trim(); const n=current('llm.profile'), S=profSummary(n);
+    if (S && S.provider===prov){ if (newProfiles[n]) newProfiles[n].base_url=i.value.trim(); else setVal({p:`llm.profiles.${n}.base_url`}, i.value.trim()); } };
+  b.onclick=()=>loadModels(prov, true); w.append(i, b); ctl.appendChild(w); return r;
+}
+function modelRow(prov, name, S){
+  const I=cfg.llm_providers[prov], list=modelLists[prov];
+  if (!list) loadModels(prov);
+  const src = !list || list.loading ? 'Looking for models…'
+    : list.source==='files' ? `GGUF files in ${list.dir}. Put another model file there to choose it.`
+    : list.source==='live' ? `The models ${I.title} offers right now.`
+    : `Suggested models${list.error ? ` (${list.error})` : ''}.`;
+  const [r]=shell({l:'Model', h:src}); const ctl=document.createElement('div'); ctl.className='ctl'; r.appendChild(ctl);
+  const items=modelItems(prov); const curKey = S && S.provider===prov ? 'p:'+name : '';
+  const s=document.createElement('select'); s.dataset.focus='model='+prov;
+  const opt = it => `<option value="${esc(it.key)}"${it.key===curKey?' selected':''}>${esc(it.label)}</option>`;
+  const setUp=items.filter(i=>i.profile && !newProfiles[i.profile]), fresh=items.filter(i=>!i.profile || newProfiles[i.profile]);
+  s.innerHTML=(curKey?'':`<option value="" selected>choose a model…</option>`)
+    + (setUp.length ? `<optgroup label="Set up before (keeps its settings)">${setUp.map(opt).join('')}</optgroup>` : '')
+    + (fresh.length ? `<optgroup label="${prov==='llama_server'?'Model files not set up yet':'Available, not set up yet'}">${fresh.map(opt).join('')}</optgroup>` : '')
+    + (prov==='llama_server' ? '' : `<option value="__custom__">another model id…</option>`);
+  s.onchange=()=>{ if (s.value==='__custom__'){ const t=prompt('Model id, exactly as the provider names it:', ''); if (t && t.trim()) pickItem(prov, {id:t.trim()}); else rerender(); return; }
+    const it=items.find(x=>x.key===s.value); if (it) pickItem(prov, it); };
+  const w=document.createElement('div'); w.className='inl'; w.appendChild(s);
+  const rb=document.createElement('button'); rb.type='button'; rb.className='btn'; rb.textContent='↻'; rb.title='Refresh the list'; rb.setAttribute('aria-label','Refresh the model list'); rb.onclick=()=>loadModels(prov, true);
+  w.appendChild(rb); ctl.appendChild(w);
+  if (S && S.provider===prov && S.isNew) ctl.insertAdjacentHTML('beforeend', `<small class="sub">New: saved as profile “${esc(name)}” with the settings below.</small>`);
+  return r;
+}
+function modelSettings(name, S, I){
+  const b=`llm.profiles.${name}`, items=[];
+  if (S.local_server) items.push({t:'note', l:'Model file', h:'The weights llama-server loads.', html:()=> `<code class="mono">${esc(S.model_path||'?')}</code>${S.file_exists?'':' <b class="bad">not found</b>'}`});
+  if (I.thinking_switch) items.push({t:'select', p:`${b}.thinking`, l:'Thinking', h:'Reasoning before it answers: better tool use, a little slower.',
+    o:[{v:null, l:'model default'}, {v:true, l:'on'}, {v:false, l:'off'}]});
+  if ((I.effort_levels||[]).length) items.push({t:'select', p:`${b}.effort`, fb:['llm.effort'], l:'Reasoning effort', h:'How long it thinks first. Lower = faster and cheaper replies.',
+    o:[{v:null, l:'model default'}, ...I.effort_levels.map(x=>({v:x, l:x}))]});
+  items.push({t:'number', p:`${b}.max_tokens`, fb:['llm.max_tokens'], l:'Max reply length (tokens)', min:256, max:128000,
+    h:'Includes hidden thinking; too low cuts replies off.', more:'About 4 tokens per 3 words. Cloud reasoning models need room for their thinking: 16000 is a good start.'});
+  if (I.sampling){
+    items.push({t:'number', p:`${b}.temperature`, fb:['llm.temperature'], l:'Temperature', step:0.05, min:0, max:2, h:'0 = same answer every time, 0.7 balanced, above 1 more creative but less reliable.'});
+    items.push({t:'number', p:`${b}.top_p`, fb:['llm.top_p'], l:'Top-p', step:0.01, min:0, max:1, h:'Leave at 0.95 unless you know why.'}); }
+  if (S.local_server){
+    items.push({t:'number', p:`${b}.extra_body.top_k`, fb:[()=>S.top_k], l:'Top-k', min:0, max:200, h:'Qwen-family models: 20.'});
+    items.push({t:'number', p:`${b}.serve.context`, fb:[()=>S.context], l:'Context length (tokens)', min:2048, max:262144, step:1024,
+      h:'How much conversation and tool output fits. More needs more VRAM; restarts the LLM server.'}); }
+  return branchPanel(items, {}, `Settings for ${S.model} (only for this model)`);
+}
+
+// ---- personalities: the words of one, saved through /personalities (not part of the settings patch)
+const persById = id => pers.items.find(P => P.id===id);
+const persDirty = id => { const E=persEdits[id], P=persById(id); return !!(E && P && (E.label!==P.label || E.description!==P.description || E.text!==P.text)); };
+const anyPersDirty = () => Object.keys(persEdits).some(persDirty);
+const slugOf = s => (s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40).replace(/-+$/,'')) || 'personality';
+function personaEditor(id){
+  const P=persById(id), box=document.createElement('div'); box.className='pedit';
+  if (!P){ box.innerHTML=`<div class="row"><div class="lbl"><b>Not found</b><small>There is no personality “${esc(id)}” any more; the default is used until you choose another.</small></div></div>`; return box; }
+  const E = persEdits[id] || (persEdits[id] = {label:P.label, description:P.description, text:P.text});
+  const inUse = pers.active===id;
+  box.innerHTML = `
+    <div class="row"><div class="lbl"><b>Name</b><small>Shown on its card.</small></div><div class="ctl"><input type="text" data-k="label" data-focus="pers.${esc(id)}.label"></div></div>
+    <div class="row"><div class="lbl"><b>Short description</b><small>One line under the name.</small></div><div class="ctl"><input type="text" data-k="description" data-focus="pers.${esc(id)}.description"></div></div>
+    <div class="ptext"><div class="lbl"><b>How it sounds</b><small>Written to the assistant, in plain words: its tone, word choice, humour, how it treats you. ${'{user_name}'} and ${'{name}'} are filled in. Leave rules and permissions to the instructions.</small></div>
+      <textarea class="editor" data-k="text" spellcheck="true" data-focus="pers.${esc(id)}.text"></textarea>
+      <div class="adv-row"><span class="pstate"></span><span class="pbtns"></span></div></div>`;
+  box.querySelectorAll('[data-k]').forEach(el => { el.value=E[el.dataset.k]; el.oninput=()=>{ E[el.dataset.k]=el.value; state(); updateSavebar(); }; });
+  const st=box.querySelector('.pstate'), btns=box.querySelector('.pbtns');
+  const mk=(label, title, fn, cls='btn')=>{ const b=document.createElement('button'); b.type='button'; b.className=cls; b.textContent=label; b.title=title; b.onclick=fn; btns.appendChild(b); return b; };
+  const where = P.shipped ? (P.edited ? 'Comes with Alveus; your edited copy is in use.' : 'Comes with Alveus.') : 'Your own.';
+  const state=()=>{ st.textContent = (persDirty(id) ? 'Unsaved changes. ' : '') + where + (inUse ? ' In use now.' : ''); save.disabled=!persDirty(id); };
+  if (P.shipped && P.edited) mk('Restore original', 'Remove your copy and use the words it came with', () => removeP(id, `Restore “${P.label}” to the words it came with? Your edits are lost.`));
+  if (!P.shipped) mk('Delete', inUse ? 'In use: choose another personality and save first' : 'Delete this personality', () => removeP(id, `Delete the personality “${P.label}”?`)).disabled = inUse;
+  mk('Save as new…', 'Keep these words as another personality, leaving this one as it was', () => saveNew(id));
+  const save=mk('Save', inUse ? 'Used from the next request on' : 'Save the words', () => saveP(id, id));
+  state();
+  return box;
+}
+async function saveP(id, target){
+  const E=persEdits[id];
+  try{ await j('/personalities/'+encodeURIComponent(target), {method:'PUT', body:JSON.stringify(E)});
+    toast(pers.active===target ? 'Personality saved; used from the next request' : 'Personality saved');
+    delete persEdits[id]; pers = await j('/personalities'); rerender(); updateSavebar(); return true; }
+  catch(e){ toast(e.message, true); return false; }
+}
+async function saveNew(id){
+  const E=persEdits[id]; const name=prompt('Name for the new personality:', E.label + ' (mine)'); if (!name || !name.trim()) return;
+  let pid=slugOf(name), n=2; while (persById(pid)) pid = slugOf(name).slice(0,36) + '-' + (n++);
+  const orig=persById(id); persEdits[pid] = {...E, label:name.trim()};
+  if (orig) persEdits[id] = {label:orig.label, description:orig.description, text:orig.text};   // the original stays as it was
+  if (await saveP(pid, pid)){ setVal({p:'assistant.personality'}, pid, true); toast(`Saved “${name.trim()}”; press Save below to use it`); }
+}
+async function removeP(id, question){
+  if (!confirm(question)) return;
+  try{ const r=await j('/personalities/'+encodeURIComponent(id), {method:'DELETE'});
+    toast(r.restored ? 'Original words restored' : 'Personality deleted');
+    delete persEdits[id]; if (!r.restored && dirty['assistant.personality']===id) delete dirty['assistant.personality'];
+    pers = await j('/personalities'); rerender(); updateSavebar(); }
+  catch(e){ toast(e.message, true); }
+}
+
+// ---- advanced editors
+function renderAdvanced(form, nav){
+  const sec=document.createElement('section'); sec.className='grp'; sec.id='g-advanced';
+  sec.innerHTML = `<h2>Advanced</h2><p class="desc">The two text files behind the settings above, for options the form does not show.</p>
+    <h3 style="font-size:15px;margin:14px 0 4px">This machine’s settings file</h3>
+    <p class="desc" style="margin-bottom:8px">Everything changed in the form is stored here (<code class="mono">${esc(cfg.paths.local_yaml)}</code>), only what differs from the defaults in <code class="mono">config/alveus.yaml</code>. Model settings live under <code class="mono">llm.profiles</code>, per-model voice and speech settings under <code class="mono">&lt;engine&gt;.models.&lt;model&gt;</code>.</p>
+    <textarea class="editor" id="yamlEd" spellcheck="false"></textarea>
+    <div class="adv-row"><span>Saving here replaces the whole file.</span><button class="btn" id="saveYaml">Save settings file</button></div>
+    <h3 style="font-size:15px;margin:22px 0 4px">Instructions</h3>
+    <p class="desc" style="margin-bottom:8px">The directions and boundaries it follows whatever its personality: who it is, how spoken replies are shaped, what it may do, tools and confirmations (<code class="mono">${esc(cfg.paths.instructions)}</code>). Filled in automatically: {name}, {other_name}, {voice_gender}, {user_name}, {date}, {hostname}, {os}; {personality} marks where the chosen personality’s words go (Assistant → Personality).</p>
+    <textarea class="editor" id="instrEd" spellcheck="false"></textarea>
+    <div class="adv-row"><span>Used from the next request on.</span><button class="btn" id="saveInstr">Save instructions</button></div>`;
+  form.appendChild(sec); navLink(nav, sec, 'Advanced');
+  const RS=profSummary(cfg.running_profile);
+  const note=document.createElement('div'); note.className='note';
+  note.innerHTML=`Running: <b>${esc(RS ? RS.model : cfg.running_profile)}</b>${RS?` <span>(${esc((cfg.llm_providers[RS.provider]||{}).title||RS.provider)})</span>`:''}<br>${cfg.managed_by_systemd?'Managed by systemd: restarts work from here.':'Not under systemd: restart <code>alveus talk</code> yourself after saving.'}`;
+  nav.appendChild(note);
+  $('yamlEd').value = cfg.local_yaml; $('instrEd').value = instructions;
+  $('yamlEd').oninput=()=>{yamlDirty=true; updateSavebar();}; $('instrEd').oninput=()=>{instrDirty=true; updateSavebar();};
+  $('saveYaml').onclick = async () => { try{ const r=await j('/config',{method:'PUT', body:JSON.stringify({yaml:$('yamlEd').value, apply:true})}); const a=r.applied||{restart:[], errors:[]};
+    toast(a.errors.length ? a.errors.join(' · ') : 'Settings file saved and applied', !!a.errors.length); yamlDirty=false; await loadSettings(true);
+    if (a.restart.length) needRestart('assistant', 'Saved; ' + a.restart.join(', ') + ' change at the next restart'); }catch(e){ toast(e.message,true);} };
+  $('saveInstr').onclick = async () => { try{ const t=$('instrEd').value; await j('/instructions',{method:'PUT', body:JSON.stringify({text:t})}); instructions=t; toast('Instructions saved; used from the next request'); instrDirty=false; updateSavebar(); }catch(e){ toast(e.message,true);} };
+}
+
+// ---- search
+// A row stays when its label, hint, value, option names or config path contains the text; a choice stays when it
+// or anything inside it matches; sections and nav links without matches are hidden.
+function applySearch(){
+  const q=searchQuery.trim().toLowerCase(); let n=0;
+  const rows=[...document.querySelectorAll('#form .row, #form .chead')];
+  const cards = r => r.classList.contains('chead') ? (r.parentElement.querySelector(':scope > .opts')?.textContent || '') : '';   // a choice matches its options too
+  rows.forEach(r => { const hit=!q || (r.textContent+' '+cards(r)+' '+(r.dataset.path||r.parentElement.dataset.path||'')).toLowerCase().includes(q); r.classList.toggle('nomatch', !hit); if (hit && q) n++; });
+  document.querySelectorAll('#form .choice').forEach(c => { const any=!q || [...c.querySelectorAll('.row, .chead')].some(r=>!r.classList.contains('nomatch'));
+    c.classList.toggle('nomatch', !any); if (q && any) c.querySelector(':scope > .chead')?.classList.remove('nomatch'); });
+  document.querySelectorAll('#form .rowwrap').forEach(w => { const any=!q || [...w.querySelectorAll('.row')].some(r=>!r.classList.contains('nomatch')); w.classList.toggle('nomatch', !any); if (q && any) w.firstElementChild.classList.remove('nomatch'); });
+  document.querySelectorAll('#form section.grp').forEach(sec => {
+    const show=!q || sec.id==='g-advanced' && sec.textContent.toLowerCase().includes(q) || [...sec.querySelectorAll('.row, .chead')].some(r=>!r.classList.contains('nomatch'));
+    sec.hidden=!show; const link=document.querySelector(`#snav a[href="#${sec.id}"]`); if (link) link.hidden=!show; });
+  const c=$('sfindN'); if (c) c.textContent = q ? `${n} setting${n===1?'':'s'} match` : '';
+}
+
+// ---- saving
+// edits that will actually be saved: those of new profiles that were not chosen in the end are dropped
+const pending = () => Object.keys(dirty).filter(p => { const m=p.match(/^llm\.profiles\.([^.]+)\./); return !(m && newProfiles[m[1]] && m[1]!==current('llm.profile')); });
+const needsLLM = () => pending().some(p => p==='llm.profile' || /^llm\.profiles\.[^.]+\.serve\./.test(p));
+const reloads = () => pending().some(p => /^(tts\.(backend|device|chatterbox\.model|qwen3\.(model|python|weights_dir))|stt\.(backend|device|[a-z_]+\.model|[a-z_]+\.models\.[^.]+\.compute_type|[a-z_]+\.compute_type))$/.test(p));
+function buildPatch(){
+  const patch={}; const sel=current('llm.profile');
+  const set=(p,v)=>{ const parts=p.split('.'); let cur=patch; for (const k of parts.slice(0,-1)) cur=cur[k]??(cur[k]={}); cur[parts.at(-1)]=v; };
+  if (newProfiles[sel]) set(`llm.profiles.${sel}`, JSON.parse(JSON.stringify(newProfiles[sel])));
+  for (const [p,v] of Object.entries(dirty)){
+    const m=p.match(/^llm\.profiles\.([^.]+)\./); if (m && newProfiles[m[1]] && m[1]!==sel) continue;   // unsaved profiles not chosen in the end
+    set(p, v);
+  }
+  return patch;
+}
+function updateSavebar(){
+  const n=pending().length, managed=!!(cfg && cfg.managed_by_systemd);
+  const edits = yamlDirty || instrDirty || anyPersDirty();
+  $('savebar').classList.toggle('show', n>0 || edits || !!restartKind);
+  $('save').hidden = !(n>0); $('discard').hidden = !(n>0||edits);
+  $('save').textContent = 'Save';
+  if (n>0) $('saveMsg').innerHTML = `<b>${n} unsaved change${n>1?'s':''}</b><small>${needsLLM() && (profSummary(current('llm.profile'))||{}).local_server ? 'Applied right away; the local model takes 20–40 s to load.'
+      : reloads() ? 'Applied right away; the new engine or model takes a few seconds to load.' : 'Applied right away; the conversation continues.'}</small>`;
+  else if (edits) $('saveMsg').innerHTML = `<b>Unsaved editor changes</b><small>Use the Save button next to the ${anyPersDirty() ? 'personality' : 'editor'}.</small>`;
+  else if (restartKind) $('saveMsg').innerHTML = `<b>Saved.</b><small>${restartWhy ? esc(restartWhy) + ': restart' : 'Restart'} to apply${restartKind==='llm'?' (the LLM server restarts too)':''}${managed?'':' (restart alveus talk yourself)'}.</small>`;
+  $('restartA').hidden = !(restartKind==='assistant' && n===0); $('restartB').hidden = !(restartKind==='llm' && n===0);
+  if (!managed){ $('restartA').hidden = $('restartB').hidden = true; }
+}
+let restartWhy='';
+function needRestart(kind, why){ restartKind = (restartKind==='llm'||kind==='llm') ? 'llm' : 'assistant'; if (why) restartWhy=why; updateSavebar(); }
+$('discard').onclick = () => { newProfiles={}; loadSettings(true); };
+async function saveSettings(){
+  const patch=buildPatch();
+  if ('llm.profile' in dirty){
+    const target=current('llm.profile'), S=profSummary(target), cloud=!(S && S.local_server);
+    const definition = newProfiles[target] ? get(patch, `llm.profiles.${target}`) : undefined;
+    $('save').disabled=true;
+    $('saveMsg').innerHTML = cloud ? `<b>Checking ${esc(S?S.model:target)}…</b><small>Asks the provider whether the API key and the model are accepted; nothing is generated.</small>`
+      : `<b>Checking that ${esc(S?S.model:target)} loads…</b><small>Reads the model file with llama-server on the CPU; 10–40 s.</small>`;
     try{
-      const r = await j('/llm/check',{method:'POST', body:JSON.stringify({profile:target})});
-      if (!r.ok){ $('save').disabled=false; updateSavebar(); toast('Model check failed — not saved', true);
-        alert(`The model for profile "${target}" cannot be loaded by your llama-server build:\n\n${r.error}\n\nNothing was changed. If this is a newer Bonsai file, rebuild the PrismML llama.cpp fork (scripts/build_llama.sh) and try again.`); return; }
-      toast(`Model loads (${r.seconds ?? '?'} s)`);
+      const r = await j('/llm/check',{method:'POST', body:JSON.stringify({profile:target, ...(definition?{definition}:{})})});
+      if (!r.ok){ $('save').disabled=false; updateSavebar(); toast('Model check failed; nothing saved', true);
+        alert(cloud ? `${S?S.model:target} cannot be used yet:\n\n${r.error}\n\nNothing was changed. If the API key is missing or wrong, enter it above the model and save again.`
+          : `The model ${S?S.model:target} cannot be loaded by your llama-server build:\n\n${r.error}\n\nNothing was changed. If it is a newer model file, rebuild llama.cpp (scripts/build_llama.sh) or point the profile's serve.command at a newer llama-server.`); return; }
+      toast(cloud ? 'Key and model accepted' : `Model loads (${r.seconds ?? '?'} s)`);
     }catch(e){ $('save').disabled=false; updateSavebar(); toast('Model check error: '+e.message, true); return; }
     prevProfile = cfg.running_profile;
   }
-  try{ await j('/config',{method:'PUT', body:JSON.stringify({patch})}); toast('Settings saved'); await loadSettings(true); needRestart(llmChange?'llm':'assistant'); }
-  catch(e){ toast('Save failed: '+e.message, true); }
-  $('save').disabled=false;
-};
+  $('save').disabled=true; $('saveMsg').innerHTML=`<b>Applying…</b><small>${reloads() ? 'Loading the new engine or model; a few seconds.' : 'One moment.'}</small>`;
+  let res;
+  try{ res = await j('/config',{method:'PUT', body:JSON.stringify({patch, apply:true})}); }
+  catch(e){ $('save').disabled=false; updateSavebar(); toast('Save failed: '+e.message, true); return; }
+  $('save').disabled=false; dirty={}; newProfiles={};
+  const a = res.applied || {live:[], reloaded:[], restart:[], errors:[]};
+  if (a.errors.length) toast(a.errors.join(' · '), true);
+  else toast(['Saved and applied', ...a.reloaded].join(' · '));
+  await loadSettings(true); refreshHealth();
+  if (a.restart.length) needRestart('assistant', 'Saved; ' + a.restart.join(', ') + ' change at the next restart');
+}
+$('save').onclick = () => saveSettings();
+// read-only handle for debugging the form from the browser console / DevTools
+window.alveusSettings = {get dirty(){ return dirty; }, get newProfiles(){ return newProfiles; }, get pers(){ return pers; }, get persEdits(){ return persEdits; }, current, buildPatch};
+window.addEventListener('beforeunload', e => { if (Object.keys(dirty).length || yamlDirty || instrDirty || anyPersDirty()){ e.preventDefault(); e.returnValue=''; } });
+
 async function doRestart(what){
   try{ await j('/restart',{method:'POST', body:JSON.stringify({what})}); }catch(e){ toast(e.message,true); return; }
   showOverlay(what==='both'?'Restarting LLM server and assistant…':'Restarting assistant…');

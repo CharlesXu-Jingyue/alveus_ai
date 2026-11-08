@@ -1,12 +1,21 @@
-from .base import LLMBackend, LLMEvent
+"""LLM adapters, one per wire protocol, chosen by the resolved profile's ``api`` (see providers.py)."""
+from .base import LLMBackend, LLMError, LLMEvent
 from .openai_compat import OpenAICompatLLM
+from .providers import PROVIDERS
 
 
 def make_llm(profile) -> LLMBackend:
-    backend = profile.get("backend", "openai")
-    if backend in ("openai", "openai_compat", "llama_server", "vllm", "ollama"):
+    """Adapter for a profile resolved by ``alveus.config.llm_profile``."""
+    api = profile.get("api") or "openai_chat"
+    if api == "openai_chat":
         return OpenAICompatLLM(profile)
-    raise ValueError(f"Unknown LLM backend: {backend}")
+    if api == "openai_responses":
+        from .openai_responses import OpenAIResponsesLLM
+        return OpenAIResponsesLLM(profile)
+    if api == "anthropic_messages":
+        from .anthropic_messages import AnthropicLLM
+        return AnthropicLLM(profile)
+    raise ValueError(f"Unknown LLM api: {api}")
 
 
-__all__ = ["LLMBackend", "LLMEvent", "OpenAICompatLLM", "make_llm"]
+__all__ = ["LLMBackend", "LLMError", "LLMEvent", "OpenAICompatLLM", "PROVIDERS", "make_llm"]

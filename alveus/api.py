@@ -25,11 +25,12 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel
 
 from . import __version__
-from .config import (REPO_ROOT, load_config, patch_local_yaml, read_local_yaml, write_local_yaml)
+from . import personality
+from .config import (LOCAL_YAML, REPO_ROOT, load_config, patch_local_yaml, read_local_yaml, write_local_yaml)
+from .personality import instructions_path
 
 log = logging.getLogger(__name__)
 WEB_DIR = Path(__file__).parent / "web"
-PERSONA = REPO_ROOT / "config" / "persona.md"
 OWW_PRETRAINED = ["hey_jarvis", "alexa", "hey_mycroft", "hey_rhasspy", "weather", "timer"]
 
 
@@ -97,7 +98,7 @@ class ConfirmBroker:
             try:
                 return await asyncio.wait_for(fut, timeout)
             except TimeoutError:
-                return {"ok": False}
+                return {"ok": False, "reason": "no_answer"}
             finally:
                 self.pending.pop(cid, None)
         return confirm
@@ -142,9 +143,16 @@ class ConfirmIn(BaseModel):
 class ConfigIn(BaseModel):
     patch: dict[str, Any] | None = None
     yaml: str | None = None
+    apply: bool = False     # bring the running assistant in line right away (alveus/live.py)
 
 
-class PersonaIn(BaseModel):
+class TextIn(BaseModel):
+    text: str
+
+
+class PersonalityIn(BaseModel):
+    label: str = ""
+    description: str = ""
     text: str
 
 
@@ -154,6 +162,92 @@ class RestartIn(BaseModel):
 
 class LLMCheckIn(BaseModel):
     profile: str
+    definition: dict[str, Any] | None = None   # a profile not saved yet (the settings page creates them)
+
+
+class PreviewIn(BaseModel):
+    voice: str
+    text: str = ""
+    play: bool = True       # on the assistant's speaker; False (or no speaker) returns the WAV
+
+
+class SampleIn(BaseModel):
+    name: str
+    dir: str = ""
+
+
+class SecretIn(BaseModel):
+    name: str
+    value: str = ""   # empty = remove
+
+
+def _secret_names(cfg) -> dict[str, list[str]]:
+    """API-key variable -> profiles using it (every provider preset's variable is listed too)."""
+    from .config import llm_profile
+    from .llm.providers import PROVIDERS
+    names: dict[str, list[str]] = {p["api_key_env"]: [] for p in PROVIDERS.values() if p.get("api_key_env")}
+    for n in cfg.llm.get("profiles") or {}:
+        try:
+            env = llm_profile(cfg, n).get("api_key_env")
+        except KeyError:
+            continue
+        if env:
+            names.setdefault(env, []).append(n)
+    return names
+
+
+def _secrets_status(cfg) -> dict[str, Any]:
+    from . import credentials
+    from .llm.providers import PROVIDERS
+    label = {p["api_key_env"]: p.get("label", k) for k, p in PROVIDERS.items() if p.get("api_key_env")}
+    return {"path": str(credentials.secrets_path()),
+            "keys": {name: {"source": credentials.source(name), "profiles": profiles, "label": label.get(name, name)}
+                     for name, profiles in _secret_names(cfg).items()}}
+
+
+def _profile_info(cfg) -> dict[str, dict[str, Any]]:
+    from .config import llm_profile
+    from .llm.providers import describe
+    out: dict[str, dict[str, Any]] = {}
+    for n in cfg.llm.get("profiles") or {}:
+        try:
+            p = llm_profile(cfg, n)
+        except KeyError as e:
+            out[n] = {"label": f"{n} (invalid: {e})", "remote": False}
+            continue
+        out[n] = _profile_summary(p)
+        out[n]["label"] = f"{n} · {describe(p)}"
+    return out
+
+
+def _profile_summary(p) -> dict[str, Any]:
+    """What the settings page shows and edits for one resolved profile (effective values)."""
+    from .llm.service import context_of
+    serve = p.get("serve") or {}
+    mp = serve.get("model_path")
+    return {"remote": bool(p.get("remote")), "provider": p.get("provider"), "model": p.get("model"),
+            "local_server": bool(serve), "api_key_env": p.get("api_key_env"), "base_url": p.get("base_url"),
+            "model_path": os.path.expanduser(mp) if mp else None, "file_exists": bool(mp and Path(os.path.expanduser(mp)).exists()),
+            "temperature": p.get("temperature"), "top_p": p.get("top_p"), "max_tokens": p.get("max_tokens"),
+            "effort": p.get("effort"), "thinking": p.get("thinking"), "context": context_of(serve),
+            "top_k": (p.get("extra_body") or {}).get("top_k")}
+
+
+def _providers_info(cfg) -> dict[str, Any]:
+    """Provider cards for the settings page: what each offers, its key status, and the effective
+    defaults a new profile of that provider would get."""
+    from . import credentials
+    from .llm.providers import LOCAL_SERVE_TEMPLATE, PROVIDER_INFO, PROVIDERS, resolve
+    out = {}
+    for name, info in PROVIDER_INFO.items():
+        preset = PROVIDERS[name]
+        env = preset.get("api_key_env")
+        d = _profile_summary(resolve("_new", {"provider": name, "model": "_"}, dict(cfg.llm)))
+        out[name] = {**info, "label": preset.get("label", name), "api_key_env": env,
+                     "key_source": credentials.source(env) if env else None,
+                     "base_url": preset.get("base_url"), "defaults": d,
+                     **({"serve_template": LOCAL_SERVE_TEMPLATE} if info.get("local_files") else {})}
+    return out
 
 
 # ----------------------------------------------------------------------------- app
@@ -198,17 +292,23 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
     @app.get("/health")
     async def health() -> dict[str, Any]:
         from .agent.loop import active_names
-        ok, msg = await assistant.agent.llm.health() if assistant.agent else (False, "agent not ready")
+        llm = assistant.agent.llm if assistant.agent else None
+        ok, msg = await llm.health() if llm else (False, "agent not ready")
         name, other = active_names(assistant.cfg)
         if bus.state in ("speaking", "thinking"):
             _settle_state()
+        # the alveus-llm unit only matters when this profile runs its model on a local server it starts
+        local_server = bool((getattr(llm, "profile", None) or {}).get("serve"))
         return {"ok": ok, "llm": msg, "state": bus.state if has_voice else "text-only",
                 "tools": len(assistant.hub.tools) if assistant.hub else 0,
                 "stt": assistant.stt.name, "tts": assistant.tts.name, "name": name, "other_name": other,
                 "voice": has_voice, "version": __version__, "profile": assistant.cfg.llm.profile,
+                "llm_provider": getattr(llm, "provider", None), "llm_model": getattr(llm, "model", None),
+                "llm_remote": bool(getattr(llm, "remote", False)),
                 "tts_warning": getattr(assistant.tts, "warning", None),
                 "managed_by_systemd": bool(os.environ.get("INVOCATION_ID")),
-                "llm_service": _unit_status("alveus-llm.service") if os.environ.get("INVOCATION_ID") else None}
+                "llm_service": _unit_status("alveus-llm.service")
+                if os.environ.get("INVOCATION_ID") and local_server else None}
 
     @app.get("/debug/tasks", include_in_schema=False)
     async def debug_tasks() -> list[dict[str, Any]]:
@@ -424,13 +524,18 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
             "local_yaml": local_text,
             "options": {
                 "llm_profiles": sorted((cfg.llm.get("profiles") or {}).keys()),
+                "llm_profiles_labels": {n: i["label"] for n, i in _profile_info(cfg).items()},
+                "effort_levels": ["low", "medium", "high", "xhigh", "max"],
                 "stt_backends": ["faster_whisper", "parakeet", "openai_http"],
-                "tts_backends": ["kokoro", "chatterbox", "openai_http"],
+                "tts_backends": ["kokoro", "chatterbox", "qwen3", "openai_http"],
+                "qwen3_models": list(__import__("alveus.tts.qwen3_tts", fromlist=["x"]).MODELS),
+                "qwen3_languages": ["auto", *__import__("alveus.tts.qwen3_tts", fromlist=["x"]).LANGS],
                 "kokoro_voices": KOKORO_VOICES,
                 "chatterbox_models": ["turbo", "standard", "multilingual"],
                 "chatterbox_languages": ["auto", *__import__("alveus.tts.chatterbox_tts", fromlist=["x"]).MULTILINGUAL_LANGS],
                 "voice_genders": ["auto", "female", "male"],
                 "voice_samples": voice_samples,
+                "voice_texts": _voice_texts(cfg.tts.get("voices_dir")),
                 "parakeet_models": ["nemo-parakeet-tdt-0.6b-v3", "nemo-parakeet-tdt-0.6b-v2", "nemo-parakeet-ctc-0.6b"],
                 "whisper_models": ["large-v3-turbo", "large-v3", "distil-large-v3", "medium", "small", "base"],
                 "oww_models": OWW_PRETRAINED + custom_oww,
@@ -439,13 +544,95 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "log_levels": ["DEBUG", "INFO", "WARNING"],
                 "audio_backends": ["auto", "pipewire", "sounddevice"],
                 "opencode_models": ["auto", "opencode-default", *_opencode_models()],
+                "destructive_tools": sorted(t.full_name for t in (assistant.hub.tools.values() if assistant.hub else [])
+                                            if t.destructive),
             },
-            "paths": {"local_yaml": str(REPO_ROOT / "config" / "local.yaml"), "persona": str(PERSONA),
+            "paths": {"local_yaml": str(LOCAL_YAML), "instructions": str(instructions_path(cfg)),
                       "defaults": str(REPO_ROOT / "config" / "alveus.yaml")},
             "env": dict(cfg._env),
             "managed_by_systemd": bool(os.environ.get("INVOCATION_ID")),
             "running_profile": assistant.cfg.llm.profile,
+            "llm_profile_info": _profile_info(cfg),
+            "llm_providers": _providers_info(cfg),
+            "secrets": _secrets_status(cfg),
+            "running": {"tts": getattr(assistant.tts, "name", None), "kokoro_voice": getattr(assistant.tts, "voice", None),
+                        "chatterbox_model": getattr(assistant.tts, "variant", None)},
         }
+
+    @app.get("/llm/models")
+    async def llm_models(provider: str, base_url: str = "", api_key_env: str = "") -> dict[str, Any]:
+        """Models a provider offers (GGUF files for llama_server; the live list, else suggestions)."""
+        from .llm.catalog import provider_models
+        from .llm.providers import PROVIDER_INFO
+        if provider not in PROVIDER_INFO:
+            raise HTTPException(404, f"unknown provider {provider}")
+        return await provider_models(load_config(), provider, base_url or None, api_key_env or None)
+
+    @app.get("/audio/devices")
+    async def audio_devices() -> dict[str, Any]:
+        """Microphones and speakers PipeWire knows: {sources, sinks: [{name, label}]}; name is what
+        audio.input_device / output_device take."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _pipewire_devices)
+
+    @app.post("/tts/preview")
+    async def tts_preview(inp: PreviewIn) -> Response:
+        """Speak a sample sentence with another voice of the running engine and return WAV (played
+        in the browser). Kokoro only: its voices switch per call; other engines would need a reload."""
+        tts = assistant.tts
+        if getattr(tts, "name", "") != "kokoro":
+            raise HTTPException(409, "voice preview works while Kokoro is the active voice engine")
+        from .tts.kokoro_tts import KOKORO_VOICES
+        if inp.voice not in KOKORO_VOICES:
+            raise HTTPException(404, f"unknown Kokoro voice {inp.voice}")
+        from .agent.loop import active_names
+        text = inp.text or f"Hello, I am {active_names(assistant.cfg)[0]}. This is how I sound."
+        loop = asyncio.get_running_loop()
+        audio = await loop.run_in_executor(None, lambda: tts.synthesize(text, voice=inp.voice))
+        log.info("voice preview: %s (%.1f s)%s", inp.voice, len(audio) / tts.sample_rate,
+                 " on the speaker" if inp.play and has_voice else "")
+        if inp.play and has_voice:
+            assistant.audio_out.play(audio, tts.sample_rate)
+            return JSONResponse({"played": True, "seconds": len(audio) / tts.sample_rate})
+        buf = io.BytesIO()
+        sf.write(buf, audio, tts.sample_rate, format="WAV", subtype="PCM_16")
+        return Response(buf.getvalue(), media_type="audio/wav")
+
+    @app.post("/voices/play")
+    async def voice_play(inp: SampleIn) -> dict[str, Any]:
+        """Play one recording from the voices folder on the assistant's speaker."""
+        if not has_voice:
+            raise HTTPException(409, "no speaker in this mode; use GET /voices/file")
+        d = Path(os.path.expanduser(inp.dir or load_config().tts.get("voices_dir") or ""))
+        if not inp.name or inp.name not in _list_voices(str(d)):
+            raise HTTPException(404, "no such sample in the voices folder")
+        audio, sr = sf.read(str(d / inp.name), dtype="float32", always_2d=True)
+        mono = audio.mean(axis=1)
+        log.info("voice sample: %s (%.1f s) on the speaker", inp.name, len(mono) / sr)
+        assistant.audio_out.play(mono, sr)
+        return {"played": True, "seconds": len(mono) / sr}
+
+    @app.get("/secrets")
+    async def get_secrets() -> dict[str, Any]:
+        """Which API keys are set (never their values) and which profiles use them."""
+        return _secrets_status(load_config())
+
+    @app.put("/secrets")
+    async def put_secret(inp: SecretIn) -> dict[str, Any]:
+        """Store (or with an empty value remove) an API key in ~/.config/alveus/secrets.env.
+        Only variables some profile or provider uses are accepted. Takes effect on the next request."""
+        from . import credentials
+        cfg = load_config()
+        if inp.name not in _secret_names(cfg):
+            raise HTTPException(400, f"{inp.name} is not an API-key variable of any LLM profile")
+        try:
+            credentials.set_secret(inp.name, inp.value)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        llm = assistant.agent.llm if assistant.agent else None
+        if llm is not None and hasattr(llm, "_health"):
+            llm._health.clear()
+        return _secrets_status(cfg)
 
     @app.put("/config")
     async def put_config(inp: ConfigIn) -> dict[str, Any]:
@@ -456,22 +643,69 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 local = patch_local_yaml(inp.patch)
             else:
                 raise HTTPException(400, "send {patch: {...}} or {yaml: '...'}")
-            load_config()  # validate the merged result parses/expands
+            new_cfg = load_config()  # validate the merged result parses/expands
         except yaml.YAMLError as e:
             raise HTTPException(400, f"invalid YAML: {e}") from e
         except (ValueError, KeyError) as e:
             raise HTTPException(400, str(e)) from e
+        report = None
+        if inp.apply:
+            from .live import apply_config
+            report = await apply_config(assistant, new_cfg)
         bus.publish("config_saved")
-        return {"saved": True, "local": local, "local_yaml": read_local_yaml(), "restart_required": True}
+        return {"saved": True, "local": local, "local_yaml": read_local_yaml(), "applied": report,
+                "restart_required": True if report is None else bool(report["restart"])}
 
-    @app.get("/persona")
-    async def get_persona() -> dict[str, str]:
-        return {"text": PERSONA.read_text() if PERSONA.exists() else ""}
+    def _rebuild_prompt() -> None:
+        if assistant.agent is not None:   # used from the next request on
+            assistant.agent.system_prompt = assistant.agent._build_system_prompt()
 
-    @app.put("/persona")
-    async def put_persona(inp: PersonaIn) -> dict[str, bool]:
-        PERSONA.write_text(inp.text if inp.text.endswith("\n") else inp.text + "\n")
-        return {"saved": True, "restart_required": True}
+    @app.get("/instructions")
+    async def get_instructions() -> dict[str, str]:
+        """The instructions half of the system prompt (directions and boundaries)."""
+        p = instructions_path(assistant.cfg)
+        return {"text": p.read_text() if p.exists() else "", "path": str(p)}
+
+    @app.put("/instructions")
+    async def put_instructions(inp: TextIn) -> dict[str, bool]:
+        p = instructions_path(assistant.cfg)
+        p.write_text(inp.text if inp.text.endswith("\n") else inp.text + "\n")
+        _rebuild_prompt()
+        return {"saved": True}
+
+    @app.get("/personalities")
+    async def get_personalities() -> dict[str, Any]:
+        """Every personality (shipped and the owner's own) with its text, and which one is active."""
+        allp = personality.load_all(assistant.cfg)
+        act = personality.active(assistant.cfg)
+        return {"active": act.id if act else None, "default": personality.DEFAULT,
+                "own_dir": str(personality.own_dir(assistant.cfg)), "items": [p.as_dict() for p in allp.values()]}
+
+    @app.put("/personalities/{pid}")
+    async def put_personality(pid: str, inp: PersonalityIn) -> dict[str, Any]:
+        """Create or change one (a shipped one is saved as an edited copy in the owner's folder)."""
+        try:
+            p = personality.save(assistant.cfg, pid, inp.label, inp.description, inp.text)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        _rebuild_prompt()
+        bus.publish("config_saved")
+        return {"saved": True, "personality": p.as_dict()}
+
+    @app.delete("/personalities/{pid}")
+    async def delete_personality(pid: str) -> dict[str, Any]:
+        """Delete an own personality, or restore a shipped one to its original."""
+        act = personality.active(assistant.cfg)
+        allp = personality.load_all(assistant.cfg)
+        if pid in allp and not allp[pid].shipped and act and act.id == pid:
+            raise HTTPException(409, "This personality is in use; choose another one first.")
+        try:
+            what = personality.remove(assistant.cfg, pid)
+        except (ValueError, FileNotFoundError) as e:
+            raise HTTPException(404, str(e)) from e
+        _rebuild_prompt()
+        bus.publish("config_saved")
+        return {what: pid}
 
     @app.post("/restart")
     async def restart(inp: RestartIn) -> dict[str, Any]:
@@ -498,13 +732,48 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return {"stopping": units}
 
+    @app.get("/voices/file")
+    async def voice_file(name: str, dir: str = "") -> FileResponse:
+        """One voice sample from the voices folder, to listen to it in the browser."""
+        d = Path(os.path.expanduser(dir or load_config().tts.get("voices_dir") or ""))
+        if not name or name not in _list_voices(str(d)):
+            raise HTTPException(404, "no such sample in the voices folder")
+        return FileResponse(d / name)
+
     @app.get("/voices")
     async def voices(dir: str = "") -> dict[str, Any]:
         """List WAV voice samples in a folder (defaults to tts.voices_dir)."""
         d = dir or load_config().tts.get("voices_dir") or ""
         path = Path(os.path.expanduser(d)) if d else None
         return {"dir": str(path) if path else "", "exists": bool(path and path.is_dir()),
-                "files": _list_voices(d)}
+                "files": _list_voices(d), "texts": _voice_texts(d)}
+
+    @app.post("/voices/transcribe")
+    async def voice_transcribe(inp: SampleIn) -> dict[str, Any]:
+        """Write down what a recording says (``NAME.txt`` beside it) with the speech recognizer, so
+        Qwen3-TTS can copy the voice closely in the recording's own language."""
+        cfg = load_config()
+        d = Path(os.path.expanduser(inp.dir or cfg.tts.get("voices_dir") or ""))
+        if not inp.name or inp.name not in _list_voices(str(d)):
+            raise HTTPException(404, "no such sample in the voices folder")
+        stt = getattr(assistant, "stt", None)
+        if stt is None:
+            raise HTTPException(409, "speech recognition is not running in this mode")
+        audio, sr = sf.read(str(d / inp.name), dtype="float32", always_2d=True)
+        mono = audio.mean(axis=1)
+        if sr != 16000:
+            import librosa
+            mono = librosa.resample(mono, orig_sr=sr, target_sr=16000)
+        text = (await asyncio.get_running_loop().run_in_executor(None, stt.transcribe, mono, 16000)).strip()
+        if not text:
+            raise HTTPException(422, "nothing recognisable in that recording")
+        (d / inp.name).with_suffix(".txt").write_text(text + "\n", encoding="utf-8")
+        log.info("voice sample %s: transcript saved (%d characters)", inp.name, len(text))
+        tts = getattr(assistant, "tts", None)
+        if tts is not None and hasattr(tts, "ref_text") and hasattr(tts, "reconfigure"):
+            from .config import engine_opts
+            tts.reconfigure(engine_opts(assistant.cfg, "tts"))   # picks the new transcript up
+        return {"name": inp.name, "text": text}
 
     @app.get("/services")
     async def services() -> dict[str, Any]:
@@ -512,18 +781,35 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
 
     @app.post("/llm/check")
     async def llm_check(inp: LLMCheckIn) -> dict[str, Any]:
-        """Preflight: can the configured server binary load this profile's model file?
-        Starts llama-server on a spare port with the weights on the CPU (mmap, no VRAM),
-        waits for /health, then stops it. Typically 5-20 s; a bad file fails in <1 s."""
+        """Preflight before switching profiles.
+        Local server profile: can the configured server binary load the model file? Starts
+        llama-server on a spare port with the weights on the CPU (mmap, no VRAM), waits for
+        /health, then stops it. Typically 5-20 s; a bad file fails in <1 s.
+        Cloud / external profile: is the API key there and does the endpoint accept it and know
+        the model (no tokens generated)."""
         from .config import llm_profile
+        from .llm import make_llm
         cfg = load_config()
         try:
-            prof = llm_profile(cfg, inp.profile)
+            if inp.definition is not None:
+                from .config import DotDict
+                from .llm.providers import resolve
+                prof = DotDict(resolve(inp.profile, dict(inp.definition), dict(cfg.llm)))
+                prof = DotDict(json.loads(json.dumps(prof).replace("${ALVEUS_MODELS}", cfg._env["ALVEUS_MODELS"])
+                                          .replace("${ALVEUS_LLAMA_SERVER}", cfg._env["ALVEUS_LLAMA_SERVER"])))
+            else:
+                prof = llm_profile(cfg, inp.profile)
         except KeyError as e:
             raise HTTPException(404, str(e)) from e
         serve = prof.get("serve") or {}
         if not serve:
-            return {"ok": True, "skipped": "profile has no serve section (external server)"}
+            t0 = time.time()
+            try:
+                ok, msg = await make_llm(prof).health()
+            except Exception as e:  # noqa: BLE001
+                ok, msg = False, f"{type(e).__name__}: {e}"
+            return {"ok": ok, "kind": "cloud" if prof.remote else "external", "seconds": round(time.time() - t0, 1),
+                    "detail": msg, **({} if ok else {"error": msg})}
         model_path = serve.get("model_path", "")
         if not Path(model_path).exists():
             return {"ok": False, "error": f"model file not found: {model_path}"}
@@ -596,6 +882,19 @@ def _opencode_models() -> list[str]:
     return models
 
 
+def _voice_texts(voices_dir: str | None) -> list[str]:
+    """Recordings in the folder that have their words beside them (NAME.txt, not empty)."""
+    d = Path(os.path.expanduser(str(voices_dir))) if voices_dir else None
+    out = []
+    for name in _list_voices(voices_dir):
+        try:
+            if (d / name).with_suffix(".txt").read_text(encoding="utf-8").strip():
+                out.append(name)
+        except OSError:
+            continue
+    return out
+
+
 def _list_voices(voices_dir: str | None) -> list[str]:
     if not voices_dir:
         return []
@@ -603,6 +902,26 @@ def _list_voices(voices_dir: str | None) -> list[str]:
     if not d.is_dir():
         return []
     return sorted(f.name for f in d.iterdir() if f.suffix.lower() in (".wav", ".flac", ".mp3") and f.is_file())
+
+
+def _pipewire_devices() -> dict[str, Any]:
+    try:
+        out = subprocess.run(["pw-dump"], capture_output=True, text=True, timeout=5, check=False).stdout
+        nodes = json.loads(out or "[]")
+    except Exception as e:  # noqa: BLE001
+        return {"sources": [], "sinks": [], "error": f"pw-dump unavailable: {e}"}
+    res: dict[str, list[dict[str, str]]] = {"sources": [], "sinks": []}
+    for o in nodes:
+        p = ((o.get("info") or {}).get("props") or {})
+        cls, name = str(p.get("media.class", "")), p.get("node.name")
+        if not name:
+            continue
+        label = p.get("node.description") or p.get("node.nick") or name
+        if cls == "Audio/Source":
+            res["sources"].append({"name": name, "label": label})
+        elif cls == "Audio/Sink":
+            res["sinks"].append({"name": name, "label": label})
+    return res
 
 
 def _units(what: str) -> list[str]:

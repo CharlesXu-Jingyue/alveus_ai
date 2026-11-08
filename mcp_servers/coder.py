@@ -43,13 +43,18 @@ def resolve_dir(directory: str) -> str:
 
 def _model() -> str:
     """Which opencode model to request (provider/model), from ALVEUS_OPENCODE_MODEL:
-    auto (or empty)   -> the same local model Alveus itself is running (ALVEUS_LLM_MODEL, set by the
-                         tool hub), so switching the assistant's profile switches the coder too
+    auto (or empty)   -> the same model Alveus itself is running, so switching the assistant's profile
+                         switches the coder too: a cloud profile's opencode_provider/model
+                         (ALVEUS_OPENCODE_AUTO, set by the tool hub; opencode must be signed in to that
+                         provider), else the local server's model under LOCAL_PROVIDER
     opencode-default  -> whatever opencode.jsonc / the desktop app has as default (no --model)
     provider/model    -> that model, e.g. deepseek/deepseek-v4-flash (needs opencode auth for it)
     """
     v = os.environ.get("ALVEUS_OPENCODE_MODEL", "auto").strip()
     if v in ("", "auto"):
+        same = os.environ.get("ALVEUS_OPENCODE_AUTO", "").strip()
+        if same:
+            return same
         local = os.environ.get("ALVEUS_LLM_MODEL", "").strip()
         return f"{LOCAL_PROVIDER}/{local}" if local else ""
     if v == "opencode-default":

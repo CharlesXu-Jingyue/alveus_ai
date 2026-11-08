@@ -21,9 +21,11 @@ class KokoroTTS:
     def __init__(self, opts: dict, device: str = "cuda"):
         self.voice = opts.get("voice", "af_heart")
         self.speed = float(opts.get("speed", 1.0))
-        self.lang_code = opts.get("lang_code", "a")
+        # accent follows the voice (af_/am_ American, bf_/bm_ British) unless set explicitly
+        self.lang_code = opts.get("lang_code") or (self.voice[:1] if self.voice[:1] in "ab" else "a")
         self.device = device
         self._pipe = None
+        self._pipes: dict[str, object] = {}   # other accents, sharing the loaded model (previews)
 
     def load(self) -> None:
         if self._pipe is not None:
@@ -35,10 +37,37 @@ class KokoroTTS:
         # warm up
         self.synthesize("Ready.")
 
-    def synthesize(self, text: str) -> np.ndarray:
+    def reconfigure(self, opts: dict) -> bool:
+        """Apply new options in place (no reload): voice, speed, accent. Always possible: another accent
+        gets its own pipeline on the already loaded model."""
+        self.voice = opts.get("voice", self.voice)
+        self.speed = float(opts.get("speed", self.speed))
+        lang = opts.get("lang_code") or (self.voice[:1] if self.voice[:1] in "ab" else "a")
+        if self._pipe is not None and lang != self.lang_code:
+            from kokoro import KPipeline
+            self._pipes[self.lang_code] = self._pipe          # kept for previews in that accent
+            self._pipe = self._pipes.pop(lang, None) or KPipeline(lang_code=lang, repo_id="hexgrad/Kokoro-82M",
+                                                                 model=self._pipe.model)
+        self.lang_code = lang
+        return True
+
+    def _pipe_for(self, voice: str):
+        """The pipeline for a voice's accent; another accent reuses the loaded model (no extra VRAM)."""
+        lang = voice[:1] if voice[:1] in "ab" else self.lang_code
+        if lang == self.lang_code:
+            return self._pipe
+        if lang not in self._pipes:
+            from kokoro import KPipeline
+            self._pipes[lang] = KPipeline(lang_code=lang, repo_id="hexgrad/Kokoro-82M", model=self._pipe.model)
+        return self._pipes[lang]
+
+    def synthesize(self, text: str, voice: str | None = None) -> np.ndarray:
+        """``voice`` overrides the configured voice for this call (GUI preview)."""
         self.load()
+        voice = voice or self.voice
+        pipe = self._pipe if voice == self.voice else self._pipe_for(voice)
         chunks: list[np.ndarray] = []
-        for _gs, _ps, audio in self._pipe(text, voice=self.voice, speed=self.speed):
+        for _gs, _ps, audio in pipe(text, voice=voice, speed=self.speed):
             if audio is None:
                 continue
             a = audio.detach().cpu().numpy() if hasattr(audio, "detach") else np.asarray(audio)

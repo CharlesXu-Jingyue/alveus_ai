@@ -26,7 +26,7 @@ Access is restricted to `ALVEUS_FS_ROOTS` (colon-separated; default `~`). Paths 
 | `write_file` | `path`, `content`, `append=false` | creates parent folders |
 | `find_files` | `pattern`, `path="~"`, `max_results=100` | recursive glob (`*.pdf`), skips dot-dirs/node_modules |
 | `search_text` | `query`, `path="~"`, `file_glob="*"`, `max_results=50`, `regex=false` | grep-like, case-insensitive, skips files > 5 MB |
-| `move_path` **!** | `src`, `dst` | rename/move |
+| `move_path` | `src`, `dst`, `overwrite=false` | rename/move; refuses to replace an existing file unless `overwrite`, which asks first |
 | `delete_path` **!** | `path` | unlink file or remove empty dir |
 | `run_command` | `command`, `cwd="~"`, `timeout_s=60` | bash, stdout/stderr/exit code; dangerous commands confirmed |
 
@@ -48,7 +48,7 @@ missing otherwise; `playerctl` improves media control but D-Bus MPRIS is used as
 | `media_control` | `action` = play/pause/play_pause/next/previous/stop/status | MPRIS via playerctl or gdbus |
 | `list_windows` | | `wmctrl -l` |
 | `focus_window` | `title_substring` | raise window |
-| `close_window` **!** | `title_substring` | graceful close |
+| `close_window` | `title_substring` | graceful close (apps with unsaved work ask themselves); no confirmation |
 | `type_text` | `text` | `xdotool type` (X11 only) |
 | `press_keys` | `keys` (xdotool syntax, e.g. `ctrl+s`) | `xdotool key` (X11 only) |
 | `screenshot` | `path=""` | PNG via gnome-screenshot, GNOME Shell D-Bus, or ImageMagick `import` |
@@ -66,7 +66,7 @@ missing otherwise; `playerctl` improves media control but D-Bus MPRIS is used as
 | `find_process` | `name` | match on name or command line |
 | `kill_process` **!** | `pid`, `force=false` | SIGTERM / SIGKILL |
 | `list_services` | `scope="user"|"system"`, `state="running"|"failed"|"all"` | systemd units |
-| `control_service` **!** | `name`, `action` (start/stop/restart/enable/disable/status), `scope="user"` | systemctl; system scope may prompt polkit |
+| `control_service` | `name`, `action` (start/stop/restart/enable/disable/status), `scope="user"` | systemctl; asks first only for stop/disable or system scope (which may also prompt polkit) |
 | `network_info` | | IPv4 per interface, internet reachability (ping 1.1.1.1) |
 | `power` **!** | `action` = suspend/hibernate/reboot/poweroff/lock | systemctl / loginctl |
 
@@ -85,10 +85,16 @@ These are the only tools that contact the internet.
 Delegates programming work to **opencode** (`opencode run --format json`, headless; the desktop app
 is not involved, but it shares opencode's config and credentials). Which model opencode uses is set by
 `tools.servers.coder.env.ALVEUS_OPENCODE_MODEL` (GUI: Tools & safety → Coding model):
-`auto` (default) requests the same local Bonsai model the assistant is running, via the `bonsai`
-provider in `~/.config/opencode/opencode.jsonc`, so it follows `llm.profile`; `opencode-default` leaves
+`auto` (default) requests the same model the assistant is running, so it follows `llm.profile`: for a
+local profile via the `bonsai` provider in `~/.config/opencode/opencode.jsonc` (a new local model's id,
+e.g. `qwen3.8-27b`, must be listed under that provider too), for a cloud profile as
+`<opencode provider>/<model>` (e.g. `anthropic/claude-opus-5-5`; opencode must be signed in to that
+provider with `opencode auth login`, or the profile sets `opencode_model`); `opencode-default` leaves
 the choice to opencode; any `provider/model` id from `opencode models` (e.g. `deepseek/deepseek-v4-flash`)
-sends the work to that model instead. `ALVEUS_CODE_DIR` is the coding folder: the tools' descriptions quote it so the model knows it, and
+sends the work to that model instead. The files/shell tools refuse the folder holding the API keys (`~/.config/alveus/`: reading,
+listing, searching into it, and shell commands naming it); a casual-leak guard, not a sandbox.
+The coder is the only tool server that sees API-key variables
+from the environment (`inherit_api_keys: true`), since opencode may use them to sign in. `ALVEUS_CODE_DIR` is the coding folder: the tools' descriptions quote it so the model knows it, and
 `directory` is resolved against it: empty, `~`, `.` or `default` mean the folder itself; a bare name
 (`repo`, `repo/foo`) is looked up inside it (then under `~`); absolute and `~/…` paths are used as given.
 An unknown name returns an error listing the folder's subdirectories so the model can pick one.

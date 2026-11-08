@@ -50,13 +50,35 @@ Start with `alveus doctor --warm` and `journalctl --user -u alveus -n 200`.
 | `MCP server 'x' failed to start: Connection closed` | server crashed at import | run it directly: `python -m mcp_servers.x` to see the traceback |
 | `ModuleNotFoundError: mcp.server.fastmcp` | mcp ≥ 2 renamed FastMCP | already handled by `mcp_servers/common.py`; use `from .common import FastMCP` |
 | Desktop tools say "missing tools: xdotool…" | optional binaries absent | `sudo apt install xdotool wmctrl xclip playerctl` |
+| It asks before an action although the model's reasoning said it would just do it | the confirmation gate is in the agent, not the model: tools marked destructive ask (closing windows no longer does) | tick the tool under Tools & safety → Don't ask for these (`tools.no_confirm`) |
+| It gave up on an action although you were about to answer | `activation.confirm_wait_s` (default 15 s) ran out; silence means "not now" | raise the wait (Activation → Time to answer a question). The journal logs `confirmation (try N): heard '…' -> yes/no/unclear` or `no answer within N s` |
 | `code_task` returns quickly with no summary | opencode not authenticated/configured | `opencode run "hi"` in a terminal; check `~/.config/opencode/opencode.jsonc` |
+
+## Cloud models
+
+| symptom | cause | fix |
+|---|---|---|
+| "The language model failed: no API key for Anthropic …" (spoken) | the profile's key variable is set neither in the environment nor in `~/.config/alveus/secrets.env` | Settings → Language model → API keys, or `alveus llm key ANTHROPIC_API_KEY`; no restart needed |
+| "… rejected the API key" | wrong, revoked or out-of-project key | paste a new key; `alveus llm test --profile <name>` checks it with one request |
+| "… says the account has no credit left" (HTTP 402) / "rate limiting us" (429) | billing or quota at the provider | top up / raise limits in the provider console; 429s and 5xx are already retried twice |
+| "… does not know this model" (404) | model id changed or not available to the account | `alveus llm profiles`, then fix `model` in the profile; the provider's model list is the reference |
+| Switching to a cloud profile is refused: "Profile … cannot be used yet" | the GUI preflight (`POST /llm/check`) found no key, a rejected key or an unknown model | enter the key under API keys (just below the profile) and save again |
+| On a cloud profile, `nvidia-smi` still shows llama-server holding VRAM | the assistant was not restarted since the switch, or `llm.manage_local_server: false` | restart the assistant (it stops the unit; the journal says `LLM server: profile … needs no local server; stopping it`), or `systemctl --user stop alveus-llm` |
+| GUI header shows "LLM ready · cloud" but `alveus-llm` is inactive | expected: a cloud profile needs no local server, `alveus llm serve` exits at once (frees the GPU) | nothing; switching back to a local profile restarts it |
+| DeepSeek: HTTP 400 about `reasoning_content` | the API requires earlier reasoning to be sent back once tools are used | handled by the `deepseek` preset (`reasoning_replay: all`); a hand-made profile on `openai_compat` needs `reasoning_replay: all` too |
+| Claude: HTTP 400 "Invalid `signature` in `thinking` block" | a replayed thinking block no longer matches the history before it (history edited in the middle) | the agent only trims whole old turns and drops the bound thinking then; if it still happens, `/history/reset` (GUI: clear conversation) and report the steps |
+| Claude: HTTP 400 mentioning `thinking` on an older model | model without adaptive thinking (e.g. Haiku 4.5) | set `thinking: false` in that profile |
+| OpenAI: tools never called, or HTTP 400 on `/chat/completions` | current OpenAI models call tools only through the Responses API | use `provider: openai` (Responses), not `openai_compat` pointed at api.openai.com |
+| The coder tool fails with "model not found" after switching to a cloud profile | `ALVEUS_OPENCODE_MODEL: auto` follows the profile, but opencode is not signed in to that provider | `opencode auth login`, or set the coding model explicitly in the GUI |
 
 ## Python environment
 
 | symptom | cause | fix |
 |---|---|---|
 | `CUDAExecutionProvider is not in available provider names` | CPU `onnxruntime` shadows `onnxruntime-gpu` | `pip uninstall -y onnxruntime && pip install --force-reinstall --no-deps onnxruntime-gpu` |
+| Qwen3-TTS: `cannot import name 'check_model_inputs' from 'transformers.utils.generic'` | qwen-tts imported in the main environment (transformers 5) | it must run through its worker: `tts.qwen3.python` → `.venv-qwen3tts/bin/python` (`scripts/install_qwen3_tts.sh`); never `pip install qwen-tts` into the alveus env (it would downgrade transformers for everything) |
+| Qwen3-TTS silent, `/health` shows a voice warning | no recording chosen and the voices folder is empty, or the worker failed to start (the error names the cause: missing environment, out of memory) | put a WAV in the voices folder and choose it; `alveus doctor` checks the environment; `journalctl --user -u alveus | grep -i qwen` |
+| Qwen3-TTS voice sounds less like the recording in English | expected across languages; it then copies the timbre only | for the closest copy use a recording in the language it mostly speaks, with its words in `NAME.txt` |
 | `chatterbox-tts requires numpy<2` / other pins broken | another package upgraded numpy/torch | `pip install "numpy<2"`; compare with `requirements-lock.txt`. Keep experimental tools (e.g. livekit-wakeword) in a separate env |
 | `openwakeword requires tflite-runtime` in `pip check` | intentional (no py3.12 wheels) | ignore; ONNX runtime is used |
 | faster-whisper `libcudnn` not found | cuDNN from torch wheels not loaded | the backend imports torch first; ensure torch is installed in the same env |

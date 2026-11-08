@@ -36,7 +36,231 @@ README and development.md point here instead of keeping their own copies.
 
 Smaller ideas: timers/reminders (`systemd-run --user --on-active` or an in-process timer that calls
 `/speak`), Home Assistant, speaker identification, a reasoning on/off toggle (`thinking:` per
-profile is a one-line patch; there is no effort dial, only llama-server's `--reasoning-budget`).
+profile is a one-line patch; `llm.effort` exists for cloud models, local ones only have
+llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
+cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
+
+## 2026-11-07 (late afternoon) — Qwen3-TTS as a third voice engine; curated female voices
+
+- Follow-up: the owner listened and removed Xiaoyu and Wanqing (TTS-SCDuFSC): not good enough. They
+  were three short read sentences (cycling-forum lines, 2–5 s each) joined with pauses, so the
+  prosody was flat and choppy; better sources are single continuous 8–12 s utterances. Six voices
+  remain: Ayaka, Hina, Yuzu, Mio, Shiori, Feiyu.
+
+- Owner: add Qwen3-TTS 1.7B as a TTS engine; download and curate female voice samples from 朱花
+  (aiseiyou.com), japanese-anime-speech, da-fei-yu-girl-voice-zh and TTS-SCDuFSC, and name them.
+- **Engine** (`tts.backend: qwen3`): qwen-tts 0.1.1 pins transformers 4.57.3 and fails on Alveus's
+  5.2 (`check_model_inputs` was removed), so it runs in a worker process with its own venv
+  (`.venv-qwen3tts`, on top of the alveus Python, 139 MB; `scripts/install_qwen3_tts.sh`,
+  `install.sh --with-qwen3-tts`). JSON request per sentence over a pipe, float32 audio back; the
+  worker ends with Alveus (stdin closes) or when the engine is swapped (`live._engine` calls
+  `close()`). Weights in `/mnt/data/models/tts` (root disk at 94 %). Measured: ready in 3.4 s,
+  3.9 GB VRAM, ~2 s per sentence (sdpa, no flash-attn); live swap Kokoro → Qwen3 → Kokoro works and
+  frees the worker. Models `1_7b` (downloaded) and `0_6b` (downloads on first use); per-model voice,
+  gender, language, variation in the settings tree; *Its words* shows whether the recording has a
+  transcript and *Write it down* (`POST /voices/transcribe`) makes one with the running STT.
+- **Cloning mode per sentence** (measured, see backends.md): with the transcript, in-context
+  cloning is best in the recording's own language (0.88–0.94 speaker similarity) but drifts for
+  English from a Japanese/Chinese voice (as low as 0.70; Yuzu came out at 155 Hz against a 396 Hz
+  recording); the x-vector mode holds at 0.87–0.92 there. The engine sends the transcript only
+  for sentences in the recording's language.
+- **Voices** (`voices/`, `SOURCES.md` with sources and terms): Ayaka/朱花 (official 8 s sample from the
+  AI声優 YouTube channel; free use, credit "AI声優-朱花"; her creator calls her a cheeky tsundere, which
+  pairs with the Tsundere personality), Hina, Yuzu, Mio, Shiori (one line each from four characters
+  of japanese-anime-speech shard 0, CC0; file names carry character codes `0fem_aia` etc.; lines with
+  adult or awkward content skipped), Feiyu/大肥鱼 (ModelScope, CC-BY-NC), Xiaoyu and Wanqing
+  (TTS-SCDuFSC speakers F004/F003, three sentences joined, CC-BY-NC-ND; the speakers read different
+  scripts after the first lines, so sentences are matched by text). All trimmed, mono 24 kHz,
+  -20 LUFS, with `.txt` words; chosen by noise floor, pauses, pitch and Whisper agreement with the
+  given text (0–0.08 apart from 朱花's spelling), then cloned with Qwen3-TTS in their language and in
+  English: Whisper understood every output.
+- Fixes on the way: a dead worker is retired at once (a race let the next sentence write to it);
+  with no voice chosen the gender (and name) follows the recording that is actually copied.
+
+## 2026-11-07 (afternoon) — instructions and personalities are separate; four personalities ship
+
+- Owner: separate personality from instructions (instructions = directions and boundaries,
+  personality = how it sounds), store several personalities and choose one; the calm, warm one is
+  the default, plus a sweet one (honest, intimate, a bit whimsical), a playful, slightly flirtatious
+  tsundere, and a genki one (proactive, attentive, optimistic).
+- `config/persona.md` became `config/instructions.md` (`assistant.instructions_file`; the old
+  `persona_file` key is still read) with a `{personality}` slot and a paragraph saying a personality
+  never changes what the assistant does or is a reason to refuse, delay or pad. The style lines that
+  were in it ("direct, warm, and unhurried", using the name now and then, everyday words) moved into
+  `config/personalities/calm.md`. One new direction for every personality: offer a further step
+  rather than taking it (genki's proactiveness stays an offer).
+- `alveus/personality.py`: shipped personalities in `config/personalities/` are read-only; the
+  owner's own and edited copies live in `assistant.personalities_dir` (`personalities/`, git-ignored)
+  and override by id; deleting a copy restores the original. Placeholders are filled by name only, so
+  a stray brace in hand-written text no longer breaks the prompt (`str.format` did).
+- API `GET/PUT /instructions` (replaces `/persona`), `GET /personalities`, `PUT`/`DELETE
+  /personalities/{id}`; switching is an ordinary setting (`assistant.personality`, applied live;
+  the report says "personality: Sweet"). The instructions path no longer needs a restart.
+- GUI: Assistant → Personality cards with an editor for the chosen one (name, description, words;
+  Save, Save as new…, Restore original, Delete); Advanced → Instructions. Settings search now also
+  matches the names on choice cards ("tsundere", "kokoro").
+- Live check on DeepSeek Flash, same question under each ("Long day. What is 15 percent of 80? And
+  should I bother finishing the analysis tonight?"): all answered "twelve" first and kept to two or
+  three sentences; calm was even, sweet called them "love" and offered to help tomorrow, tsundere
+  covered its concern with "don't get used to it", genki offered to note where they left off.
+
+## 2026-11-07 (late night) — confirmations follow the conversation; fewer of them
+
+- Owner: no chime before answering (keep the flow natural); silence was intentional; wait longer
+  after the question. The chime is gone; the wait is `activation.confirm_wait_s` (15 s, was a fixed
+  6 s); silence now ends the question (no automatic re-ask) and the model is told the user did not
+  answer and not to ask again; an unclear reply still gets one shorter question.
+- Relaxed what asks: `close_window` is no longer marked destructive; `move_path` refuses to overwrite
+  and asks only with `overwrite=true`; `control_service` asks only for stop/disable or system scope
+  (`ASK_WHEN` in `agent/loop.py`); `rmdir` left the risky-shell pattern. Delete, kill, power and risky
+  shell commands still ask. The persona no longer tells the model to ask for confirmation itself
+  (the system does), so the model and the gate do not both ask.
+
+## 2026-11-07 (night) — a confirmation that never heard the answer; settings apply without a restart; previews on the speaker
+
+- **"Close it" was asked although the model chose not to ask, then counted as declined.** From the saved
+  history (DeepSeek Flash): the model reasoned that closing a window it had just opened needs no
+  question and called `desktop__close_window`; the agent's destructive gate asked anyway (by design:
+  `close_window` is marked destructive, and the gate does not depend on the model). The spoken
+  question was six seconds of raw JSON ("close window with {title_substring: Firefox}"); listening
+  started at 03:25:22 and ended at 03:25:23 with no transcript: a sound shorter than `min_speech_ms`
+  (the tail of its own question or a clipped answer) started a "speech" that 0.7 s of silence then
+  ended, and `rec is None` was returned as `False`, so the model was told "the user declined, do not
+  retry". Fixes: plain-words descriptions (`describe_action`: "close window: Firefox"), a chime before
+  listening, a 0.15 s settle, `patient` recording (blips below `min_speech_ms` do not end the window),
+  yes/no/unclear parsing with one repeat, and silence reported as `no_answer` (the model may ask again)
+  instead of a refusal. GUI confirmations that time out are `no_answer` too. New `tools.no_confirm`
+  (GUI: Don't ask for these) for risky tools the owner trusts; shell commands and sudo always ask.
+  A unit test reproduces the old failure with a 64 ms click before the answer.
+- **Previews could not be heard.** The endpoint answered in 0.2–1.2 s and a simulated click in a clean
+  headless Chrome played; the owner's Chrome did not, cause unknown (tab or site sound, autoplay).
+  ▶ now plays on the assistant's own speaker (`POST /tts/preview` with `play`, `POST /voices/play` for
+  Chatterbox recordings), which is also what the voice will sound like; the browser is the fallback when
+  there is no speaker. Each preview is logged.
+- **Restart-free settings.** `alveus/live.py` applies a saved configuration to the running process
+  (GUI and YAML editor send `apply: true`): instant for names/persona/gender, model settings and
+  switching profiles (new adapter; the history is provider-neutral, so the conversation continues),
+  engine settings that `reconfigure()` takes in place (Kokoro voice/speed/accent on the loaded model,
+  Chatterbox sample/expressiveness/language, Whisper language), VAD, wake names and sensitivity,
+  the hotkey, log level; reload-and-swap for another engine or model (load the new one, swap, free the
+  old; nothing preloaded); tool servers, audio devices and the API address are reported as restart-only.
+  Persona saves rebuild the system prompt at once. Verified on an isolated instance: voice and speed
+  changed in the running process, a microphone change reported for the restart. 74 tests.
+
+## 2026-11-07 (evening) — settings page redesigned as a tree; a model choice per provider; per-model settings
+
+- **Review (owner asked for one, with UX in mind).** Findings on the old page, worst first:
+  (1) dependent fields never hid: `.field{display:grid}` beat the `hidden` attribute, so all three
+  speech-to-text and all three voice engines' options showed at once (same bug hid nothing in the
+  save bar); (2) flat where the settings are nested: engine → model → that model's voice, folder,
+  gender and language, with gender and voices folder global although only one engine used each;
+  (3) no way to pick a model within a provider (DeepSeek Flash, Claude Sonnet, a new GGUF): only
+  predefined profiles; (4) typing where picking is possible: device names from `wpctl status`,
+  language codes, `af_bella`-style voice ids, pynput shortcut syntax; (5) a paragraph of hint under
+  every row (the page was 9,000 px); (6) no way to hear a voice before choosing it; (7) Kokoro's accent
+  was a separate setting that silently mismatched British voices; (8) save, then a separate restart
+  button, with nothing saying what a change restarts.
+- **New structure.** `SECTIONS` is a tree: choices render as cards with one line each, and the
+  chosen option's own settings open in a nested panel, recursively (Voice → Chatterbox → Multilingual
+  → voice to copy / gender / language). Model-specific values are stored under
+  `<engine>.models.<model>` and resolved by `config.engine_opts()` (engine block < model block, with
+  `tts.voices_dir` / `tts.voice_gender` as fallbacks); every model keeps its own. Sections: Assistant,
+  Language model, Listening, Voice, Activation, Audio, Tools & safety, System, Advanced.
+- **Language model.** Provider cards (this computer, Anthropic, OpenAI, DeepSeek, OpenRouter, vLLM,
+  Ollama, other server; key status on each), the API key in the provider's panel, then a model list
+  from `GET /llm/models` (GGUF files under `ALVEUS_MODELS`; the provider's live list with a key, else
+  suggestions; *another model id…*), then that model's settings, shown only where the provider
+  supports them (`PROVIDER_INFO`: effort levels, thinking switch, sampling; context length and top-k
+  for local files via `serve.context`). Picking an unknown model creates its profile on save; the
+  preflight checks unsaved profiles too (`definition`).
+- **Pickers.** PipeWire devices (`GET /audio/devices`), languages by name, Kokoro voices with accent
+  and gender, ▶ for a Kokoro sample (`POST /tts/preview`, any accent on the loaded model) and for
+  the Chatterbox recording (`GET /voices/file`), *Record* for the shortcut, the automatic gender shown
+  with its reason. Kokoro's accent now follows the voice (`lang_code: null`).
+- **Saving.** One *Save & restart* (restarts the LLM server too when the model changes), *Save
+  without restart*, a warning when leaving with unsaved edits, *changed · reset* per row (reset =
+  use the inherited value). One-line hints with *More*; the page is ~6,500 px with everything open.
+- **Verified** on a text-only instance with its own `local.yaml` copy (`ALVEUS_LOCAL_CONFIG`, new) and
+  `INVOCATION_ID` unset, in headless Chrome over DevTools: no JS errors; engine/model switching shows
+  the right nested settings; a Chinese language set for Chatterbox Multilingual lands in
+  `tts.chatterbox.models.multilingual.language`; picking DeepSeek Flash with low effort saved a new
+  `deepseek-flash` profile after a passing preflight, and one real request with it succeeded; the
+  local list shows both GGUF files and the missing Qwen file; Kokoro preview of a British voice
+  while an American one was loaded (3.4 s WAV); path traversal on `/voices/file` refused; phone width
+  without horizontal scroll; light theme. 65 tests.
+
+## 2026-11-07 (later) — first live cloud runs (DeepSeek); the local server follows the profile; key hygiene
+
+- **Live DeepSeek.** With the owner's disposable key (entered by them; never seen by the session):
+  `alveus llm test --profile deepseek` with thinking on (reasoning streamed to the GUI channel) and
+  `--no-thinking` (`thinking: {type: disabled}` accepted, no reasoning returned); a two-turn
+  `alveus chat --profile deepseek` with a tool call in each turn (the second turn carries the first
+  turn's `reasoning_content`, which DeepSeek demands); one turn through the running assistant.
+  Replies took 2–5 s per turn including the tool round. About a dozen requests in total; the
+  account showed $17.56 afterwards (`GET /user/balance`).
+- **Gap found and closed.** The owner had switched to DeepSeek and restarted only the assistant
+  (old code), so llama-server kept ~10 GB of VRAM. Now `alveus/llm/service.py` runs first in
+  `VoiceAssistant.start()`: a profile without `serve:` stops `alveus-llm`, a local profile starts it
+  if down and restarts it if it serves another model (`llm.manage_local_server`, default on;
+  skipped for `--profile` overrides because the unit serves the saved profile). Verified on the
+  real services: local → DeepSeek (restart both) and DeepSeek → local → DeepSeek with
+  assistant-only restarts; GPU memory 13.9 GB → 3.7 GB, and the profile survives restarts because
+  it is saved in `config/local.yaml`. `--no-block` systemctl calls, since the caller is itself a unit.
+- **Key hygiene.** AGENTS.md has a rule section for sessions (never read the key file or dump
+  environments, check keys only by source, warn before paid test series). The files/shell tools
+  refuse `~/.config/alveus/` (read, list, find, search, and shell commands naming it). The
+  `anthropic` and `httpx2` loggers are held at WARNING like `openai`/`httpx`, so DEBUG logs do not
+  copy whole conversations. Fixed `--show-thinking` and the tool lines in `alveus chat` / `llm
+  test` printing literal `[dim]` tags.
+
+## 2026-11-07 — swappable language model: providers, three protocols, cloud keys (branch `llm-providers`)
+
+- **Why.** The owner wants the central model swappable: the local Bonsai server today, but also
+  cloud APIs (DeepSeek, ChatGPT, Claude) or another local model (Qwen 3.8 27B), without code changes.
+  The old layer was one OpenAI-compatible client, which cannot serve Claude, nor current OpenAI
+  models (they call tools only through the Responses API).
+- **Design.** A profile is now a *provider* plus a *model*. Providers are presets
+  (`alveus/llm/providers.py`: protocol, address, key variable, quirks, parameters the provider
+  rejects), not classes; resolution is preset < llm-level defaults < profile. One adapter per wire
+  protocol: `openai_chat` (llama-server, vLLM, Ollama, DeepSeek, OpenRouter, anything compatible;
+  the old client, extended), `openai_responses` (OpenAI, stateless `store: false`, encrypted
+  reasoning replayed), `anthropic_messages` (Claude via the official `anthropic` SDK, adaptive
+  thinking with summaries for the GUI, prompt caching, server-side refusal fallback). The agent's
+  history stays provider-neutral; whatever a provider needs back verbatim (Claude's signed thinking
+  blocks, OpenAI's reasoning items) is stored per message as `_replay` and only that provider's
+  adapter reads it. Old `backend: openai` profiles keep working.
+- **Agent changes that every provider needed.** Normalized finish reasons; a tool call cut off by
+  the output limit is never run, and both that case and the tool-round limit now answer every
+  pending call (a dangling `tool_use` is a hard error for Claude and OpenAI); a refusal without
+  text is reported; `LLMError` messages are short enough to be spoken.
+- **Keys and privacy.** Keys live in the environment or `~/.config/alveus/secrets.env` (mode 600,
+  outside the repo), set in the GUI (write-only fields right under the profile) or with
+  `alveus llm key`. They are read per request (no restart), never exported to `os.environ`, and
+  API-key variables are stripped from tool servers' environments except the coder's
+  (`inherit_api_keys`). Docs and the GUI hint state plainly that a cloud profile sends the
+  conversation, tool results included, to the provider.
+- **Services.** `alveus llm serve` exits 0 for a profile without `serve:`, so choosing a cloud
+  profile stops `alveus-llm` and frees the GPU; `/health` only reports the unit for local-server
+  profiles, and the GUI preflight checks key and model for cloud profiles instead of loading weights.
+  The coder's `auto` follows cloud profiles too (`anthropic/claude-opus-5-5` in opencode terms).
+- **Learned.** DeepSeek returns HTTP 400 unless earlier `reasoning_content` is sent back once tools
+  are involved (preset `reasoning_replay: all`), and its thinking switch is `thinking: {type}` plus
+  `reasoning_effort`. Claude's thinking signatures cover everything before them, so trimming old
+  turns invalidates them: the agent drops that replay data when it trims (`prefix_bound`) and the
+  messages are rebuilt without thinking. The current Anthropic API version rejects
+  `temperature`/`top_p`/`top_k` on every model, and Claude Opus 5.5 cannot turn thinking off
+  (only `effort`, default `medium`); its notes between tool calls arrive as thinking blocks, which
+  `display: summarized` makes visible in the GUI. OpenAI's flagship ids are now `gpt-6*`.
+- **Verified.** 51 tests (adapters against recorded-style streams, including the SDK through a mock
+  transport and an interrupted Claude stream closing its connection). Local end to end: `alveus chat`
+  with tools on Bonsai through the new adapter. A text-only API instance on port 8799: key storage
+  (file mode 600, values never returned), and the preflight against the real Anthropic, OpenAI and
+  DeepSeek endpoints with a deliberately invalid key (each answered 401 and produced a readable
+  message, which also confirms the URLs). GUI rendered in headless Chrome over the DevTools
+  protocol: no JS errors, labelled profiles, effort choices, key rows. **Not verified:** an actual
+  generation from any cloud model; no keys are stored on this machine yet.
+- **Not done on purpose.** The Qwen 3.8 27B weights were not downloaded (profile `qwen-local` points
+  at the expected path); opencode's `bonsai` provider would need that model id added for `auto`.
 
 ## 2026-09-11 — reasoning for spoken turns and across reloads
 

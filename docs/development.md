@@ -5,12 +5,18 @@
 ```bash
 conda activate alveus
 pip install -e ".[dev]"
-python -m pytest -q tests          # unit tests (config, sentence splitter, name matcher)
+python -m pytest -q tests          # unit tests (config, LLM adapters with mocked streams, agent loop, …)
 python -m ruff check alveus mcp_servers
 ```
 
 Integration checks that need the running stack: `alveus doctor --warm`, `alveus tools`,
 `alveus llm test`, `printf 'what is my gpu temperature?\n/quit\n' | alveus chat`.
+Cloud profiles: `alveus llm test --profile claude` (one paid request; needs the key).
+
+LLM adapters are tested without network: httpx `MockTransport` for the two OpenAI protocols and the
+`anthropic` SDK with an `httpx2.MockTransport` (`tests/test_llm_adapters.py`); feed the SSE events a
+provider sends and assert the `LLMEvent`s and the request body. New provider quirks belong in a
+preset in `alveus/llm/providers.py` plus a test, not in a new class.
 
 ## Conventions
 
@@ -28,7 +34,7 @@ Integration checks that need the running stack: `alveus doctor --warm`, `alveus 
 ```
 alveus/            core package (see architecture.md)
 mcp_servers/       built-in MCP servers
-config/            alveus.yaml (defaults), persona.md, local.yaml (git-ignored), comfy/ (exported ComfyUI workflows)
+config/            alveus.yaml (defaults), instructions.md, personalities/ (shipped), local.yaml (git-ignored), comfy/ (exported ComfyUI workflows)
 scripts/           installer pieces: pip_install_env.sh, build_llama.sh, download_models.sh,
                    install_services.sh, train_wakeword.sh
 systemd/           *.service.in templates rendered by install_services.sh

@@ -17,6 +17,9 @@ class ParakeetSTT:
         self.device = device
         self._model = None
 
+    def reconfigure(self, opts: dict) -> bool:
+        return opts.get("model", "nemo-parakeet-tdt-0.6b-v3") == self.model_name
+
     def load(self) -> None:
         if self._model is not None:
             return

@@ -9,28 +9,46 @@ assistant:
   female_name: Aurea
   user_name: Charles
   language: en
-  persona_file: ${ALVEUS_HOME}/config/persona.md
+  # The system prompt has two parts. Instructions = directions and boundaries (identity, how spoken
+  # replies are shaped, what it may do, tools, confirmations); placeholders {name} {other_name}
+  # {voice_gender} {user_name} {date} {hostname} {os}, and {personality} where the personality goes.
+  instructions_file: ${ALVEUS_HOME}/config/instructions.md
+  # Personality = how it sounds (tone, word choice, humour), never what it does. Shipped:
+  # calm (default), sweet, tsundere, genki (config/personalities/). Your own ones, and edited copies
+  # of the shipped ones, go in personalities_dir (GUI: Settings > Assistant > Personality).
+  personality: calm
+  personalities_dir: ${ALVEUS_HOME}/personalities
   max_history_turns: 30
   # Speak while the model is still generating (sentence-level streaming).
   streaming_tts: true
 
 # ---------------------------------------------------------------- LLM
 llm:
-  # Which profile under llm.profiles to use by default.
+  # Which profile under llm.profiles thinks for the assistant.
   profile: bonsai-1bit
-  # Common request parameters (overridable per profile).
+  # Defaults for every profile; a profile's own value wins. null = do not send (provider default).
+  # Providers that reject a parameter (e.g. temperature on Claude and OpenAI) never get it.
   temperature: 0.7
   top_p: 0.95
   max_tokens: 4096
+  # Reasoning depth for models that have the setting (Claude, OpenAI, DeepSeek):
+  # low | medium | high | xhigh | max (which levels exist depends on the model). null = model default.
+  effort: null
   # Max tool-call rounds per user turn.
   max_tool_rounds: 12
+  # When the assistant starts, bring the local LLM server (systemd unit alveus-llm) in line with the
+  # profile: stop it for a cloud profile (frees the GPU), start or restart it for a local one.
+  manage_local_server: true
+  # A profile = a provider + a model. The provider (alveus/llm/providers.py) supplies the protocol,
+  # address and API-key variable: llama_server | vllm | ollama | openai_compat (give base_url) |
+  # openai | anthropic | deepseek | openrouter. Any preset key can be overridden here.
+  # Cloud providers read their key from the environment or ~/.config/alveus/secrets.env
+  # (GUI: Settings > Language model > API keys). With a cloud profile, the conversation, including
+  # what tools read for it (file contents, command output, web pages), is sent to that provider.
   profiles:
     bonsai-1bit:
-      backend: openai            # any OpenAI-compatible server (llama-server, vLLM, Ollama, LM Studio...)
-      base_url: http://127.0.0.1:8080/v1
-      api_key: local
+      provider: llama_server     # started by the alveus-llm service from `serve` below
       model: bonsai-27b-1bit     # must match the id served by /v1/models (or --alias)
-      reasoning: true            # model emits reasoning_content; hide it from TTS
       extra_body:
         top_k: 20
       # Used by `alveus llm serve` / systemd to launch the server for this profile.
@@ -40,11 +58,8 @@ llm:
         args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek",
                "-fa", "on", "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
     bonsai-ternary:
-      backend: openai
-      base_url: http://127.0.0.1:8080/v1
-      api_key: local
+      provider: llama_server
       model: bonsai-27b-ternary
-      reasoning: true
       extra_body:
         top_k: 20
       serve:
@@ -52,17 +67,45 @@ llm:
         model_path: ${ALVEUS_MODELS}/bonsai-ternary/Ternary-Bonsai-27B-PQ2_0.gguf
         args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek",
                "-fa", "on", "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
-    # Example of a future swap: any other OpenAI-compatible endpoint.
-    # ollama-qwen:
-    #   backend: openai
-    #   base_url: http://127.0.0.1:11434/v1
-    #   api_key: ollama
-    #   model: qwen3:32b
+    # A standard GGUF on this machine (not downloaded yet: put the file at model_path first).
+    # A model newer than the Bonsai fork may need an upstream llama.cpp build: point serve.command at it.
+    qwen-local:
+      provider: llama_server
+      model: qwen3.8-27b
+      extra_body:
+        top_k: 20
+      serve:
+        command: ${ALVEUS_LLAMA_SERVER}
+        model_path: ${ALVEUS_MODELS}/qwen/Qwen3.8-27B-Q4_K_M.gguf
+        args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek",
+               "-fa", "on", "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
+    # Cloud models. Hidden thinking counts against max_tokens, hence the larger limit.
+    claude:
+      provider: anthropic        # key: ANTHROPIC_API_KEY
+      model: claude-opus-5-5
+      max_tokens: 16000
+    chatgpt:
+      provider: openai           # key: OPENAI_API_KEY; uses the Responses API, stateless (store: false)
+      model: gpt-6.1-sol
+      max_tokens: 16000
+    deepseek:
+      provider: deepseek         # key: DEEPSEEK_API_KEY
+      model: deepseek-v4-pro
+      max_tokens: 16000
+    # Anything else that speaks /v1/chat/completions:
+    # my-server:
+    #   provider: openai_compat
+    #   base_url: http://127.0.0.1:1234/v1
+    #   model: some-model
+    #   api_key_env: MY_SERVER_KEY   # omit for servers without keys
 
 # ---------------------------------------------------------------- Speech to text
+# Engines keep their own settings; an engine with several models can also keep settings per model
+# under <engine>.models.<model> (e.g. faster_whisper.models.large-v3.compute_type), which win over the
+# engine's own. The GUI stores model-specific choices there. Same scheme for tts below.
 stt:
   backend: faster_whisper        # faster_whisper | parakeet | openai_http
-  device: cuda
+  device: cuda                   # cuda | cpu
   faster_whisper:
     model: large-v3-turbo        # or: distil-large-v3, medium, small
     compute_type: float16
@@ -76,25 +119,43 @@ stt:
 
 # ---------------------------------------------------------------- Text to speech
 tts:
-  backend: kokoro                # kokoro | chatterbox | openai_http
-  device: cuda
-  # auto = infer from the voice: Kokoro voice prefix (af_/bf_ female, am_/bm_ male) or, for
-  # chatterbox, the cloned sample's file name starting with f_ / m_. Or force: female | male
+  backend: kokoro                # kokoro | chatterbox | qwen3 | openai_http
+  device: cuda                   # cuda | cpu
+  # Fallbacks for engines/models that set none themselves (each engine or model may set its own
+  # voice_gender / voices_dir). voice_gender auto = infer from the voice: Kokoro voice prefix
+  # (af_/bf_ female, am_/bm_ male) or, for chatterbox and qwen3, the copied recording's name starting with
+  # f_ / m_. Or force: female | male. The gender decides which name the assistant uses.
   voice_gender: auto
   # Folder holding voice samples (WAV) for cloning. The GUI lists its files as choices.
   voices_dir: ${ALVEUS_HOME}/voices
   kokoro:
     voice: af_heart              # see: alveus tts voices
     speed: 1.0
-    lang_code: a                 # a = American English, b = British
+    lang_code: null              # null = follow the voice (af_/am_ American, bf_/bm_ British); or a | b
   chatterbox:
     model: turbo                 # turbo (English, fastest) | standard (English, expressive) |
                                  # multilingual (23 languages incl. zh/ja/ko/de/fr/es, auto-detected per sentence)
+    # Settings below apply to every model; models.<model>.<key> overrides them for one model, e.g.
+    #   models: { multilingual: { voice_ref: f_mei.wav, language: auto }, turbo: { voice_ref: m_charles_demo.wav } }
     voice_ref: null              # WAV to clone: a file name inside voices_dir or an absolute path; name it f_*.wav / m_*.wav
     language: auto               # multilingual only: auto = detect per sentence, or a fixed code like zh
     fallback_language: en        # used when auto-detection is unsure
     exaggeration: 0.5
     cfg_weight: 0.5
+  qwen3:                         # Qwen3-TTS: copies a voice from a recording; zh en ja ko de fr ru pt es it
+    model: 1_7b                  # 1_7b (Qwen3-TTS-12Hz-1.7B-Base, best, ~4 GB VRAM) | 0_6b (0.6B-Base, faster)
+    # It runs in its own small environment (qwen-tts needs transformers 4.57): scripts/install_qwen3_tts.sh
+    python: ${ALVEUS_HOME}/.venv-qwen3tts/bin/python
+    # Folder for the weights (each model in a subfolder named after it, downloaded there on first use);
+    # null = the Hugging Face cache.
+    weights_dir: null
+    # Recording to copy (a file in voices_dir or a path); name it f_*/m_* for the gender. Its words in
+    # <name>.txt beside it give the closest copy; without that file only the timbre is copied.
+    # models.<model>.<key> overrides any of these for one model.
+    voice_ref: null
+    language: auto               # auto = detect per sentence | zh | en | ja | ko | de | fr | ru | pt | es | it
+    fallback_language: en        # used when auto-detection is unsure
+    temperature: 0.9             # variation: lower = steadier and flatter, higher = livelier, less predictable
   openai_http:                   # any /v1/audio/speech server (Kokoro-FastAPI, ...)
     base_url: http://127.0.0.1:8880/v1
     model: kokoro
@@ -137,6 +198,8 @@ activation:
     name_segment_s: 12
     # Keep listening for follow-ups this many seconds after the assistant finishes speaking.
     follow_up_window_s: 8
+  # How long it waits for your yes/no after asking to confirm a risky action. Silence = not now.
+  confirm_wait_s: 15
   hotkey:
     enabled: true
     # pynput format. Press once to start listening, again (or stay silent) to stop.
@@ -147,6 +210,9 @@ activation:
 tools:
   # Built-in servers live in mcp_servers/. Any stdio/http MCP server can be added.
   confirm_destructive: true      # ask (spoken) before rm, kill, shutdown, etc.
+  # Risky tools that may run without asking, e.g. [desktop__close_window]. Shell commands matching the
+  # risky-command patterns and anything with sudo still ask.
+  no_confirm: []
   servers:
     files:
       command: [python, -m, mcp_servers.files_shell]
@@ -161,9 +227,13 @@ tools:
     coder:
       command: [python, -m, mcp_servers.coder]   # delegates coding tasks to opencode
       enabled: true
+      # opencode may sign in to cloud providers with API keys from the environment; other tool
+      # servers never see those variables
+      inherit_api_keys: true
       env:
         # Which model opencode uses for delegated coding work:
-        #   auto             -> the same local Bonsai model the assistant runs (follows llm.profile)
+        #   auto             -> the same model the assistant runs (follows llm.profile; for a cloud
+        #                       profile opencode must be signed in to that provider)
         #   opencode-default -> the default set in ~/.config/opencode/opencode.jsonc
         #   provider/model   -> e.g. deepseek/deepseek-v4-flash (cloud; needs `opencode auth login`)
         ALVEUS_OPENCODE_MODEL: auto

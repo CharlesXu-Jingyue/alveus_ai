@@ -24,11 +24,34 @@ def with_sudo_password(command: str, password: str) -> tuple[str, str | None]:
     return _SUDO_FIRST.sub(r"\1sudo -S -p '' ", command, count=1), password + "\n"
 
 
+def _key_dir() -> Path:
+    """Folder holding the LLM API keys (alveus/credentials.py); off limits to these tools."""
+    p = os.environ.get("ALVEUS_SECRETS") or "~/.config/alveus/secrets.env"
+    return Path(os.path.expanduser(p)).resolve().parent
+
+
+KEY_DIR = _key_dir()
+_KEY_REFUSAL = (f"Refused: {KEY_DIR} holds the API keys for cloud models; these tools never read or change it. "
+                "Keys are managed in the Alveus settings page.")
+
+
+def _protected(p: Path) -> bool:
+    return p == KEY_DIR or KEY_DIR in p.parents
+
+
 def _safe(path: str) -> Path:
     p = Path(os.path.expanduser(path)).resolve()
     if not any(p == r or r in p.parents for r in ROOTS):
         raise PermissionError(f"{p} is outside allowed roots {[str(r) for r in ROOTS]}")
+    if _protected(p):
+        raise PermissionError(_KEY_REFUSAL)
     return p
+
+
+def _mentions_keys(command: str) -> bool:
+    """A casual-leak guard for shell commands (not a sandbox: the shell can always find a way)."""
+    c = command.replace("$HOME", "~").replace("${HOME}", "~").replace(str(Path.home()), "~")
+    return "secrets.env" in c or ".config/alveus" in c or str(KEY_DIR) in command
 
 
 @mcp.tool(annotations=annot(read_only=True))
@@ -77,7 +100,8 @@ def find_files(pattern: str, path: str = "~", max_results: int = 100) -> str:
     root = _safe(path)
     out = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in ("node_modules", "__pycache__")]
+        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in ("node_modules", "__pycache__")
+                       and not _protected(Path(dirpath, d).resolve())]
         for fn in filenames:
             if fnmatch.fnmatch(fn, pattern):
                 out.append(str(Path(dirpath, fn)))
@@ -93,7 +117,8 @@ def search_text(query: str, path: str = "~", file_glob: str = "*", max_results: 
     rx = re.compile(query if regex else re.escape(query), re.IGNORECASE)
     hits = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in ("node_modules", "__pycache__")]
+        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in ("node_modules", "__pycache__")
+                       and not _protected(Path(dirpath, d).resolve())]
         for fn in filenames:
             if not fnmatch.fnmatch(fn, file_glob):
                 continue
@@ -112,9 +137,14 @@ def search_text(query: str, path: str = "~", file_glob: str = "*", max_results: 
 
 
 @mcp.tool(annotations=annot(destructive=True))
-def move_path(src: str, dst: str) -> str:
-    """Move or rename a file or folder."""
+def move_path(src: str, dst: str, overwrite: bool = False) -> str:
+    """Move or rename a file or folder. Refuses to replace an existing destination unless
+    overwrite=true (the user is asked first in that case)."""
     s, d = _safe(src), _safe(dst)
+    if d.is_dir() and not s.samefile(d):
+        d = _safe(str(d / s.name))       # into an existing folder, like mv
+    if d.exists() and not overwrite:
+        return j({"error": f"{d} already exists; call again with overwrite=true to replace it"})
     s.rename(d)
     return j({"moved": str(s), "to": str(d)})
 
@@ -136,6 +166,8 @@ def run_command(command: str, cwd: str = "~", timeout_s: int = 60, sudo_password
     Commands may use sudo: the user is asked to allow it once and types the password themselves,
     so never ask for a password in chat and always leave sudo_password empty."""
     c = _safe(cwd)
+    if _mentions_keys(command):
+        return j({"error": _KEY_REFUSAL})
     command, input_text = with_sudo_password(command, sudo_password)
     res = run(command, timeout=timeout_s, shell=True, cwd=str(c), input_text=input_text)
     if input_text and res.get("exit_code") not in (0, None) and "incorrect password" in (res.get("stderr") or "").lower():

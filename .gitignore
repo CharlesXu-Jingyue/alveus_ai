@@ -16,3 +16,5 @@ voices/
 images/
 .wakeword-train/
 data/
+/personalities/
+.venv-qwen3tts/

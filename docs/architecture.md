@@ -37,18 +37,22 @@
         └───────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────────────────┘
                                                                         │
                                                     llama-server (:8080, systemd alveus-llm) ◄── LLM HTTP
+                                                    or a cloud API (Anthropic, OpenAI, DeepSeek, …)
 ```
 
 Two long-running processes matter: **`alveus-llm`** (llama-server holding the model in VRAM) and
 **`alveus`** (`alveus talk`: audio loop, agent, speech models, API, and the five MCP child processes
-it spawns over stdio).
+it spawns over stdio). With a cloud profile, `alveus-llm` exits right after start (nothing to serve)
+and the agent talks to the provider's API instead; when the assistant starts it also stops a
+leftover local server, or (re)starts it for a local profile (`alveus/llm/service.py`).
 
 ## Packages
 
 | path | responsibility |
 |---|---|
 | `alveus/config.py` | Layered YAML loading, `${VAR}`/`~` expansion, `DotDict`, `llm_profile()` |
-| `alveus/llm/` | `LLMBackend` protocol + `OpenAICompatLLM` (SSE streaming, tool-call accumulation, reasoning separation) |
+| `alveus/llm/` | `LLMBackend` protocol and `LLMEvent`/`LLMError` (`base.py`); provider presets and profile resolution (`providers.py`); one adapter per protocol: `openai_compat.py` (Chat Completions: local servers, DeepSeek, OpenRouter), `openai_responses.py` (OpenAI), `anthropic_messages.py` (Claude, official SDK); shared httpx/SSE helpers (`http.py`) |
+| `alveus/credentials.py` | API keys: environment, then `~/.config/alveus/secrets.env` (mode 600); never exported to child processes |
 | `alveus/stt/` | `STTBackend` protocol + faster-whisper, Parakeet (onnx-asr), OpenAI-HTTP |
 | `alveus/tts/` | `TTSBackend` protocol + Kokoro, Chatterbox, OpenAI-HTTP |
 | `alveus/audio/backend.py` | `AudioIn`/`AudioOut` with PipeWire (subprocess) and sounddevice implementations |
@@ -113,20 +117,41 @@ it spawns over stdio).
 
 `on_state` callbacks let the CLI print state changes; the API's `/health` reports the current state.
 
+## Live settings
+
+`PUT /config` with `apply: true` (what the GUI sends) hands the new configuration to `alveus/live.py`:
+the agent gets new limits, a rebuilt system prompt and, if the profile changed, a new LLM adapter (the
+history is provider-neutral, so the conversation continues; `reconcile_local_server` restarts
+`alveus-llm` for another local model); each speech engine first tries `reconfigure(opts)` in place and
+otherwise a new engine is loaded, swapped in and the old one freed; the voice loop rebuilds its name
+matcher, wake-word model and hotkey listener. Everything the loop reads per use (`self.cfg`) needs
+nothing. Tool servers, audio devices and the API address are reported as needing a restart.
+
 ## Concurrency model
 
 - The main coroutine runs the state machine on asyncio.
 - Blocking work (audio reads, STT, TTS, VAD reset) runs in a 3-worker `ThreadPoolExecutor`.
 - `AudioIn` and `AudioOut` each own one background thread plus a `pw-record`/`pw-play` child.
-- LLM streaming is async (httpx). MCP servers are child processes; `ToolHub` talks to them
+- LLM streaming is async (httpx; the `anthropic` SDK for Claude). MCP servers are child processes; `ToolHub` talks to them
   through the `mcp` client library's async stdio transport, all inside one `AsyncExitStack`.
 - The FastAPI server runs in the same event loop (uvicorn `Server.serve()`), so `/chat` with
   `speak: true` shares the loaded models and the speaker queue with the voice loop.
 
 ## Prompting and model interface
 
-- The system prompt is `config/persona.md` rendered with `{name}`, `{other_name}`, `{voice_gender}`,
-  `{user_name}`, `{date}`, `{hostname}`, `{os}`, plus a line listing available tool groups.
+- The system prompt has two halves (`alveus/personality.py`): the **instructions**
+  (`config/instructions.md`: identity, the shape of spoken replies, the private-system rules, tools,
+  confirmations) and a **personality** (`config/personalities/*.md` or the owner's own, chosen by
+  `assistant.personality`), which only shapes how it sounds. The personality goes where the
+  instructions say `{personality}`; the instructions state that it never changes what the assistant
+  does. Placeholders `{name}`, `{other_name}`, `{voice_gender}`, `{user_name}`, `{date}`, `{hostname}`,
+  `{os}` are filled in both (only these: other braces in hand-written text are left alone), and a line
+  listing the available tool groups is appended. The prompt is rebuilt when settings, the instructions
+  or a personality change, so all of these apply from the next request.
+- The history is provider-neutral (OpenAI-style messages); each LLM adapter converts it, and the
+  tool list, to its protocol (see [backends.md](backends.md#llm)). Provider-specific data that must
+  go back unchanged (Claude's signed thinking, OpenAI's encrypted reasoning) rides along as
+  `_replay` on the message; trimming old turns drops the part that is bound to the old prefix.
 - Tools are presented in OpenAI function-calling format, names namespaced `server__tool`
   (`system__gpu_status`). llama-server's `--jinja` renders Bonsai's Qwen3.6 chat template, which
   natively supports tools and thinking. `--reasoning-format deepseek` moves thinking into
@@ -139,20 +164,39 @@ it spawns over stdio).
 
 ## Safety model
 
-- **Destructive gate.** A tool call is confirmed before execution if the tool carries
-  `destructive_hint` (delete_path, move_path, close_window, kill_process, control_service,
-  power) or if a `run_command` command matches `_DESTRUCTIVE_SHELL` in `agent/loop.py`
-  (`rm`, `kill`, `shutdown`, `mkfs`, `dd`, `git push --force`, `chmod -R`, …). In voice mode the
+- **Destructive gate.** The gate is in the agent loop, not in the model: whatever the model reasons
+  ("closing a window it just opened is fine"), the call is confirmed before execution if the tool carries
+  `destructive_hint` (delete_path, kill_process, power; move_path and control_service only per
+  `ASK_WHEN` in `agent/loop.py`: replacing an existing file, or stopping/disabling a service or any
+  system-scope action) or if a `run_command` command matches `_DESTRUCTIVE_SHELL` (`rm`, `kill`,
+  `shutdown`, `mkfs`, `dd`, `git push --force`, `chmod -R`, …). Closing a window, starting or restarting
+  a user service, renaming without overwriting and `rmdir` do not ask (relaxed 2026-11-07). The
+  instructions tell the model that the system asks, so it does not ask a second time. In voice mode the
   assistant asks aloud and listens for yes/no; in `alveus chat` it prompts on the terminal;
   through the bare `/chat` API there is no confirmer, so destructive calls are refused.
   Disable with `tools.confirm_destructive: false`.
+  Spoken confirmations name the action in plain words ("close window: Firefox") and then simply wait,
+  like a person would (no chime), for `activation.confirm_wait_s` (15 s), ignoring clicks and the tail of
+  their own voice. Silence means "not now": the action is left undone and the model is told the user did
+  not answer and not to ask again; a reply that is neither yes nor no gets one shorter question; only a
+  heard "no" counts as *declined*, which also blocks retries in that request. `tools.no_confirm` lists risky
+  tools the owner trusts to run without asking; shell commands and sudo are always checked.
 - **Filesystem scope.** The files server only touches paths under `ALVEUS_FS_ROOTS`
   (default `~`).
+- **Cloud models.** With a cloud profile the conversation leaves the machine: transcripts, the system
+  prompt, and every tool result (file contents, command output, web pages) go to that provider. The
+  GUI's profile hint and these docs say so; local profiles keep everything on the machine.
+- **API keys.** Read from the environment or `~/.config/alveus/secrets.env` (outside the repo, mode
+  600), written by the GUI or `alveus llm key`; `GET /secrets` reports only whether a key is set.
+  Keys are not exported to `os.environ`, and API-key variables are removed from the tool servers'
+  environment (except the coder's), so the shell tool cannot print them. The file is still readable
+  by your user, and so by the files/shell tools if the model is talked into it; keep keys limited
+  (spend caps, separate project keys).
 - **Network exposure.** llama-server and the API bind to 127.0.0.1. Nothing is exposed on the LAN
   unless you change `api.host` or the server args.
 - **Prompt injection.** Web page content and file contents returned by tools are model input.
-  The persona asks for confirmation before irreversible actions, and the gate enforces it for
-  the risky tool set regardless of what the model "decides".
+  The confirmation gate asks before the risky tool set regardless of what the model "decides"
+  (the instructions tell the model that the system asks, so it does not ask twice).
 
 ## Portability decisions
 

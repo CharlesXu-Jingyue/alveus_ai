@@ -2,17 +2,21 @@ from .base import STTBackend
 
 
 def make_stt(cfg) -> STTBackend:
+    """The active STT engine with its options (engine block + the selected model's own block)."""
+    from ..config import engine_opts
+
     backend = cfg.stt.get("backend", "faster_whisper")
     device = cfg.stt.get("device", "cuda")
+    opts = engine_opts(cfg, "stt")
     if backend == "faster_whisper":
         from .faster_whisper_stt import FasterWhisperSTT
-        return FasterWhisperSTT(cfg.stt.get("faster_whisper") or {}, device)
+        return FasterWhisperSTT(opts, device)
     if backend == "parakeet":
         from .parakeet_stt import ParakeetSTT
-        return ParakeetSTT(cfg.stt.get("parakeet") or {}, device)
+        return ParakeetSTT(opts, device)
     if backend == "openai_http":
         from .openai_http_stt import OpenAIHttpSTT
-        return OpenAIHttpSTT(cfg.stt.get("openai_http") or {})
+        return OpenAIHttpSTT(opts)
     raise ValueError(f"Unknown STT backend: {backend}")
 
 

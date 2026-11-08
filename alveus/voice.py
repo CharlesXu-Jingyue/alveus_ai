@@ -27,7 +27,22 @@ from .tts import make_tts
 
 log = logging.getLogger(__name__)
 
-YES = {"yes", "yeah", "yep", "sure", "do it", "go ahead", "confirm", "ok", "okay", "affirmative", "please do", "proceed"}
+YES = {"yes", "yeah", "yep", "yup", "sure", "do it", "go ahead", "confirm", "ok", "okay", "affirmative", "please do",
+       "proceed", "correct", "right", "of course", "absolutely"}
+NO = {"no", "nope", "nah", "don't", "do not", "stop", "cancel", "wait", "not now", "never", "negative", "hold on"}
+
+
+def classify_answer(text: str) -> str | None:
+    """'yes', 'no', or None when the reply is neither (then the question is asked again)."""
+    t = " ".join(text.lower().replace(",", " ").replace(".", " ").replace("!", " ").replace("?", " ").split())
+    if not t:
+        return None
+    starts = lambda words: any(t == w or t.startswith(w + " ") for w in words)  # noqa: E731
+    if starts(NO):
+        return "no"
+    if starts(YES):
+        return "yes"
+    return None
 # Whisper hallucinations on near-silence
 JUNK = {"thank you.", "thanks for watching.", "you", "bye.", "thank you for watching.", ".", "the end."}
 
@@ -83,11 +98,14 @@ class VoiceAssistant:
 
     # ------------------------------------------------------------------ lifecycle
     async def start(self) -> None:
-        log.info("Loading speech models...")
         loop = asyncio.get_running_loop()
+        prof = llm_profile(self.cfg)
+        # first, so a cloud profile frees the GPU before the speech models load
+        from .llm.service import reconcile_local_server
+        await loop.run_in_executor(self._pool, reconcile_local_server, self.cfg, prof)
+        log.info("Loading speech models...")
         await asyncio.gather(loop.run_in_executor(self._pool, self.stt.load),
                              loop.run_in_executor(self._pool, self.tts.load))
-        prof = llm_profile(self.cfg)
         llm = make_llm(prof)
         ok, msg = await llm.health()
         log.info("LLM %s: %s", "OK" if ok else "NOT READY", msg)
@@ -113,6 +131,54 @@ class VoiceAssistant:
         if self.hotkey:
             how.append(f"press {self.hotkey.combo}")
         log.info("%s is ready: %s.", self.name, " / ".join(how) or "no activation configured")
+
+    def apply_voice_config(self, old, new, changed: list[str], report: dict) -> None:
+        """The voice loop's part of a live settings change (alveus/live.py): names, voice detection,
+        wake word, keyboard shortcut. Everything else the loop reads from self.cfg on every use."""
+        self.name, self.other_name = active_names(new)
+        if "audio.vad.threshold" in changed:
+            self.vad.threshold = float(new.audio.vad.get("threshold", 0.5))
+            report["live"].append("voice detection sensitivity")
+        ww = new.activation.get("wake_word") or {}
+        names_changed = any(p.startswith(("activation.wake_word", "assistant.name", "assistant.female_name", "tts."))
+                            for p in changed)
+        if names_changed:
+            self.names = NameMatcher(list(ww.get("names") or [self.name, self.other_name]),
+                                     list(ww.get("name_aliases") or []))
+            self.name_segment_s = float(ww.get("name_segment_s", 12))
+        if any(p.startswith(("activation.wake_word.mode", "activation.wake_word.oww_model",
+                             "activation.wake_word.enabled")) for p in changed):
+            self.ww_enabled = bool(ww.get("enabled", True))
+            mode = str(ww.get("mode", "names")) if self.ww_enabled else "off"
+            wake = None
+            if mode in ("oww", "both"):
+                try:
+                    from .audio.wakeword import WakeWord
+                    wake = WakeWord(ww.get("oww_model", "hey_jarvis"), float(ww.get("threshold", 0.5)),
+                                    models_dir=f"{new._env['ALVEUS_MODELS']}/wakeword")
+                except Exception as e:  # noqa: BLE001
+                    report["errors"].append(f"wake word: {e}")
+                    mode = "names" if mode == "both" else "off"
+            self.wake, self.ww_mode = wake, mode
+            report["live"].append(f"wake up by: {mode}")
+        elif self.wake is not None and "activation.wake_word.threshold" in changed:
+            self.wake.threshold = float(ww.get("threshold", 0.5))
+            report["live"].append("wake-word sensitivity")
+        elif names_changed and any(p.startswith("activation.wake_word") for p in changed):
+            report["live"].append("wake names")
+        if any(p.startswith("activation.hotkey") for p in changed):
+            if self.hotkey:
+                self.hotkey.stop()
+            self.hotkey = None
+            hk = new.activation.get("hotkey") or {}
+            if hk.get("enabled", True):
+                try:
+                    self.hotkey = Hotkey(hk.get("combo", "<ctrl>+<alt>+<space>"), self.trigger.fire,
+                                         mode=hk.get("mode", "toggle"))
+                    self.hotkey.start()
+                except Exception as e:  # noqa: BLE001
+                    report["errors"].append(f"keyboard shortcut: {e}")
+            report["live"].append("keyboard shortcut")
 
     async def close(self) -> None:
         self.stop_flag = True
@@ -235,16 +301,18 @@ class VoiceAssistant:
         return text
 
     def _record_utterance(self, prefix: list[np.ndarray] | None, max_len: float | None,
-                          watch_wake: bool = False) -> np.ndarray | None:
+                          watch_wake: bool = False, patient: bool = False,
+                          no_speech_timeout: float = 6.0) -> np.ndarray | None:
         """Blocking: capture until end-of-speech silence. Returns float32 16 kHz or None.
         With ``watch_wake`` the frames are also scored by the openWakeWord model (mode ``both``: VAD
         starts recording before the phrase is complete); a detection sets ``self._wake_hit`` and
-        returns None so the caller treats it like the hotkey."""
+        returns None so the caller treats it like the hotkey. ``patient`` (confirmation answers): a sound
+        shorter than ``min_speech_ms`` (a click, the tail of its own voice) does not end the window; it
+        keeps listening for a real answer until the no-speech timeout."""
         v = self.cfg.audio.vad
         end_silence = float(v.get("end_silence_ms", 700)) / 1000
         min_speech = float(v.get("min_speech_ms", 250)) / 1000
         max_len = max_len or float(v.get("max_utterance_s", 60))
-        no_speech_timeout = 6.0
         frames: list[np.ndarray] = list(prefix or [])
         if not frames:
             self.vad.reset()
@@ -273,6 +341,10 @@ class VoiceAssistant:
             if not speech_started and now - t0 > no_speech_timeout:
                 return None
             if speech_started and now - last_speech > end_silence:
+                if patient and speech_dur < min_speech:
+                    log.debug("ignoring a %.2f s blip while waiting for an answer", speech_dur)
+                    frames, speech_started, speech_dur = [], False, 0.0
+                    continue
                 break
             if now - t0 > max_len:
                 break
@@ -355,21 +427,33 @@ class VoiceAssistant:
             self.audio_out.play(audio, self.tts.sample_rate)
             self._set(State.THINKING)
             return await gui(description)
-        prompt = f"I am about to {description.removeprefix('[sudo] ')}. Should I go ahead?"
-        self.on_event("voice_confirm", text=prompt)
-        audio = await loop.run_in_executor(self._pool, self.tts.synthesize, speakable(prompt))
-        self._set(State.SPEAKING)
-        self.audio_out.play(audio, self.tts.sample_rate)
-        await loop.run_in_executor(self._pool, self.audio_out.wait)
-        self._set(State.LISTENING)
-        rec = await loop.run_in_executor(self._pool, self._record_utterance, None, 10.0)
-        if rec is None:
-            return False
-        ans = (await loop.run_in_executor(self._pool, self.stt.transcribe, rec, 16000)).lower().strip(" .!,")
-        self.on_transcript("user", ans)
-        ok = any(ans == y or ans.startswith(y + " ") or ans.startswith(y + ",") for y in YES)
+        # Ask like a person would, then listen patiently (activation.confirm_wait_s). Silence means "not
+        # now": the action is left undone, reported to the model as "no answer" (not as a refusal), and
+        # not asked again. Only a reply that is neither yes nor no gets one more, shorter question.
+        wait = float(self.cfg.activation.get("confirm_wait_s", 15) or 15)
+        prompts = [f"I'm about to {description.removeprefix('[sudo] ')}. Should I go ahead?",
+                   "Sorry, should I go ahead? Yes or no?"]
+        for attempt, prompt in enumerate(prompts, 1):
+            self.on_event("voice_confirm", text=prompt)
+            audio = await loop.run_in_executor(self._pool, self.tts.synthesize, speakable(prompt))
+            self._set(State.SPEAKING)
+            self.audio_out.play(audio, self.tts.sample_rate)
+            await loop.run_in_executor(self._pool, self.audio_out.wait)
+            await asyncio.sleep(0.15)                 # let the speaker's last samples die away
+            self._set(State.LISTENING)
+            rec = await loop.run_in_executor(self._pool, self._record_utterance, None, wait + 15.0, False, True, wait)
+            if rec is None:
+                log.info("confirmation (try %d): no answer within %.0f s; leaving it undone", attempt, wait)
+                break
+            ans = (await loop.run_in_executor(self._pool, self.stt.transcribe, rec, 16000)).strip()
+            self.on_transcript("user", ans)
+            verdict = classify_answer(ans)
+            log.info("confirmation (try %d): heard %r -> %s", attempt, ans, verdict or "unclear")
+            if verdict:
+                self._set(State.THINKING)
+                return verdict == "yes"
         self._set(State.THINKING)
-        return ok
+        return {"ok": False, "reason": "no_answer"}
 
     # helpers for API / CLI
     def speak(self, text: str) -> None:

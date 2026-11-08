@@ -1,72 +1,127 @@
-"""OpenAI-compatible chat backend (llama-server, vLLM, Ollama, LM Studio, ...).
+"""OpenAI Chat Completions protocol (``api: openai_chat``).
 
-Streams /v1/chat/completions over SSE with plain httpx (no SDK), so it works the same with
-any server and keeps the dependency surface small.
+Serves llama-server, vLLM, SGLang, Ollama, LM Studio and the cloud APIs that copy this protocol
+(DeepSeek, OpenRouter, Groq, Together, Mistral, ...). Streams /chat/completions over SSE with plain
+httpx, accumulates tool-call fragments by index and reads ``reasoning_content`` (llama.cpp,
+DeepSeek) or ``reasoning`` (vLLM, OpenRouter).
 """
 from __future__ import annotations
 
-import json
 import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-import httpx
-
-from .base import LLMEvent
+from .. import credentials
+from .base import HealthCache, LLMError, LLMEvent, public
+from .http import auth_headers, http_error, iter_sse, new_client, normalize_args, open_stream
 
 log = logging.getLogger(__name__)
 
+_FINISH = {"stop": "stop", "tool_calls": "tool_calls", "function_call": "tool_calls", "length": "length",
+           "content_filter": "refusal"}
+
 
 class OpenAICompatLLM:
+    api = "openai_chat"
+
     def __init__(self, profile):
         self.profile = profile
         self.name = profile.get("name", "llm")
+        self.provider = str(profile.get("provider", "openai_compat"))
+        self.label = str(profile.get("label") or self.provider)
         self.model = profile["model"]
-        self.base_url = profile["base_url"].rstrip("/")
-        self.api_key = profile.get("api_key") or "local"
-        self.temperature = profile.get("temperature", 0.7)
-        self.top_p = profile.get("top_p", 0.95)
-        self.max_tokens = profile.get("max_tokens", 4096)
+        self.base_url = str(profile.get("base_url") or "").rstrip("/")
+        if not self.base_url:
+            raise ValueError(f"LLM profile '{self.name}': base_url is required for provider {self.provider}")
+        self.remote = bool(profile.get("remote", False))
+        self.temperature = profile.get("temperature")
+        self.top_p = profile.get("top_p")
+        self.max_tokens = profile.get("max_tokens")
+        self.max_tokens_field = profile.get("max_tokens_field") or "max_tokens"
+        self.effort = profile.get("effort")
         self.extra_body: dict[str, Any] = dict(profile.get("extra_body") or {})
-        self.reasoning = bool(profile.get("reasoning", False))
-        # thinking: True/False forces enable_thinking via chat_template_kwargs; None = model default
+        self.headers: dict[str, Any] = dict(profile.get("headers") or {})
+        # thinking: True/False forces it on/off (how: thinking_param); None = the model's default
         self.thinking = profile.get("thinking", None)
-        self._client = httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=10.0),
-                                         headers={"Authorization": f"Bearer {self.api_key}"})
+        self.thinking_param = profile.get("thinking_param") or "chat_template_kwargs"
+        self.reasoning_replay = profile.get("reasoning_replay") or "none"
+        self._client = new_client()
+        self._health = HealthCache(60.0 if self.remote else 0.0)
 
-    async def health(self) -> tuple[bool, str]:
-        try:
-            r = await self._client.get(f"{self.base_url}/models", timeout=5)
-            r.raise_for_status()
-            ids = [m["id"] for m in r.json().get("data", [])]
-            if self.model in ids or not ids:
-                return True, f"{self.base_url} serving {ids}"
-            return False, f"model '{self.model}' not in served models {ids}"
-        except Exception as e:  # noqa: BLE001
-            return False, f"{self.base_url} unreachable: {e}"
+    # ------------------------------------------------------------------ helpers
+    def _key(self) -> str | None:
+        key = credentials.api_key_for(self.profile)
+        if not key and self.remote:
+            env = self.profile.get("api_key_env") or "an api_key"
+            raise LLMError(f"no API key for {self.label}: set {env} under Settings, API keys")
+        return key
+
+    def _messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        out = []
+        for m in messages:
+            msg = public(m)
+            if self.reasoning_replay == "all" and m.get("role") == "assistant":
+                msg["reasoning_content"] = m.get("_reasoning") or ""
+            out.append(msg)
+        return out
 
     def _payload(self, messages, tools, thinking) -> dict[str, Any]:
         body: dict[str, Any] = {
             "model": self.model,
-            # drop private bookkeeping keys such as "_reasoning" (GUI only)
-            "messages": [{k: v for k, v in m.items() if not k.startswith("_")} for m in messages],
-            "temperature": self.temperature,
-            "top_p": self.top_p,
-            "max_tokens": self.max_tokens,
+            # private bookkeeping keys such as "_reasoning" (GUI) are never sent as such
+            "messages": self._messages(messages),
             "stream": True,
             "stream_options": {"include_usage": True},
             **self.extra_body,
         }
+        if self.temperature is not None:
+            body["temperature"] = self.temperature
+        if self.top_p is not None:
+            body["top_p"] = self.top_p
+        if self.max_tokens is not None:
+            body[self.max_tokens_field] = self.max_tokens
+        if self.effort:
+            body["reasoning_effort"] = self.effort
         th = self.thinking if thinking is None else thinking
         if th is not None:
-            kw = dict(body.get("chat_template_kwargs") or {})
-            kw["enable_thinking"] = bool(th)
-            body["chat_template_kwargs"] = kw
+            if self.thinking_param == "chat_template_kwargs":
+                kw = dict(body.get("chat_template_kwargs") or {})
+                kw["enable_thinking"] = bool(th)
+                body["chat_template_kwargs"] = kw
+            elif self.thinking_param == "deepseek":
+                body["thinking"] = {"type": "enabled" if th else "disabled"}
         if tools:
             body["tools"] = tools
             body["tool_choice"] = "auto"
         return body
 
+    # ------------------------------------------------------------------ health
+    async def health(self) -> tuple[bool, str]:
+        cached = self._health.get()
+        if cached:
+            return cached
+        try:
+            key = self._key()
+        except LLMError as e:
+            return False, str(e)
+        try:
+            r = await self._client.get(f"{self.base_url}/models", headers=auth_headers(key, self.headers), timeout=8)
+        except Exception as e:  # noqa: BLE001
+            return False, f"{self.base_url} unreachable: {e}"
+        if r.status_code >= 400:
+            return self._health.put((False, str(http_error(self.label, r.status_code, r.text))))
+        try:
+            ids = [m["id"] for m in r.json().get("data", [])]
+        except Exception:  # noqa: BLE001
+            ids = []
+        if not self.remote:
+            if self.model in ids or not ids:
+                return True, f"{self.base_url} serving {ids}"
+            return False, f"model '{self.model}' not in served models {ids}"
+        note = "" if not ids or self.model in ids else f" (model '{self.model}' is not in its model list)"
+        return self._health.put((True, f"{self.label} reachable, model {self.model}{note}"))
+
+    # ------------------------------------------------------------------ stream
     async def stream(
         self,
         messages: list[dict[str, Any]],
@@ -77,23 +132,12 @@ class OpenAICompatLLM:
         pending: dict[int, dict[str, Any]] = {}   # tool call accumulation by index
         finish: str | None = None
         usage: dict[str, Any] = {}
-
-        async with self._client.stream("POST", f"{self.base_url}/chat/completions",
-                                       json=self._payload(messages, tools, thinking)) as resp:
-            if resp.status_code >= 400:
-                text = (await resp.aread()).decode(errors="replace")
-                raise RuntimeError(f"LLM HTTP {resp.status_code}: {text[:500]}")
-            async for line in resp.aiter_lines():
-                if not line.startswith("data:"):
-                    continue
-                data = line[5:].strip()
-                if not data or data == "[DONE]":
-                    continue
-                try:
-                    chunk = json.loads(data)
-                except json.JSONDecodeError:
-                    log.debug("bad SSE chunk: %r", data[:200])
-                    continue
+        headers = auth_headers(self._key(), self.headers)
+        async with open_stream(self._client, f"{self.base_url}/chat/completions",
+                               self._payload(messages, tools, thinking), headers, self.label) as resp:
+            async for chunk in iter_sse(resp):
+                if chunk.get("error"):
+                    raise LLMError(f"{self.label} error: {chunk['error'].get('message', chunk['error'])}")
                 if chunk.get("usage"):
                     usage = chunk["usage"]
                 choices = chunk.get("choices") or []
@@ -102,7 +146,7 @@ class OpenAICompatLLM:
                 choice = choices[0]
                 delta = choice.get("delta") or {}
                 r = delta.get("reasoning_content") or delta.get("reasoning")
-                if r:
+                if r and isinstance(r, str):
                     yield LLMEvent("reasoning", text=r)
                 if delta.get("content"):
                     yield LLMEvent("content", text=delta["content"])
@@ -119,27 +163,26 @@ class OpenAICompatLLM:
                 if choice.get("finish_reason"):
                     finish = choice["finish_reason"]
 
+        if self.remote:   # a real answer is the best health check; spares the next /models call
+            self._health.put((True, f"{self.label} answered, model {self.model}"))
         for idx in sorted(pending):
             slot = pending[idx]
             slot["id"] = slot["id"] or f"call_{idx}"
-            slot["arguments"] = _normalize_args(slot["arguments"])
+            slot["arguments"] = normalize_args(slot["arguments"])
             yield LLMEvent("tool_call", tool_call=slot)
-        yield LLMEvent("done", finish_reason=finish, usage=usage)
+        norm = _FINISH.get(finish or "", finish or "stop")
+        if pending and norm == "stop":
+            norm = "tool_calls"
+        yield LLMEvent("done", finish_reason=norm, usage=_usage(usage))
 
 
-def _normalize_args(s: str) -> str:
-    s = (s or "").strip()
-    if not s:
-        return "{}"
-    try:
-        json.loads(s)
-        return s
-    except json.JSONDecodeError:
-        for suffix in ('"}', "}", '"]}', "]}"):  # best-effort repair for truncated JSON
-            try:
-                json.loads(s + suffix)
-                return s + suffix
-            except json.JSONDecodeError:
-                continue
-        log.warning("Unparseable tool arguments: %r", s[:200])
-        return json.dumps({"_raw": s})
+def _usage(u: dict[str, Any]) -> dict[str, Any]:
+    out = {k: u[k] for k in ("prompt_tokens", "completion_tokens", "total_tokens") if k in u}
+    cached = (u.get("prompt_tokens_details") or {}).get("cached_tokens") or u.get("prompt_cache_hit_tokens")
+    if cached:
+        out["cached_tokens"] = cached
+    return out
+
+
+# kept for older imports
+_normalize_args = normalize_args

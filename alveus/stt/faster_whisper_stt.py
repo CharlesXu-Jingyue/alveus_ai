@@ -18,6 +18,15 @@ class FasterWhisperSTT:
         self.device = device
         self._model = None
 
+    def reconfigure(self, opts: dict) -> bool:
+        """Language and beam size apply in place; another model or precision needs a reload."""
+        if opts.get("model", "large-v3-turbo") != self.model_name or \
+                opts.get("compute_type", self.compute_type) != self.compute_type:
+            return False
+        self.language = opts.get("language") or None
+        self.beam_size = int(opts.get("beam_size", 1))
+        return True
+
     def load(self) -> None:
         if self._model is not None:
             return

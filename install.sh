@@ -10,6 +10,7 @@
 #   --lib DIR           where llama.cpp is built (default: ~/local/lib)
 #   --ternary           also download Ternary-Bonsai-27B          --no-1bit  skip Bonsai 1-bit
 #   --with-chatterbox   install Chatterbox TTS (heavier)        --no-parakeet  skip Parakeet STT
+#   --with-qwen3-tts    install Qwen3-TTS (own small environment; weights download on first use)
 #   --services          install & enable systemd --user units
 #   --skip-llama        don't build llama.cpp (set ALVEUS_LLAMA_SERVER yourself)
 #   --skip-models       don't download anything
@@ -17,11 +18,11 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ENV_NAME=alveus; USE_VENV=0; MODELS="$HOME/local/model"; LIB="$HOME/local/lib"
-TERNARY=0; ONEBIT=1; CHATTERBOX=0; PARAKEET=1; SERVICES=0; SKIP_LLAMA=0; SKIP_MODELS=0
+TERNARY=0; ONEBIT=1; CHATTERBOX=0; QWEN3=0; PARAKEET=1; SERVICES=0; SKIP_LLAMA=0; SKIP_MODELS=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --env) ENV_NAME="$2"; shift;; --venv) USE_VENV=1;; --models) MODELS="$2"; shift;; --lib) LIB="$2"; shift;;
-    --ternary) TERNARY=1;; --no-1bit) ONEBIT=0;; --with-chatterbox) CHATTERBOX=1;; --no-parakeet) PARAKEET=0;;
+    --ternary) TERNARY=1;; --no-1bit) ONEBIT=0;; --with-chatterbox) CHATTERBOX=1;; --with-qwen3-tts) QWEN3=1;; --no-parakeet) PARAKEET=0;;
     --services) SERVICES=1;; --skip-llama) SKIP_LLAMA=1;; --skip-models) SKIP_MODELS=1;;
     -h|--help) sed -n '2,20p' "$0"; exit 0;;
     *) echo "unknown option $1"; exit 1;;
@@ -54,6 +55,7 @@ fi
 ARGS=(); [ $CHATTERBOX = 1 ] && ARGS+=(--with-chatterbox); [ $PARAKEET = 0 ] && ARGS+=(--no-parakeet)
 "$HERE/scripts/pip_install_env.sh" "${ARGS[@]}"
 PY="$(command -v python)"
+[ "$QWEN3" = 1 ] && "$HERE/scripts/install_qwen3_tts.sh"
 
 if [ "$SKIP_LLAMA" = 0 ]; then
   say "Building PrismML llama.cpp (CUDA)"
