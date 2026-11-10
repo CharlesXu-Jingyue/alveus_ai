@@ -11,7 +11,9 @@ from alveus.config import DotDict, load_config
 
 def cfg_with(tmp_path, **assistant):
     cfg = load_config()
-    cfg["assistant"] = {**cfg["assistant"], "personalities_dir": str(tmp_path / "own"), **assistant}
+    # the shipped default, not whatever the owner picked in config/local.yaml
+    cfg["assistant"] = {**cfg["assistant"], "personalities_dir": str(tmp_path / "own"), "personality": "calm",
+                        **assistant}
     return DotDict(json.loads(json.dumps(cfg, default=str)))
 
 
