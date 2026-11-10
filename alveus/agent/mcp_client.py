@@ -185,6 +185,8 @@ class ToolHub:
             except json.JSONDecodeError as e:
                 return json.dumps({"error": f"invalid JSON arguments: {e}"})
         session = self.sessions[info.server]
+        # a server may need longer per call (images: the first picture loads the model from disk)
+        timeout_s = float((self.servers_cfg.get(info.server) or {}).get("call_timeout_s", timeout_s))
         try:
             res = await asyncio.wait_for(session.call_tool(info.name, arguments or {}), timeout=timeout_s)
         except TimeoutError:

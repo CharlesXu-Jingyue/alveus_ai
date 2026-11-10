@@ -331,6 +331,20 @@ tools:
         ALVEUS_OPENCODE_MODEL: auto
         # Project folder used when you do not name one in the request.
         ALVEUS_CODE_DIR: "~"
+    images:
+      # Makes and redraws pictures by running ComfyUI workflows (mcp_servers/comfy.py). Needs ComfyUI
+      # running (here: user unit comfyui.service); the pictures show in the chat window.
+      command: [python, -m, mcp_servers.comfy]
+      enabled: true
+      call_timeout_s: 600              # the first picture loads the model from disk
+      env:
+        ALVEUS_COMFY_URL: http://127.0.0.1:8188
+        ALVEUS_IMAGES_DIR: ~/local/data/alveus-ai/images      # where Alveus keeps the pictures it makes
+        # API-format exports (ComfyUI: Workflow -> Export (API)); any export with the usual nodes works
+        ALVEUS_COMFY_GENERATE: ${ALVEUS_HOME}/config/comfy/txt2img_z_image_turbo_demo.json
+        ALVEUS_COMFY_EDIT: ${ALVEUS_HOME}/config/comfy/img2img_z_image_turbo_fun_union_controlnet_demo.json
+        # ComfyUI unloads its models after this many idle seconds (0 = after each picture, -1 = never)
+        ALVEUS_COMFY_UNLOAD_AFTER_S: "120"
     # Example third-party server (disabled):
     # home-assistant:
     #   url: http://homeassistant.local:8123/mcp_server/sse

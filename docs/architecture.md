@@ -32,16 +32,16 @@
                      │   FastAPI (uvicorn, :8765) ── /chat /speak /transcribe /trigger /stop /tools        │
                      └────────────┼────────────────────────────────────────────────────────────────────────┘
                                   ▼
-        ┌───────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────────┐
-        │ files     │ │ desktop  │ │ system   │ │ web      │ │ coder → opencode run │   MCP server processes
-        └───────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────────────────┘
-                                                                        │
+        ┌───────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────────┐ ┌───────────────────┐
+        │ files     │ │ desktop  │ │ system   │ │ web      │ │ coder → opencode run │ │ images → ComfyUI  │  MCP server processes
+        └───────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────────────────┘ └───────────────────┘
+                                                                        │                    (:8188, comfyui.service)
                                                     llama-server (:8080, systemd alveus-llm) ◄── LLM HTTP
                                                     or a cloud API (Anthropic, OpenAI, DeepSeek, …)
 ```
 
 Two long-running processes matter: **`alveus-llm`** (llama-server holding the model in VRAM) and
-**`alveus`** (`alveus talk`: audio loop, agent, speech models, API, and the five MCP child processes
+**`alveus`** (`alveus talk`: audio loop, agent, speech models, API, and the six MCP child processes
 it spawns over stdio). With a cloud profile, `alveus-llm` exits right after start (nothing to serve)
 and the agent talks to the provider's API instead; when the assistant starts it also stops a
 leftover local server, or (re)starts it for a local profile (`alveus/llm/service.py`).

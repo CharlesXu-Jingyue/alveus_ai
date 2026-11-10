@@ -3,7 +3,8 @@
 Alveus gives the model tools through the **Model Context Protocol**. Each tool group is a
 separate MCP server process started over stdio by `ToolHub` when the assistant starts (HTTP/SSE
 servers are also supported). Tools are shown to the model as `server__tool` and executed with a
-120 s timeout; results are returned as text (JSON from the built-in servers).
+120 s timeout (per server: `call_timeout_s`; `images` uses 600 s); results are returned as text
+(JSON from the built-in servers).
 
 `alveus tools` prints the live list. Destructive tools (marked **!** below) require confirmation
 when `tools.confirm_destructive` is on. `run_command` is additionally screened by a regex for
@@ -109,6 +110,52 @@ running profile's id.
 | `code_task` | `task`, `directory=""`, `continue_last=false`, `timeout_s=900` | full agentic coding run in that directory (reads, edits, runs); returns opencode's final message, tools used, session id. `continue_last` resumes the previous session in the same directory |
 | `code_question` | `question`, `directory=""`, `timeout_s=300` | read-only analysis with opencode's `plan` agent |
 | `git_status` | `directory=""` | `git status --short --branch` + last 5 commits |
+
+## `images` — `mcp_servers/comfy.py`
+
+Makes and redraws pictures by running ComfyUI workflows over its HTTP API (ComfyUI must be running:
+here the user unit `comfyui.service` on `http://127.0.0.1:8188`). The pictures are saved in
+`ALVEUS_IMAGES_DIR` (default `~/local/data/alveus-ai/images`) and shown in the GUI chat under the
+tool card (click for full size); the GUI serves them at `/images/file?name=…`.
+
+| tool | parameters | does |
+|---|---|---|
+| `generate_image` | `prompt`, `width=1024`, `height=1024`, `seed=-1`, `steps=0` | text to image with `ALVEUS_COMFY_GENERATE` (default Z-Image Turbo, 8 steps); sizes are rounded to multiples of 16 (256–2048); returns path, `image_url`, seed, seconds |
+| `edit_image` | `prompt`, `image=""`, `strength=0.75`, `size=1024`, `seed=-1` | image to image with `ALVEUS_COMFY_EDIT` (default Z-Image Turbo + Fun ControlNet Union on Canny edges): keeps the outlines, repaints the rest from the prompt. `image` is a path, a name in the image folder, or empty for the newest picture; it is scaled to `size` on the long side. `strength` = how strictly the edges are followed |
+| `recent_images` | `limit=10` | the newest pictures in the folder |
+
+**Workflows.** Both are API-format exports (ComfyUI GUI: Workflow → Export (API)) in `config/comfy/`;
+a GUI-format file is refused with that hint. Parameters are placed by node type, not node id: the
+prompt into every text encoder that feeds a sampler's *positive* input (followed through
+ControlNet/unCLIP conditioning nodes; negatives are left alone), seed and steps into the samplers,
+width/height into the `Empty…Latent…` node, the picture into `LoadImage`, strength into the
+ControlNet node (or, in a plain image-to-image export whose latent comes from `VAEEncode`, into the
+sampler's denoise). So other exports in `config/comfy/` (SDXL, Qwen-Image 2512) work by pointing
+the setting at them. `SaveImage` nodes become `PreviewImage` and other previews are dropped, so
+ComfyUI's own `output/` folder only holds what its GUI made; Alveus fetches the result from
+ComfyUI's temp folder via `/view`. Input pictures are uploaded to ComfyUI's `input/alveus/input.png`.
+
+**What editing can do.** The Fun ControlNet redraws from the Canny edge map: style, colours,
+materials, lighting, season, or another animal/person in the same pose all work; erasing or adding
+one object does not (that needs an inpainting or instruction-editing model such as Qwen-Image-Edit).
+The tool description tells the model to describe the whole result, not the change.
+
+**GPU memory.** Z-Image Turbo bf16 + its Qwen3-4B text encoder take about 8 GB on the GPU while
+loaded (ComfyUI offloads the rest to RAM). After `ALVEUS_COMFY_UNLOAD_AFTER_S` idle seconds (default
+120; 0 = after each picture, -1 = never) the server calls ComfyUI's `POST /free`, and it also does so
+when Alveus stops before the delay is up. Measured beside Whisper large-v3 + Qwen3-TTS + LFM3:
+1024×768 in 4.5 s with the model loaded, 12–14 s when it has to load again; an edit 6.5–14 s.
+
+| env (`tools.servers.images.env`) | default |
+|---|---|
+| `ALVEUS_COMFY_URL` | `http://127.0.0.1:8188` |
+| `ALVEUS_IMAGES_DIR` | `~/local/data/alveus-ai/images` |
+| `ALVEUS_COMFY_GENERATE` | `${ALVEUS_HOME}/config/comfy/txt2img_z_image_turbo_demo.json` |
+| `ALVEUS_COMFY_EDIT` | `${ALVEUS_HOME}/config/comfy/img2img_z_image_turbo_fun_union_controlnet_demo.json` |
+| `ALVEUS_COMFY_UNLOAD_AFTER_S` | `120` |
+| `ALVEUS_COMFY_TIMEOUT_S` | `540` (one job; it is interrupted after that) |
+
+All are in the GUI under Settings → Tools & safety → Image tools.
 
 ## Adding third-party MCP servers
 

@@ -9,7 +9,7 @@ Browsable offline version: `docs/handbook.html` (open it directly, run `alveus h
 | [installation.md](installation.md) | Installing on this machine and on a fresh Linux + CUDA machine; models; services; uninstall |
 | [configuration.md](configuration.md) | Every configuration key in `config/alveus.yaml`, override layers, environment variables |
 | [usage.md](usage.md) | Talking to Alveus, example requests, CLI reference, service management, text mode |
-| [tools.md](tools.md) | All 41 built-in MCP tools, the safety model, adding third-party servers, writing your own |
+| [tools.md](tools.md) | All 44 built-in MCP tools, the safety model, adding third-party servers, writing your own |
 | [backends.md](backends.md) | LLM / STT / TTS / audio backends, how to swap them, measured performance, adding new ones |
 | [api.md](api.md) | The browser GUI and local HTTP API (streaming chat, confirmations, config, restart) |
 | [wake-words.md](wake-words.md) | Activation modes, pretrained wake words, training custom "Alveus" / "Aurea" models |

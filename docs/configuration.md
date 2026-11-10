@@ -210,9 +210,11 @@ stt:
 | `servers.<name>.cwd` | repo root | |
 | `servers.<name>.enabled` | `true` | |
 | `servers.<name>.timeout_s` | `60` | startup timeout |
+| `servers.<name>.call_timeout_s` | `120` | how long one tool call may take (`images`: 600) |
 | `servers.<name>.inherit_api_keys` | `false` | pass LLM API-key variables (`ANTHROPIC_API_KEY`, …) from the environment to this stdio server; only the coder needs it (opencode) |
 
-Built-in servers: `files`, `desktop`, `system`, `web`, `coder`. The coder server honours
+Built-in servers: `files`, `desktop`, `system`, `web`, `coder`, `images` (ComfyUI; its `env`
+settings are listed in [tools.md](tools.md#images--mcp_serverscomfypy)). The coder server honours
 `ALVEUS_OPENCODE_MODEL` (`auto` = the assistant's own local model, `opencode-default`, or a
 `provider/model` id such as `deepseek/deepseek-v4-flash`) and `ALVEUS_CODE_DIR` (default project folder).
 Every stdio server also receives `ALVEUS_HOME`, `ALVEUS_LLM_PROFILE`, `ALVEUS_LLM_MODEL`, `ALVEUS_LLM_BASE_URL`.

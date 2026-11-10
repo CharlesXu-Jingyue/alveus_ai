@@ -100,6 +100,8 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
 .bubble ul{margin:4px 0 8px;padding-left:22px}
 .cursor::after{content:"▍";color:var(--accent);animation:pulse .9s infinite}
 .tools{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px}
+.tool .pic{display:block;max-width:min(100%,520px);margin:0 10px 10px;border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.tool .pic img{display:block;width:100%;height:auto}
 .tool{border:1px solid var(--rule);border-radius:8px;background:var(--surface);font-size:13px;overflow:hidden}
 .tool .hd{display:flex;gap:10px;align-items:center;padding:7px 10px;cursor:pointer;color:var(--ink-2);user-select:none}
 .tool .hd:hover{background:var(--accent-soft)}
@@ -484,7 +486,17 @@ function toolCard(name, args){
   hd.onclick=toggle; hd.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } };
   return d;
 }
-function toolDone(card, text){ card.classList.remove('running'); card.querySelector('.st').textContent = /"error"/.test(text)?'error':'done'; card.querySelector('pre.res').textContent = text||''; if (/"error"/.test(text)) card.classList.add('err'); }
+function toolDone(card, text){ card.classList.remove('running'); card.querySelector('.st').textContent = /"error"/.test(text)?'error':'done'; card.querySelector('pre.res').textContent = text||''; if (/"error"/.test(text)) card.classList.add('err'); toolPicture(card, text); }
+// a picture made by the image tools: shown under its card, click opens it full size
+function toolPicture(card, text){
+  let r; try{ r = JSON.parse(text||''); }catch(e){ return; }
+  if (!r || typeof r.image_url!=='string' || !r.image_url.startsWith('/images/file?') || card.querySelector('.pic')) return;
+  const a=document.createElement('a'); a.className='pic'; a.href=r.image_url; a.target='_blank'; a.rel='noopener';
+  a.title=(r.prompt||'')+(r.seed!=null?`  (seed ${r.seed})`:'');
+  a.innerHTML=`<img src="${esc(r.image_url)}" alt="${esc(r.prompt||'generated picture')}" loading="lazy">`;
+  a.querySelector('img').onload=()=>scrollBottom(); a.querySelector('img').onerror=()=>{ a.remove(); };
+  card.appendChild(a);          // inside the card: it may not be on the page yet (history)
+}
 async function loadHistory(){
   try{
     const h = await j('/history'); clearLog();
@@ -764,6 +776,16 @@ const SECTIONS = [
   {t:'text', p:'tools.servers.files.env.ALVEUS_FS_ROOTS', l:'Folders it may access', h:'Files and shell tools stay inside these. Separate several with a colon, e.g. ~:/data.'},
   {t:'bool', p:'tools.servers.desktop.enabled', l:'Desktop tools', h:'Open apps and files, manage windows, type, volume, music, clipboard, screenshots.'},
   {t:'bool', p:'tools.servers.web.enabled', l:'Web tools', h:'Search the web, read pages, weather. The only tools that go online.'},
+  {t:'bool', p:'tools.servers.images.enabled', l:'Image tools (ComfyUI)', h:'Make pictures from a description and redraw a picture in another style. They show in the chat.', on:[
+    {t:'text', p:'tools.servers.images.env.ALVEUS_IMAGES_DIR', l:'Picture folder', h:'Where the pictures it makes are kept.'},
+    {t:'text', p:'tools.servers.images.env.ALVEUS_COMFY_URL', l:'ComfyUI address', h:'ComfyUI must be running there, e.g. http://127.0.0.1:8188.'},
+    {t:'text', p:'tools.servers.images.env.ALVEUS_COMFY_GENERATE', l:'Workflow for new pictures', h:'A workflow exported from ComfyUI with Workflow → Export (API).',
+     more:'The prompt, size and seed are put into the usual nodes (text encoder, empty latent, sampler), so most text-to-image exports work: Z-Image, SDXL, Qwen-Image. The model files are whatever the export names.'},
+    {t:'text', p:'tools.servers.images.env.ALVEUS_COMFY_EDIT', l:'Workflow for redrawing', h:'An image-to-image export; the picture goes into its Load Image node.',
+     more:'With a ControlNet (the default: Z-Image Fun ControlNet, Canny edges) it keeps the outlines and repaints the rest; strength is how strictly the outlines are followed. In a plain image-to-image export (VAE Encode into the sampler) strength is how much of the picture is redrawn.'},
+    {t:'number', p:'tools.servers.images.env.ALVEUS_COMFY_UNLOAD_AFTER_S', l:'Free the GPU after (seconds idle)', min:-1, max:3600, step:10,
+     h:'ComfyUI unloads its models this long after the last picture. 0 = at once, -1 = never.',
+     more:'Kept loaded, the next picture takes about 4 s instead of 7–14 s, but ComfyUI holds about 8 GB of graphics memory that speech and the language model may need.'}]},
   {t:'bool', p:'tools.servers.coder.enabled', l:'Coding tool (opencode)', h:'Hand programming tasks to opencode in a project folder.', on:[
     {t:'combo', p:'tools.servers.coder.env.ALVEUS_OPENCODE_MODEL', o:'opencode_models', l:'Coding model',
      h:'auto = the assistant’s own model; or any model opencode is signed in to.',

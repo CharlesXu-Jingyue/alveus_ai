@@ -44,10 +44,10 @@ change with a descriptive message (see `git log` for the style).
 | LLM server | http://127.0.0.1:8080/v1 (OpenAI-compatible) |
 | API keys for cloud LLM profiles | `~/.config/alveus/secrets.env` (mode 600, outside the repo; `ALVEUS_SECRETS` overrides); GUI writes it via `PUT /secrets`, CLI `alveus llm key NAME` |
 | opencode config (coder tool) | `~/.config/opencode/opencode.jsonc`, provider `bonsai` |
-| ComfyUI (image generation, not yet wired to Alveus) | checkout `~/local/lib/ComfyUI`, conda env `comfy` (torch cu130), user unit `comfyui.service` on http://127.0.0.1:8188, `RequiresMountsFor=/mnt/data` |
+| ComfyUI (image generation; Alveus's `images` tools, `mcp_servers/comfy.py`) | checkout `~/local/lib/ComfyUI`, conda env `comfy` (torch cu130), user unit `comfyui.service` on http://127.0.0.1:8188, `RequiresMountsFor=/mnt/data` |
 | ComfyUI models | `/mnt/data/comfy/models/{checkpoints,diffusion_models,text_encoders,vae,loras,controlnet,model_patches}` via `extra_model_paths.yaml`; `/mnt/data` is the NTFS "Data" drive (fstab by label, `ntfs3`, uid 1000) |
-| generated images | ComfyUI GUI renders: `~/local/lib/ComfyUI/output` (ComfyUI's default). Alveus-made images (planned): copied to `~/local/data/alveus-ai/images`; both paths to be settings |
-| exported workflows (API format) | `config/comfy/*.json` (`z_image_turbo_demo.json` so far) |
+| generated images | ComfyUI GUI renders: `~/local/lib/ComfyUI/output` (ComfyUI's default). Alveus-made images: `~/local/data/alveus-ai/images` (`tools.servers.images.env.ALVEUS_IMAGES_DIR`; fetched from ComfyUI's temp folder, never in its output) |
+| exported workflows (API format) | `config/comfy/*.json`; the images tools use `txt2img_z_image_turbo_demo.json` (new pictures) and `img2img_z_image_turbo_fun_union_controlnet_demo.json` (redrawing) |
 
 Hardware: RTX 4090 24 GB, i9-13900K, 62 GB RAM, Ubuntu 24.04, GNOME on X11, PipeWire audio
 (motherboard USB audio + Panasonic SC-GN01 speaker/mic). Root partition is only 195 GB (keep big
@@ -200,6 +200,6 @@ causes — check `journalctl --user -u alveus` first.
 
 The roadmap and the history live in **`docs/devlog.md`** (Plans section at the top; add an entry
 there for every working session, newest first). Current order: (1) conversations and memory,
-(2) image generation through ComfyUI (installed, not integrated — MCP server over `config/comfy/`
-workflows, VRAM rule), (3) vision input and video, (4) interrupt by speech (echo cancellation first),
+(2) image generation follow-ups (ComfyUI is wired in; next: a real instruction editor such as
+Qwen-Image-Edit, picture upload in the GUI, vision input to see the result), (3) vision input and video, (4) interrupt by speech (echo cancellation first),
 (5) wake-word tuning for the owner's voice. Update the dev log, not this file, when priorities change.

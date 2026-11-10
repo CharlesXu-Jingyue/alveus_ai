@@ -135,7 +135,7 @@ docs/              wake-words.md and more
 
 ## Next items
 
-Conversations and memory; image generation through ComfyUI (installed, MCP integration next); vision
+Conversations and memory; image editing beyond restyling (ComfyUI is wired in); vision
 input and video; interrupt by speech; wake-word tuning. Details and history: [docs/devlog.md](docs/devlog.md).
 
 New here (human or AI agent)? Start with [AGENTS.md](AGENTS.md). Full documentation: [docs/README.md](docs/README.md), or open `docs/handbook.html` offline in a browser (`alveus handbook`; served at `/handbook` by the GUI) (overview, architecture, installation, configuration reference, usage, tools, backends, API, wake words, troubleshooting, development).

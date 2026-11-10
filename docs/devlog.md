@@ -9,18 +9,11 @@ README and development.md point here instead of keeping their own copies.
 1. **Conversations and memory.** Persist conversations (list, resume, search), summarize long ones,
    and give the agent a memory store it can read and write across restarts (facts, preferences).
    Likely an MCP server plus a sidebar in the GUI; today history lives only in `Agent.history`.
-2. **Image generation through ComfyUI.** ComfyUI is installed and running (see 2026-09-10) but not
-   wired to Alveus. Design: `mcp_servers/comfy.py` exposes each exported workflow in `config/comfy/` as
-   one tool with a few parameters (prompt, size, seed, steps), driven by a manifest that maps
-   parameters to node inputs by node *title*. It POSTs `/prompt`, polls `/history/<id>`, fetches the
-   image via `/view` or copies it from ComfyUI's own output folder (`~/local/lib/ComfyUI/output`,
-   the default; the service no longer passes `--output-directory`) into Alveus's image folder
-   (`~/local/data/alveus-ai/images`) and opens it with the desktop tool. Both paths are settings
-   (`images.comfy_output` and `images.dir`, editable in the GUI) so the GUI's own renders stay in
-   ComfyUI's folder while Alveus-made images live with the other Alveus data. VRAM rule: Z-Image and SDXL fit next to the LLM; FLUX.1 dev and FLUX.2 klein 9B need
-   `alveus-llm` stopped for the render (then restarted) or a clear failure; free ComfyUI's memory
-   after every job (`POST /free`). Later: `scripts/install_comfy.sh`, image-to-image, showing the
-   image in the GUI.
+2. **Image generation follow-ups.** ComfyUI is wired in (2026-11-10). Next: a real instruction
+   editor (Qwen-Image-Edit or FLUX.2 klein editing) for "remove the cup"-style changes, which the
+   Canny ControlNet cannot do; picture upload/drag-and-drop in the GUI chat; the FLUX/Qwen-Image
+   workflows as selectable alternatives (the 20 GB models need `alveus-llm` stopped for the render);
+   `scripts/install_comfy.sh` for a fresh machine; letting the model see its result (plan 3).
 3. **Vision input and video.** Bonsai's `mmproj` tower via llama-server `--mmproj` (screenshots,
    camera), video understanding and generation, each a pluggable backend like STT/TTS.
 4. **Interrupt by speech.** (1) PipeWire echo cancellation (`module-echo-cancel`) so the mic no
@@ -39,6 +32,45 @@ Smaller ideas: timers/reminders (`systemd-run --user --on-active` or an in-proce
 profile is a one-line patch; `llm.effort` exists for cloud models, local ones only have
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
+
+## 2026-11-10 — pictures through ComfyUI (generate and redraw)
+
+- New MCP server `images` (`mcp_servers/comfy.py`) with `generate_image`, `edit_image` and
+  `recent_images`, over the two owner-exported API workflows: `txt2img_z_image_turbo_demo.json`
+  and `img2img_z_image_turbo_fun_union_controlnet_demo.json` (Z-Image Turbo bf16 + Fun ControlNet
+  Union on Canny edges). It POSTs `/prompt`, polls `/history/<id>`, fetches the picture with
+  `/view` and saves it in `~/local/data/alveus-ai/images`.
+- Parameters go in by node type rather than by id or title (the earlier plan was a manifest of
+  node titles): prompt into the encoder feeding a sampler's positive input, seed/steps into samplers,
+  size into the empty latent, picture into LoadImage, strength into the ControlNet. The same code
+  fills the SDXL base+refiner and SDXL unCLIP exports correctly (tested), so swapping workflows is a
+  setting, not code. `SaveImage` becomes `PreviewImage`, so ComfyUI's output folder keeps only its
+  GUI's renders (this settles the "copy or not" question from 2026-09-10).
+- GUI: a tool result with `image_url` shows the picture inside the tool card (also after a reload,
+  from `/history`); `GET /images/file?name=` serves only file names inside the folder. Settings →
+  Tools & safety → Image tools edits the folder, ComfyUI address, both workflows and the unload delay.
+- `ToolHub` honours a per-server `call_timeout_s` (images: 600 s; the default 120 s is too short for
+  a cold model load). Pillow is now a declared dependency (input pictures are scaled to 1024 on the
+  long side, multiples of 16, before upload: the export has no resize node, and a 4000 px photo
+  would become a 4000 px latent).
+- Measured on the 4090 beside Whisper large-v3, Qwen3-TTS and LFM3 1.7B: 1024×768 in 4.5 s warm,
+  12–14 s when the models must be reloaded from RAM; an edit 6.5–14 s; ComfyUI holds about 8 GB
+  while loaded. End to end through LFM3: "draw a cozy cabin…" 14 s, "redraw it as a watercolour"
+  11 s, both correct calls; the reply no longer reads the file path aloud once the result says the
+  picture is already on screen.
+- Lessons:
+  - The edit workflow keeps outlines, not content. Watercolour, fox → wolf in the same pose, and
+    night lighting all work; local edits (erase or add one object) do not, so the tool description
+    tells the model to describe the whole result.
+  - Unloading after every picture costs 2–3× the time. Instead the server unloads after 120 idle
+    seconds. A series of edits stays fast, and the GPU is free again soon after.
+  - ComfyUI's `/free` only sets a flag; memory drops a few seconds later.
+  - An asyncio task can't be trusted to unload at exit: the event loop cancels it on shutdown. The
+    server keeps a "models loaded" flag, unloads in an `atexit` hook, and turns SIGTERM into a
+    normal exit so that hook runs.
+  - Headless Chrome's `--virtual-time-budget` never finishes on the GUI (it keeps an SSE stream
+    open); `--timeout=8000` works for screenshots. A tool card built for the history view isn't on
+    the page yet, so the picture must go inside the card, not after it.
 
 ## 2026-11-09 — models on the data disk; six more local language models with aliases
 

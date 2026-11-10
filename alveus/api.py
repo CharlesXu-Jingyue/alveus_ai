@@ -742,6 +742,15 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
             raise HTTPException(404, "no such sample in the voices folder")
         return FileResponse(d / name)
 
+    @app.get("/images/file")
+    async def image_file(name: str) -> FileResponse:
+        """A picture from the image tools' folder (shown in the chat window)."""
+        d = images_dir(load_config())
+        if not d or not name or Path(name).name != name or Path(name).suffix.lower() not in IMAGE_EXTS \
+                or not (d / name).is_file():
+            raise HTTPException(404, "no such picture in the image folder")
+        return FileResponse(d / name)
+
     @app.get("/voices")
     async def voices(dir: str = "") -> dict[str, Any]:
         """List WAV voice samples in a folder (defaults to tts.voices_dir)."""
@@ -882,6 +891,16 @@ def _opencode_models() -> list[str]:
         pass
     _opencode_cache = (time.time(), models)
     return models
+
+
+IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def images_dir(cfg) -> Path | None:
+    """The folder the images tool saves into (tools.servers.images.env.ALVEUS_IMAGES_DIR)."""
+    srv = ((cfg.get("tools") or {}).get("servers") or {}).get("images") or {}
+    d = (srv.get("env") or {}).get("ALVEUS_IMAGES_DIR")
+    return Path(os.path.expanduser(str(d))) if d else None
 
 
 def _voice_texts(voices_dir: str | None) -> list[str]:

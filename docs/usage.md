@@ -51,6 +51,13 @@ the news for Neuralink", "summarize https://example.com/article".
 ~/local/repo/foo, add type hints to utils.py and run the tests" (opencode edits files; can take
 minutes), "what's the git status of ~/local/repo/alveus-ai?".
 
+**Images (ComfyUI)** – "draw a cozy cabin in a snowy forest at night", "make a 1344 by 768
+picture of a lighthouse in a storm, oil painting", "redraw that as a watercolour", "turn the fox
+into a grey wolf, same pose", "make the same picture again with seed 42". The picture appears in
+the chat window (click it for full size) and is saved in `~/local/data/alveus-ai/images`.
+Redrawing keeps the outlines and changes everything else; it cannot remove or add single objects.
+ComfyUI must be running (`systemctl --user start comfyui`).
+
 **Conversation** – anything else: explanations, drafting text, maths, planning. The model is
 Bonsai-27B (Qwen3.6-derived); expect solid general knowledge with a 1-bit quality trade-off.
 

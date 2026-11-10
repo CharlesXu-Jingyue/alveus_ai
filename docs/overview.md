@@ -26,7 +26,7 @@ name you used.
    vLLM, Ollama, LM Studio), OpenAI (Responses API), Anthropic (Messages API), DeepSeek,
    OpenRouter, or any OpenAI-compatible endpoint.
 3. **Real agency, with guard rails.** The model calls tools through the Model Context Protocol
-   (MCP): files, shell, GNOME desktop, system status/control, web, and delegation of coding
+   (MCP): files, shell, GNOME desktop, system status/control, web, pictures through ComfyUI, and delegation of coding
    work to opencode. Destructive actions are confirmed by voice before they run.
 4. **Portable.** `install.sh` reproduces the whole stack on another Linux + CUDA box; nothing
    in the repo depends on this machine's paths.
