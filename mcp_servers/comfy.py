@@ -3,6 +3,9 @@
 Two workflows, each an API-format export from the ComfyUI GUI (Workflow -> Export (API)):
   ALVEUS_COMFY_GENERATE  text to image (default: Z-Image Turbo)
   ALVEUS_COMFY_EDIT      image to image (default: Z-Image Turbo with the Fun ControlNet Union, Canny)
+The edit workflow follows the old picture's Canny edges, so its tool is restyle_image: same
+outlines, new look. A different pose, layout or set of objects is a new picture (generate_image
+with the description rewritten); both descriptions say so, because that is where the model picks.
 The parameters are put into the graph by what the nodes are, not by their ids, so another export
 (SDXL, Qwen-Image ...) works as long as it uses the usual nodes: the prompt goes into the text
 encoder feeding the sampler's positive input, the seed and steps into the sampler, the size into
@@ -334,6 +337,10 @@ def _seed(seed: int) -> int:
 async def generate_image(prompt: str, width: int = 1024, height: int = 1024, seed: int = -1,
                          steps: int = 0) -> str:
     """Make a new picture from a description and save it (it shows in the chat window).
+    Also the tool for changing WHAT IS IN a picture made earlier: another pose or body position,
+    another layout, viewpoint or framing, things added, removed or moved. Write the earlier
+    prompt again with the change in it, and pass the earlier seed to keep the look close.
+    (restyle_image cannot do any of that: it keeps the old outlines.)
     prompt: a detailed description in English or Chinese: subject, setting, style, lighting,
       composition; write out any text that should appear in the picture in quotes.
     width, height: pixels, multiples of 16; 1024x1024 square, 1344x768 landscape, 768x1344 portrait.
@@ -348,11 +355,13 @@ async def generate_image(prompt: str, width: int = 1024, height: int = 1024, see
 
 
 @mcp.tool()
-async def edit_image(prompt: str, image: str = "", strength: float = 0.75, size: int = 1024,
-                     seed: int = -1) -> str:
-    """Redraw an existing picture: it keeps the outlines (composition, shapes, poses, edges) and
-    repaints everything else from the prompt, e.g. another style, colours, materials, season,
-    lighting or a different person in the same pose. It cannot erase or add single objects.
+async def restyle_image(prompt: str, image: str = "", strength: float = 0.75, size: int = 1024,
+                        seed: int = -1) -> str:
+    """Repaint an existing picture over its own outlines: the composition, shapes, poses and edges
+    stay exactly where they are; style, colours, materials, textures, lighting, season, or who or
+    what fills a shape (another person or animal in the same pose) change. It traces the edges, so
+    it can NOT change a pose or body position, move, add or remove anything, or change the
+    viewpoint: for those use generate_image with the whole new description.
     prompt: describe the whole result, not the change ("watercolour painting of a red fox in snow").
     image: a file path, a picture's name in the image folder, or "" for the newest picture made.
     strength: how closely the outlines are followed, 0.3 loose .. 1.0 strict.
@@ -363,7 +372,7 @@ async def edit_image(prompt: str, image: str = "", strength: float = 0.75, size:
     upload = "input.png"          # overwritten each time; ComfyUI notices the new contents
     wf, outs = prepare(load_workflow(EDIT), prompt=prompt, seed=s, image=f"alveus/{upload}",
                        strength=max(0.0, min(1.0, strength)))
-    res = await render(wf, outs, out_name(prompt, "edit"), upload=png, upload_name=upload)
+    res = await render(wf, outs, out_name(prompt, "restyle"), upload=png, upload_name=upload)
     return j({**res, "source": str(src), "width": w, "height": h, "seed": s, "prompt": prompt})
 
 

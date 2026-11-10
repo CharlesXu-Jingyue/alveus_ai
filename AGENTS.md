@@ -47,7 +47,7 @@ change with a descriptive message (see `git log` for the style).
 | ComfyUI (image generation; Alveus's `images` tools, `mcp_servers/comfy.py`) | checkout `~/local/lib/ComfyUI`, conda env `comfy` (torch cu130), user unit `comfyui.service` on http://127.0.0.1:8188, `RequiresMountsFor=/mnt/data` |
 | ComfyUI models | `/mnt/data/comfy/models/{checkpoints,diffusion_models,text_encoders,vae,loras,controlnet,model_patches}` via `extra_model_paths.yaml`; `/mnt/data` is the NTFS "Data" drive (fstab by label, `ntfs3`, uid 1000) |
 | generated images | ComfyUI GUI renders: `~/local/lib/ComfyUI/output` (ComfyUI's default). Alveus-made images: `~/local/data/alveus-ai/images` (`tools.servers.images.env.ALVEUS_IMAGES_DIR`; fetched from ComfyUI's temp folder, never in its output) |
-| exported workflows (API format) | `config/comfy/*.json`; the images tools use `txt2img_z_image_turbo_demo.json` (new pictures) and `img2img_z_image_turbo_fun_union_controlnet_demo.json` (redrawing) |
+| exported workflows (API format) | `config/comfy/*.json`; the images tools use `txt2img_z_image_turbo_demo.json` (new pictures; also new poses/layouts) and `img2img_z_image_turbo_fun_union_controlnet_demo.json` (`restyle_image`: same outlines, new look) |
 
 Hardware: RTX 4090 24 GB, i9-13900K, 62 GB RAM, Ubuntu 24.04, GNOME on X11, PipeWire audio
 (motherboard USB audio + Panasonic SC-GN01 speaker/mic). Root partition is only 195 GB (keep big

@@ -120,8 +120,8 @@ tool card (click for full size); the GUI serves them at `/images/file?name=…`.
 
 | tool | parameters | does |
 |---|---|---|
-| `generate_image` | `prompt`, `width=1024`, `height=1024`, `seed=-1`, `steps=0` | text to image with `ALVEUS_COMFY_GENERATE` (default Z-Image Turbo, 8 steps); sizes are rounded to multiples of 16 (256–2048); returns path, `image_url`, seed, seconds |
-| `edit_image` | `prompt`, `image=""`, `strength=0.75`, `size=1024`, `seed=-1` | image to image with `ALVEUS_COMFY_EDIT` (default Z-Image Turbo + Fun ControlNet Union on Canny edges): keeps the outlines, repaints the rest from the prompt. `image` is a path, a name in the image folder, or empty for the newest picture; it is scaled to `size` on the long side. `strength` = how strictly the edges are followed |
+| `generate_image` | `prompt`, `width=1024`, `height=1024`, `seed=-1`, `steps=0` | text to image with `ALVEUS_COMFY_GENERATE` (default Z-Image Turbo, 8 steps); sizes are rounded to multiples of 16 (256–2048); returns path, `image_url`, seed, seconds. Also the tool for changing what is *in* an earlier picture (pose, layout, viewpoint, objects): the earlier prompt rewritten, optionally with the earlier seed |
+| `restyle_image` | `prompt`, `image=""`, `strength=0.75`, `size=1024`, `seed=-1` | image to image with `ALVEUS_COMFY_EDIT` (default Z-Image Turbo + Fun ControlNet Union on Canny edges): keeps the outlines, repaints the rest from the prompt. `image` is a path, a name in the image folder, or empty for the newest picture; it is scaled to `size` on the long side. `strength` = how strictly the edges are followed |
 | `recent_images` | `limit=10` | the newest pictures in the folder |
 
 **Workflows.** Both are API-format exports (ComfyUI GUI: Workflow → Export (API)) in `config/comfy/`;
@@ -135,10 +135,19 @@ the setting at them. `SaveImage` nodes become `PreviewImage` and other previews 
 ComfyUI's own `output/` folder only holds what its GUI made; Alveus fetches the result from
 ComfyUI's temp folder via `/view`. Input pictures are uploaded to ComfyUI's `input/alveus/input.png`.
 
-**What editing can do.** The Fun ControlNet redraws from the Canny edge map: style, colours,
-materials, lighting, season, or another animal/person in the same pose all work; erasing or adding
-one object does not (that needs an inpainting or instruction-editing model such as Qwen-Image-Edit).
-The tool description tells the model to describe the whole result, not the change.
+**Which tool for which change.** The Fun ControlNet redraws from the Canny edge map of the old
+picture, so the outlines stay where they are. That makes two kinds of change:
+
+| the request changes … | examples | tool |
+|---|---|---|
+| how things look; outlines stay | style, colours, materials, textures, lighting, season, time of day, another person/animal in the same pose | `restyle_image` |
+| what is there or where | pose or body position, layout, viewpoint, framing, adding/removing/moving things | `generate_image` with the earlier prompt rewritten (earlier seed for a similar look) |
+
+Both tool descriptions state this, because the descriptions are where the model chooses; the tool
+is called `restyle_image` (not "edit") so the name alone points the right way. The second kind
+gives a new picture, not the old one changed; keeping the same character in a new pose needs an
+instruction-editing model such as Qwen-Image-Edit (devlog plan 2). The restyle description also
+tells the model to describe the whole result, not the change.
 
 **Stopping.** Interrupt, the header Stop button, the hotkey or the wake word cancel the tool call
 (Alveus's agent cancels it and the MCP client sends `notifications/cancelled`); the server then

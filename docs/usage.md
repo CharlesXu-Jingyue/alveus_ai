@@ -53,9 +53,11 @@ minutes), "what's the git status of ~/local/repo/alveus-ai?".
 
 **Images (ComfyUI)** – "draw a cozy cabin in a snowy forest at night", "make a 1344 by 768
 picture of a lighthouse in a storm, oil painting", "redraw that as a watercolour", "turn the fox
-into a grey wolf, same pose", "make the same picture again with seed 42". The picture appears in
-the chat window (click it for full size) and is saved in `~/local/data/alveus-ai/images`.
-Redrawing keeps the outlines and changes everything else; it cannot remove or add single objects.
+into a grey wolf, same pose", "make the same picture again with seed 42", "now make her sit on the
+bench". The picture appears in the chat window (click it for full size) and is saved in
+`~/local/data/alveus-ai/images`. A change of look (style, colours, lighting, another animal in the
+same pose) redraws over the old outlines (`restyle_image`); a change of pose, layout or objects
+makes a new picture from the rewritten description (`generate_image`), so details may differ.
 ComfyUI must be running (`systemctl --user start comfyui`).
 
 **Conversation** – anything else: explanations, drafting text, maths, planning. The model is

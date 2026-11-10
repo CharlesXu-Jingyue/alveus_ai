@@ -35,7 +35,7 @@ cloud profile once keys exist, switching profiles without a restart, a Gemini pr
 
 ## 2026-11-10 — pictures through ComfyUI (generate and redraw)
 
-- New MCP server `images` (`mcp_servers/comfy.py`) with `generate_image`, `edit_image` and
+- New MCP server `images` (`mcp_servers/comfy.py`) with `generate_image`, `edit_image` (now `restyle_image`) and
   `recent_images`, over the two owner-exported API workflows: `txt2img_z_image_turbo_demo.json`
   and `img2img_z_image_turbo_fun_union_controlnet_demo.json` (Z-Image Turbo bf16 + Fun ControlNet
   Union on Canny edges). It POSTs `/prompt`, polls `/history/<id>`, fetches the picture with
@@ -72,6 +72,12 @@ cloud profile once keys exist, switching profiles without a restart, a Gemini pr
   - The edit workflow keeps outlines, not content. Watercolour, fox → wolf in the same pose, and
     night lighting all work; local edits (erase or add one object) do not, so the tool description
     tells the model to describe the whole result.
+  - So the two workflows do different jobs, and the tools now say which (owner: "it's suitable for
+    editing small textures and details, but not … reconfiguring the character's body position").
+    `edit_image` is renamed `restyle_image`, whose description says it keeps the outlines and can
+    not change a pose, layout or objects. `generate_image`'s description says it is the tool for
+    those, with the earlier prompt rewritten and the earlier seed. The descriptions are where a
+    1.7B model picks, and "edit" in the name invited "edit her pose".
   - Unloading after every picture costs 2–3× the time. Instead the server unloads after 120 idle
     seconds. A series of edits stays fast, and the GPU is free again soon after.
   - ComfyUI's `/free` only sets a flag; memory drops a few seconds later.
