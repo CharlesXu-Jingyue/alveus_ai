@@ -32,8 +32,9 @@ What it does, in order (each step is also a standalone script under `scripts/`):
 3. **llama.cpp** – `scripts/build_llama.sh` clones `PrismML-Eng/llama.cpp` (needed for Bonsai's
    `Q1_0`/`PQ2_0` kernels) into `~/local/lib/llama.cpp-bonsai` and builds `llama-server` and
    `llama-cli` with `-DGGML_CUDA=ON` for the GPU's compute capability (auto-detected).
-4. **Models** – `scripts/download_models.sh`: Bonsai-27B 1-bit (and Ternary with `--ternary`) into
-   `~/local/model/`, plus pre-caching Whisper, Kokoro and the `hey_jarvis` wake word.
+4. **Models** – `scripts/download_models.sh`: Bonsai-27B 1-bit (and Ternary with `--ternary`, six
+   more local models with `--extra`, ~76 GB) into `~/local/model/llm/` (`--models DIR` elsewhere),
+   plus pre-caching Whisper, Kokoro and the `hey_jarvis` wake word.
    Only the needed GGUF files are fetched (the repos also contain 54 GB F16 files).
 5. **Config** – writes `config/local.yaml` with the model dir, llama-server path, and your name.
 6. **Services** (`--services`) – renders and enables `alveus-llm.service` and `alveus.service`
@@ -50,8 +51,8 @@ Flags: `--env NAME`, `--venv`, `--models DIR`, `--lib DIR`, `--ternary`, `--no-1
 
 Qwen3-TTS runs in its own small environment (qwen-tts needs transformers 4.57, Alveus 5.x):
 `--with-qwen3-tts`, or later `conda activate alveus && scripts/install_qwen3_tts.sh [--weights DIR]`.
-With `--weights DIR` the 1.7B weights (4.5 GB) are downloaded there now; set `tts.qwen3.weights_dir`
-to the same folder. Otherwise they download on first use.
+The weights go to `tts.qwen3.weights_dir` (default `$ALVEUS_MODELS/tts`) on first use; with
+`--weights DIR` they are downloaded there now (set `tts.qwen3.weights_dir` to DIR if it differs).
 
 ## Opening the GUI
 
@@ -75,14 +76,15 @@ alveus stt test           # microphone works (speak for 5 s)
 | path | contents |
 |---|---|
 | `~/local/repo/alveus-ai` | this repository (`ALVEUS_HOME`) |
-| `~/local/model/bonsai/Bonsai-27B-Q1_0.gguf` | 1-bit weights (3.8 GB) |
-| `~/local/model/bonsai-ternary/Ternary-Bonsai-27B-PQ2_0.gguf` | ternary weights (7.2 GB) |
-| `~/local/model/wakeword/` | custom openWakeWord `.onnx` models (empty until you train one) |
-| `~/local/lib/llama.cpp-bonsai/build/bin/llama-server` | inference server binary |
+| `/mnt/data/models` | `ALVEUS_MODELS` (set in `config/local.yaml`; the second disk) |
+| `/mnt/data/models/llm/<model>/*.gguf` | language models: `bonsai/` 1-bit (3.8 GB), `bonsai-ternary/` (7.2 GB), `bonsai2-ternary/`, `lfm2.5-24b-a2b/`, `lfm3-1.7b/`, `qwen3.8-27b-{direct,coder,abliterated}/` |
+| `/mnt/data/models/tts/` | Qwen3-TTS weights (`tts.qwen3.weights_dir`) |
+| `/mnt/data/models/wakeword/` | custom openWakeWord `.onnx` models (`alveus`, `aurea`) and their training samples |
+| `~/local/lib/llama.cpp-bonsai/build/bin/llama-server` | inference server binary (Prism fork, `ALVEUS_LLAMA_SERVER`) |
+| `~/local/lib/llama.cpp/build/bin/llama-server` | upstream llama.cpp (`ALVEUS_LLAMA_SERVER_UPSTREAM`, for LFM3; `scripts/build_llama.sh --upstream`) |
 | `~/miniconda3/envs/alveus` | Python environment |
 | `~/.cache/huggingface/hub` | faster-whisper, Kokoro, Parakeet, Chatterbox weights |
 | `~/local/repo/alveus-ai/.venv-qwen3tts` | Qwen3-TTS's own environment (git-ignored) |
-| `/mnt/data/models/tts/Qwen3-TTS-12Hz-1.7B-Base` | Qwen3-TTS weights (`tts.qwen3.weights_dir`, this machine) |
 | `~/local/repo/alveus-ai/voices/` | recordings to copy, their `.txt` words, `SOURCES.md` (git-ignored) |
 | `~/miniconda3/envs/alveus/lib/python3.12/site-packages/openwakeword/resources/models` | pretrained wake-word models |
 | `~/.config/systemd/user/alveus*.service` | rendered service units |
@@ -123,6 +125,6 @@ scripts/install_services.sh --start                                      # re-re
 ```bash
 systemctl --user disable --now alveus alveus-llm && rm ~/.config/systemd/user/alveus*.service
 conda env remove -n alveus
-rm -rf ~/local/repo/alveus-ai ~/local/lib/llama.cpp-bonsai
-rm -rf ~/local/model/bonsai ~/local/model/bonsai-ternary ~/local/model/wakeword   # weights
+rm -rf ~/local/repo/alveus-ai ~/local/lib/llama.cpp-bonsai ~/local/lib/llama.cpp
+rm -rf "$ALVEUS_MODELS"/llm "$ALVEUS_MODELS"/tts "$ALVEUS_MODELS"/wakeword   # weights
 ```

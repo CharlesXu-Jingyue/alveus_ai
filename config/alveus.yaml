@@ -46,39 +46,128 @@ llm:
   # (GUI: Settings > Language model > API keys). With a cloud profile, the conversation, including
   # what tools read for it (file contents, command output, web pages), is sent to that provider.
   profiles:
+    # Local GGUF files live in ${ALVEUS_MODELS}/llm/. alias = the name the settings page shows.
+    # ${ALVEUS_LLAMA_SERVER} is the PrismML fork (Bonsai's 1-bit and ternary kernels; it also runs the
+    # Qwen3.8 and LFM2.5 files below); ${ALVEUS_LLAMA_SERVER_UPSTREAM} is upstream llama.cpp, for the
+    # architectures the fork does not have yet (LFM3). Build either with scripts/build_llama.sh [--upstream].
+    # Profiles without -ngl let llama-server fit the layers into the free VRAM (--fit, default on):
+    # with the speech models loaded, a 27B Q4 model does not fit on a 24 GB card whole, and the rest
+    # runs on the CPU (slower) instead of failing to start.
     bonsai-1bit:
       provider: llama_server     # started by the alveus-llm service from `serve` below
+      alias: Bonsai 27B · 1-bit
       model: bonsai-27b-1bit     # must match the id served by /v1/models (or --alias)
       extra_body:
         top_k: 20
       # Used by `alveus llm serve` / systemd to launch the server for this profile.
       serve:
         command: ${ALVEUS_LLAMA_SERVER}
-        model_path: ${ALVEUS_MODELS}/bonsai/Bonsai-27B-Q1_0.gguf
+        model_path: ${ALVEUS_MODELS}/llm/bonsai/Bonsai-27B-Q1_0.gguf
         args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek",
                "-fa", "on", "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
     bonsai-ternary:
       provider: llama_server
+      alias: Ternary Bonsai 27B
       model: bonsai-27b-ternary
       extra_body:
         top_k: 20
       serve:
         command: ${ALVEUS_LLAMA_SERVER}
-        model_path: ${ALVEUS_MODELS}/bonsai-ternary/Ternary-Bonsai-27B-PQ2_0.gguf
+        model_path: ${ALVEUS_MODELS}/llm/bonsai-ternary/Ternary-Bonsai-27B-PQ2_0.gguf
         args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek",
                "-fa", "on", "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
     # A standard GGUF on this machine (not downloaded yet: put the file at model_path first).
     # A model newer than the Bonsai fork may need an upstream llama.cpp build: point serve.command at it.
     qwen-local:
       provider: llama_server
+      alias: Qwen3.8 27B
       model: qwen3.8-27b
       extra_body:
         top_k: 20
       serve:
         command: ${ALVEUS_LLAMA_SERVER}
-        model_path: ${ALVEUS_MODELS}/qwen/Qwen3.8-27B-Q4_K_M.gguf
-        args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek",
+        model_path: ${ALVEUS_MODELS}/llm/qwen/Qwen3.8-27B-Q4_K_M.gguf
+        args: ["-c", "32768", "--jinja", "--reasoning-format", "deepseek",
                "-fa", "on", "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
+    # Six more local models (scripts/download_models.sh --extra fetches them). All six have had their
+    # refusals removed by their makers, so they answer what the stock models decline; the instructions'
+    # boundaries (confirmations, what not to touch) still apply, they are enforced by Alveus.
+    # Sampling follows each model card.
+    bonsai2-ternary:             # OS-Software/Ternary-Bonsai-2-27B-Uncensored-Heretic-v2-GGUF, PQ2_0
+      provider: llama_server
+      alias: Ternary Bonsai 2 27B
+      model: ternary-bonsai-2-27b
+      temperature: 1.0
+      extra_body:
+        top_k: 20
+      serve:
+        command: ${ALVEUS_LLAMA_SERVER}
+        model_path: ${ALVEUS_MODELS}/llm/bonsai2-ternary/Ternary-Bonsai-2-27B-Uncensored-Heretic-v2-PQ2_0.gguf
+        args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek",
+               "-fa", "on", "--temp", "1.0", "--top-p", "0.95", "--top-k", "20"]
+    lfm25-moe:                  # abenzerps/LFM2.5-24B-A2B-Uncensored-GSQ-RCO-GGUF, IQ4_XS + DSpark drafter
+      provider: llama_server     # 24B mixture of experts, 2B active per token: fast
+      alias: LFM2.5 24B-A2B MoE
+      model: lfm2.5-24b-a2b
+      temperature: 0.1
+      extra_body:
+        top_k: 50
+        repeat_penalty: 1.05
+      serve:
+        command: ${ALVEUS_LLAMA_SERVER}
+        model_path: ${ALVEUS_MODELS}/llm/lfm2.5-24b-a2b/LFM2.5-24B-A2B-GSQ-RCO-IQ4_XS.gguf
+        args: ["-c", "32768", "--jinja", "--reasoning-format", "deepseek", "-fa", "on",
+               "-md", "${ALVEUS_MODELS}/llm/lfm2.5-24b-a2b/LFM2.5-24B-A2B-DSpark-Q8_0.gguf",
+               "--spec-type", "draft-dspark", "--spec-draft-n-max", "3", "-ngld", "99",
+               "--temp", "0.1", "--top-k", "50", "--repeat-penalty", "1.05"]
+    lfm3-small:                   # AtomicChat/LFM3-1.7B-Uncensored-GGUF, Q6_K
+      provider: llama_server     # small and quick; needs upstream llama.cpp
+      alias: LFM3 1.7B
+      model: lfm3-1.7b
+      serve:
+        command: ${ALVEUS_LLAMA_SERVER_UPSTREAM}
+        model_path: ${ALVEUS_MODELS}/llm/lfm3-1.7b/LFM3-1.7B-Uncensored-AD-Q6_K.gguf
+        args: ["-ngl", "99", "-c", "32768", "--jinja", "--reasoning-format", "deepseek", "-fa", "on"]
+    # Three Qwen3.8 27B variants. Each file carries Qwen's multi-token-prediction head, which
+    # llama-server uses to draft tokens ahead (--spec-type draft-mtp): faster, same answers.
+    qwen38-direct:              # HauhauCS/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-MTP-GGUF, Q4_K_P
+      provider: llama_server     # tuned to answer straight away, with little preamble
+      alias: Qwen3.8 27B · direct
+      model: qwen3.8-27b-direct
+      temperature: 1.0
+      extra_body:
+        top_k: 20
+      serve:
+        command: ${ALVEUS_LLAMA_SERVER}
+        model_path: ${ALVEUS_MODELS}/llm/qwen3.8-27b-direct/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-Q4_K_P.gguf
+        args: ["-c", "32768", "--jinja", "--reasoning-format", "deepseek", "-fa", "on",
+               "--spec-type", "draft-mtp", "--spec-draft-n-max", "2",
+               "--temp", "1.0", "--top-p", "0.95", "--top-k", "20"]
+    qwen38-coder:               # DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-…-MTP-GGUF, MTP Q4_K_M
+      provider: llama_server     # a merge tuned for code, with much shorter thinking
+      alias: Qwen3.8 27B · coder merge
+      model: qwen3.8-27b-coder
+      temperature: 0.7
+      extra_body:
+        top_k: 20
+      serve:
+        command: ${ALVEUS_LLAMA_SERVER}
+        model_path: ${ALVEUS_MODELS}/llm/qwen3.8-27b-coder/Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-MTP-Q4_K_M.gguf
+        args: ["-c", "32768", "--jinja", "--reasoning-format", "deepseek", "-fa", "on",
+               "--spec-type", "draft-mtp", "--spec-draft-n-max", "2",
+               "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
+    qwen38-abliterated:         # orcarouter/Qwen3.8-27B-Uncensored-GGUF, Q4_K_M
+      provider: llama_server     # the stock model with only its refusal direction removed
+      alias: Qwen3.8 27B · abliterated
+      model: qwen3.8-27b-abliterated
+      extra_body:
+        top_k: 20
+      serve:
+        command: ${ALVEUS_LLAMA_SERVER}
+        model_path: ${ALVEUS_MODELS}/llm/qwen3.8-27b-abliterated/Qwen3.8-27B-Uncensored-Q4_K_M.gguf
+        args: ["-c", "32768", "--jinja", "--reasoning-format", "deepseek", "-fa", "on",
+               "--spec-type", "draft-mtp", "--spec-draft-n-max", "2",
+               "--temp", "0.7", "--top-p", "0.95", "--top-k", "20"]
     # Cloud models. Hidden thinking counts against max_tokens, hence the larger limit.
     claude:
       provider: anthropic        # key: ANTHROPIC_API_KEY
@@ -148,7 +237,7 @@ tts:
     python: ${ALVEUS_HOME}/.venv-qwen3tts/bin/python
     # Folder for the weights (each model in a subfolder named after it, downloaded there on first use);
     # null = the Hugging Face cache.
-    weights_dir: null
+    weights_dir: ${ALVEUS_MODELS}/tts
     # Recording to copy (a file in voices_dir or a path); name it f_*/m_* for the gender. Its words in
     # <name>.txt beside it give the closest copy; without that file only the timbre is copied.
     # models.<model>.<key> overrides any of these for one model.

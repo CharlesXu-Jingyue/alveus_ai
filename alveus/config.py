@@ -90,6 +90,8 @@ def load_config(extra: str | os.PathLike | None = None) -> DotDict:
         "ALVEUS_HOME": str(REPO_ROOT),
         "ALVEUS_MODELS": str(REPO_ROOT / "models"),
         "ALVEUS_LLAMA_SERVER": "llama-server",
+        # upstream llama.cpp for architectures the Bonsai fork lacks; until it is built, the fork
+        "ALVEUS_LLAMA_SERVER_UPSTREAM": "${ALVEUS_LLAMA_SERVER}",
     }
     for k, v in (merged.pop("env", None) or {}).items():
         env[k] = os.path.expanduser(str(v))

@@ -216,7 +216,7 @@ def _profile_info(cfg) -> dict[str, dict[str, Any]]:
             out[n] = {"label": f"{n} (invalid: {e})", "remote": False}
             continue
         out[n] = _profile_summary(p)
-        out[n]["label"] = f"{n} · {describe(p)}"
+        out[n]["label"] = f"{p.get('alias') or n} · {describe(p)}"
     return out
 
 
@@ -226,6 +226,7 @@ def _profile_summary(p) -> dict[str, Any]:
     serve = p.get("serve") or {}
     mp = serve.get("model_path")
     return {"remote": bool(p.get("remote")), "provider": p.get("provider"), "model": p.get("model"),
+            "alias": p.get("alias"),
             "local_server": bool(serve), "api_key_env": p.get("api_key_env"), "base_url": p.get("base_url"),
             "model_path": os.path.expanduser(mp) if mp else None, "file_exists": bool(mp and Path(os.path.expanduser(mp)).exists()),
             "temperature": p.get("temperature"), "top_p": p.get("top_p"), "max_tokens": p.get("max_tokens"),
@@ -303,6 +304,7 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
                 "tools": len(assistant.hub.tools) if assistant.hub else 0,
                 "stt": assistant.stt.name, "tts": assistant.tts.name, "name": name, "other_name": other,
                 "voice": has_voice, "version": __version__, "profile": assistant.cfg.llm.profile,
+                "profile_alias": (getattr(llm, "profile", None) or {}).get("alias"),
                 "llm_provider": getattr(llm, "provider", None), "llm_model": getattr(llm, "model", None),
                 "llm_remote": bool(getattr(llm, "remote", False)),
                 "tts_warning": getattr(assistant.tts, "warning", None),

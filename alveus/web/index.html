@@ -343,7 +343,7 @@ async function refreshHealth(){
   try{
     health = await j('/health');
     name = health.name; $('brandName').textContent = name; $('emptyName').textContent = name;
-    $('brandSub').textContent = `${health.profile} · ${health.stt} · ${health.tts}`;
+    $('brandSub').textContent = `${health.profile_alias || health.profile} · ${health.stt} · ${health.tts}`;
     $('llm').className = 'llm' + (health.ok?' ok':''); $('llmText').textContent = health.ok ? (health.llm_remote ? 'LLM ready · cloud' : 'LLM ready') : (health.llm_service && health.llm_service.active!=='active' ? 'LLM service '+health.llm_service.active : 'LLM down');
     $('llmText').title = health.ok ? health.llm : (health.llm_service?.last_error || health.llm);
     $('toolCount').textContent = `${health.tools} tools`;
@@ -1038,11 +1038,11 @@ function modelItems(prov){
   const list=modelLists[prov]; const own=profilesOf(prov); const items=[];
   if (prov==='llama_server'){
     for (const f of (list&&list.models)||[]){ const pr=own.find(([,s])=>s.model_path===f.path);
-      items.push({key: pr ? 'p:'+pr[0] : 'f:'+f.path, label:`${f.file} · ${f.size_gb} GB`, profile: pr && pr[0], file: pr ? null : f}); }
-    for (const [n,s] of own) if (!items.some(i=>i.profile===n)) items.push({key:'p:'+n, label:`${String(s.model_path||s.model).split('/').pop()} · file missing`, profile:n});
+      items.push({key: pr ? 'p:'+pr[0] : 'f:'+f.path, label:`${(pr && pr[1].alias) || f.file} · ${f.size_gb} GB`, profile: pr && pr[0], file: pr ? null : f}); }
+    for (const [n,s] of own) if (!items.some(i=>i.profile===n)) items.push({key:'p:'+n, label:`${s.alias || String(s.model_path||s.model).split('/').pop()} · file missing`, profile:n});
   } else {
     const notes={}; for (const m of (list&&list.models)||[]) notes[m.id]=m.note;
-    for (const [n,s] of own) items.push({key:'p:'+n, label:`${s.model}${notes[s.model]?' — '+notes[s.model]:''}`, profile:n});
+    for (const [n,s] of own) items.push({key:'p:'+n, label:`${s.alias || s.model}${notes[s.model]?' — '+notes[s.model]:''}`, profile:n});
     for (const m of (list&&list.models)||[]) if (!own.some(([,s])=>s.model===m.id)) items.push({key:'m:'+m.id, label:`${m.id}${m.note?' — '+m.note:''}${m.name?' · '+m.name:''}`, id:m.id});
   }
   return items;
@@ -1062,7 +1062,7 @@ function llmBlock(){
   const panel=document.createElement('div'); panel.className='branch';
   panel.innerHTML=`<div class="bh">${esc(I.title||prov)}</div>`;
   const run=cfg.effective.llm.profile, RS=profSummary(run);
-  if (RS && name!==run) panel.insertAdjacentHTML('beforeend', `<div class="hint-line">Running now: <b>${esc(RS.model)}</b> (${esc((P[RS.provider]||{}).title||RS.provider)}). The new choice applies after saving.</div>`);
+  if (RS && name!==run) panel.insertAdjacentHTML('beforeend', `<div class="hint-line">Running now: <b>${esc(RS.alias || RS.model)}</b> (${esc((P[RS.provider]||{}).title||RS.provider)}). The new choice applies after saving.</div>`);
   if (I.group==='cloud') panel.insertAdjacentHTML('beforeend', `<div class="hint-line warn">With a cloud model, what you say, and what the tools read for it (file contents, command output), is sent to ${esc(I.title)}.</div>`);
   if (I.api_key_env) panel.appendChild(keyRow(prov));
   if (I.needs_base_url) panel.appendChild(baseUrlRow(prov));
@@ -1119,6 +1119,7 @@ function modelRow(prov, name, S){
 }
 function modelSettings(name, S, I){
   const b=`llm.profiles.${name}`, items=[];
+  items.push({t:'text', p:`${b}.alias`, l:'Name in the list', h:'What the model list and the header call it; empty = the file or model id.'});
   if (S.local_server) items.push({t:'note', l:'Model file', h:'The weights llama-server loads.', html:()=> `<code class="mono">${esc(S.model_path||'?')}</code>${S.file_exists?'':' <b class="bad">not found</b>'}`});
   if (I.thinking_switch) items.push({t:'select', p:`${b}.thinking`, l:'Thinking', h:'Reasoning before it answers: better tool use, a little slower.',
     o:[{v:null, l:'model default'}, {v:true, l:'on'}, {v:false, l:'off'}]});
@@ -1133,7 +1134,7 @@ function modelSettings(name, S, I){
     items.push({t:'number', p:`${b}.extra_body.top_k`, fb:[()=>S.top_k], l:'Top-k', min:0, max:200, h:'Qwen-family models: 20.'});
     items.push({t:'number', p:`${b}.serve.context`, fb:[()=>S.context], l:'Context length (tokens)', min:2048, max:262144, step:1024,
       h:'How much conversation and tool output fits. More needs more VRAM; restarts the LLM server.'}); }
-  return branchPanel(items, {}, `Settings for ${S.model} (only for this model)`);
+  return branchPanel(items, {}, `Settings for ${S.alias || S.model} (only for this model)`);
 }
 
 // ---- personalities: the words of one, saved through /personalities (not part of the settings patch)
@@ -1202,7 +1203,7 @@ function renderAdvanced(form, nav){
   form.appendChild(sec); navLink(nav, sec, 'Advanced');
   const RS=profSummary(cfg.running_profile);
   const note=document.createElement('div'); note.className='note';
-  note.innerHTML=`Running: <b>${esc(RS ? RS.model : cfg.running_profile)}</b>${RS?` <span>(${esc((cfg.llm_providers[RS.provider]||{}).title||RS.provider)})</span>`:''}<br>${cfg.managed_by_systemd?'Managed by systemd: restarts work from here.':'Not under systemd: restart <code>alveus talk</code> yourself after saving.'}`;
+  note.innerHTML=`Running: <b>${esc(RS ? (RS.alias || RS.model) : cfg.running_profile)}</b>${RS?` <span>(${esc((cfg.llm_providers[RS.provider]||{}).title||RS.provider)})</span>`:''}<br>${cfg.managed_by_systemd?'Managed by systemd: restarts work from here.':'Not under systemd: restart <code>alveus talk</code> yourself after saving.'}`;
   nav.appendChild(note);
   $('yamlEd').value = cfg.local_yaml; $('instrEd').value = instructions;
   $('yamlEd').oninput=()=>{yamlDirty=true; updateSavebar();}; $('instrEd').oninput=()=>{instrDirty=true; updateSavebar();};

@@ -374,13 +374,13 @@ def llm_profiles():
 
     cfg = load_config()
     t = Table(title=f"LLM profiles (active: {cfg.llm.profile})")
-    for c in ("profile", "provider", "api", "model", "runs", "ready"):
+    for c in ("profile", "alias", "provider", "api", "model", "runs", "ready"):
         t.add_column(c)
     for name in cfg.llm.get("profiles") or {}:
         try:
             p = llm_profile(cfg, name)
         except KeyError as e:
-            t.add_row(name, "[red]invalid[/red]", "", "", "", str(e)[:60])
+            t.add_row(name, "", "[red]invalid[/red]", "", "", "", str(e)[:60])
             continue
         mp = (p.get("serve") or {}).get("model_path", "")
         if mp:
@@ -390,7 +390,8 @@ def llm_profiles():
             ready = f"[green]✓[/green] {p.api_key_env} ({src})" if src else f"[red]no key[/red] {p.api_key_env}"
         else:
             ready = p.get("base_url") or "-"
-        t.add_row(name, p.provider, p.api, str(p.get("model")), "cloud" if p.remote else "local", ready)
+        t.add_row(name, str(p.get("alias") or ""), p.provider, p.api, str(p.get("model")),
+                  "cloud" if p.remote else "local", ready)
     console.print(t)
 
 

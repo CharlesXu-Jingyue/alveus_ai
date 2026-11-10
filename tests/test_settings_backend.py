@@ -76,6 +76,34 @@ def test_local_gguf_discovery(tmp_path):
     assert files[0]["portable"] == "${ALVEUS_MODELS}/qwen/Qwen3.8-27B-Q4_K_M.gguf"
 
 
+def test_llm_folder_is_scanned_and_drafters_are_skipped(tmp_path):
+    (tmp_path / "wakeword").mkdir()
+    (tmp_path / "wakeword" / "stray.gguf").write_bytes(b"x")          # outside llm/: not listed
+    d = tmp_path / "llm" / "lfm"
+    d.mkdir(parents=True)
+    for f in ("LFM2.5-24B-A2B-GSQ-RCO-IQ4_XS.gguf", "LFM2.5-24B-A2B-DSpark-Q8_0.gguf", "mmproj-BF16.gguf",
+              "Qwen3.8-27B-FastMTP-32K.gguf"):
+        (d / f).write_bytes(b"x")
+    files = catalog.local_files(str(tmp_path))
+    assert [f["file"] for f in files] == ["LFM2.5-24B-A2B-GSQ-RCO-IQ4_XS.gguf"]
+    assert files[0]["portable"] == "${ALVEUS_MODELS}/llm/lfm/LFM2.5-24B-A2B-GSQ-RCO-IQ4_XS.gguf"
+    assert catalog.llm_dir(str(tmp_path)) == tmp_path / "llm"
+
+
+def test_shipped_local_profiles_have_aliases_and_dotless_names():
+    from alveus.api import _profile_info
+    cfg = load_config()
+    info = _profile_info(cfg)
+    local = {n: s for n, s in info.items() if s.get("local_server")}
+    assert {"bonsai2-ternary", "lfm25-moe", "lfm3-small", "qwen38-direct", "qwen38-coder", "qwen38-abliterated"} <= set(local)
+    for n, s in local.items():
+        assert "." not in n and s["alias"] and s["label"].startswith(s["alias"])   # GUI paths split on dots
+        assert "/llm/" in s["model_path"]
+    aliases = [s["alias"] for s in local.values()]
+    assert len(set(aliases)) == len(aliases)
+    assert not any(w in a.lower() for a in aliases for w in ("uncensored", "heretic", "turbo", "max", "hauhau", "davidau"))
+
+
 def test_model_list_falls_back_to_suggestions(monkeypatch, tmp_path):
     monkeypatch.setenv("ALVEUS_SECRETS", str(tmp_path / "none.env"))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

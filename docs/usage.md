@@ -103,8 +103,9 @@ machine's value, after which the inherited one applies (the engine's setting, or
 
 - **Language model:** pick where the model runs (this computer, Anthropic, OpenAI, DeepSeek,
   OpenRouter, or your own vLLM / Ollama / OpenAI-compatible server), then the model. For this
-  computer the list is the GGUF files in the models folder (`ALVEUS_MODELS`); drop another file there
-  and it appears. For cloud providers it is the provider's live list once the key is in, otherwise a
+  computer the list is the GGUF files in the models folder (`$ALVEUS_MODELS/llm`, one folder per
+  model); drop another file there and it appears. Models with a profile show its alias (e.g. *Qwen3.8
+  27B · coder merge*), editable as *Name in the list* in that model's settings. For cloud providers it is the provider's live list once the key is in, otherwise a
   short suggested list; *another model id…* takes anything. Each model keeps its own settings
   (thinking, reasoning effort, reply length, temperature, context length for local models), shown only
   where that provider supports them. Picking a model that was never set up creates its profile on save

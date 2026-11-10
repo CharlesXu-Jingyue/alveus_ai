@@ -78,20 +78,46 @@ answer that request". Without a key in Alveus' store, the SDK's own credential l
 
 ### Shipped profiles
 
-| profile | provider | model | notes |
+| profile (alias in the GUI) | provider | model | notes |
 |---|---|---|---|
-| `bonsai-1bit` (default) | `llama_server` | `Bonsai-27B-Q1_0.gguf`, 3.8 GB | ~90 % of FP16 quality, 27B params, Qwen3.6 base, 262k ctx, native tool calling + thinking. ~60–95 tok/s |
-| `bonsai-ternary` | `llama_server` | `Ternary-Bonsai-27B-PQ2_0.gguf`, 7.2 GB | ~95 %; better agentic/tool scores (BFCL, τ²-bench); same server flags |
-| `qwen-local` | `llama_server` | `Qwen3.8-27B-Q4_K_M.gguf` (not downloaded) | template for any standard GGUF; put the file at `serve.model_path` first |
+| `bonsai-1bit` (default), *Bonsai 27B · 1-bit* | `llama_server` | `Bonsai-27B-Q1_0.gguf`, 3.8 GB | ~90 % of FP16 quality, 27B params, Qwen3.6 base, 262k ctx, native tool calling + thinking. ~60–95 tok/s |
+| `bonsai-ternary`, *Ternary Bonsai 27B* | `llama_server` | `Ternary-Bonsai-27B-PQ2_0.gguf`, 7.2 GB | ~95 %; better agentic/tool scores (BFCL, τ²-bench); same server flags |
+| `qwen-local`, *Qwen3.8 27B* | `llama_server` | `Qwen3.8-27B-Q4_K_M.gguf` (not downloaded) | template for any standard GGUF; put the file at `serve.model_path` first |
+| `bonsai2-ternary`, *Ternary Bonsai 2 27B* | `llama_server` | `Ternary-Bonsai-2-27B-Uncensored-Heretic-v2-PQ2_0.gguf`, 7.2 GB | OS-Software's refusal-removed Ternary Bonsai 2; Prism fork |
+| `lfm25-moe`, *LFM2.5 24B-A2B MoE* | `llama_server` | `LFM2.5-24B-A2B-GSQ-RCO-IQ4_XS.gguf`, 13.8 GB + DSpark drafter 0.4 GB | Liquid's mixture of experts (2B active per token); `--spec-type draft-dspark`; temperature 0.1 |
+| `lfm3-small`, *LFM3 1.7B* | `llama_server` | `LFM3-1.7B-Uncensored-AD-Q6_K.gguf`, 1.6 GB | needs upstream llama.cpp (`ALVEUS_LLAMA_SERVER_UPSTREAM`) |
+| `qwen38-direct`, *Qwen3.8 27B · direct* | `llama_server` | `Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-Q4_K_P.gguf`, 17.9 GB | HauhauCS "Aggressive": answers without preamble; MTP drafting |
+| `qwen38-coder`, *Qwen3.8 27B · coder merge* | `llama_server` | `Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-MTP-Q4_K_M.gguf`, 18.5 GB | DavidAU's merge tuned for code with much shorter thinking; MTP drafting |
+| `qwen38-abliterated`, *Qwen3.8 27B · abliterated* | `llama_server` | `Qwen3.8-27B-Uncensored-Q4_K_M.gguf`, 16.8 GB | orcarouter: stock Qwen3.8 with the refusal direction removed; MTP drafting |
 | `claude` | `anthropic` | `claude-opus-5-5` | `max_tokens: 16000` (thinking counts against it) |
 | `chatgpt` | `openai` | `gpt-6.1-sol` | Responses API, `max_tokens: 16000` |
 | `deepseek` | `deepseek` | `deepseek-v4-pro` | thinking on by default; `deepseek-flash` is the cheaper model |
 
+`alias` is the name the settings page shows for a profile (model list, header, "Running"), editable
+there as "Name in the list"; without one the file name or model id is shown. The six models from
+`bonsai2-ternary` on come from `scripts/download_models.sh --extra` into `$ALVEUS_MODELS/llm/`.
+Their makers removed the refusal training, so they answer what the stock models decline; Alveus's
+own boundaries (confirmations, `tools.no_confirm`, the instructions) are enforced outside the model
+and still apply. The aliases leave out the uploaders' names and their marketing words ("Uncensored",
+"Heretic", "TURBO", "MAX") and keep what tells the models apart.
+
+The three Qwen3.8 files carry Qwen's multi-token-prediction (MTP) head: with `--spec-type
+draft-mtp` llama-server drafts two tokens ahead with it and the full model verifies them, so the
+answers are the same and come faster. The LFM2.5 profile does the same with Liquid's separate DSpark
+drafter (`-md …-DSpark-Q8_0.gguf --spec-type draft-dspark`). Both work on the Prism fork as built in
+September 2026. Profiles without `-ngl` leave the GPU layers to llama-server's `--fit` (on by
+default): it puts as many layers on the GPU as fit with 1 GB to spare and runs the rest on the CPU.
+That matters on a 24 GB card, where the speech models (Whisper large-v3 ~4.7 GB, Qwen3-TTS ~6.5 GB)
+leave about 12 GB for the language model.
+
 The Bonsai files need the **PrismML fork of llama.cpp**, specifically its `prism` branch, for the
 custom kernels (`Q1_0` = type 41 is also on the fork's master, but `PQ2_0` = type 142 only exists
 on `prism`; upstream llama.cpp only runs the `Q2_g64` ternary variant). `scripts/build_llama.sh`
-clones/checks out `prism` and builds. A model architecture newer than the fork may need an
-upstream llama.cpp build; give that profile its own `serve.command`. Switching profiles in the GUI
+clones/checks out `prism` and builds. A model architecture newer than the fork needs an
+upstream llama.cpp build: `scripts/build_llama.sh --upstream` builds ggml-org's master into
+`~/local/lib/llama.cpp`; set `ALVEUS_LLAMA_SERVER_UPSTREAM` in `config/local.yaml` to its
+`build/bin/llama-server` and give the profile `serve.command: ${ALVEUS_LLAMA_SERVER_UPSTREAM}`
+(until it is set it means the fork). Switching profiles in the GUI
 runs a check first and refuses the switch if the binary cannot read the file (local) or the
 provider does not accept the key and model (cloud).
 
@@ -117,7 +143,7 @@ Speech recognition and synthesis stay local.
 
 GUI: Settings → Language model: pick the provider, then the model, then save (check, then restart
 of both services). The model list comes from `GET /llm/models`: the GGUF files under
-`ALVEUS_MODELS` for this computer, the provider's live list for cloud APIs (once the key is in),
+`ALVEUS_MODELS/llm` for this computer (vision projectors and drafters left out), the provider's live list for cloud APIs (once the key is in),
 suggestions otherwise. A model without a profile gets one on save, named after the model id
 (`deepseek-flash`; a GGUF file gets `provider: llama_server` and a `serve:` block from
 `LOCAL_SERVE_TEMPLATE` with context length 32768), and its settings (thinking, effort, reply length,
@@ -195,7 +221,8 @@ time-to-first-word ≈ LLM thinking time + first sentence generation + ~0.2 s sy
   The worker ends when its stdin closes, i.e. when Alveus exits or swaps the engine (`close()`
   frees its 3.9 GB), and a crashed worker is restarted for the next sentence.
 - **Weights.** `tts.qwen3.weights_dir` holds one folder per model (`Qwen3-TTS-12Hz-1.7B-Base`, 4.5 GB
-  with its speech tokenizer); a missing one is downloaded there first. Unset: the Hugging Face cache.
+  with its speech tokenizer); a missing one is downloaded there first. Default `$ALVEUS_MODELS/tts`;
+  `null`: the Hugging Face cache.
 - **Copying a voice.** The Base models have no voice of their own. With the recording's words in
   `NAME.txt` beside it (`GET /voices` lists which have them; *Write it down* in the GUI, `POST
   /voices/transcribe`, makes one with the running speech recognizer), a sentence in the recording's

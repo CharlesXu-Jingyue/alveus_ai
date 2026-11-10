@@ -13,14 +13,18 @@ Settings are merged in this order (later wins):
 Every string value is expanded: `~` → home, `${VAR}` → a variable. Variables come from the
 process environment or from the YAML `env:` block (environment wins). Always defined:
 `ALVEUS_HOME` (repo root), `ALVEUS_MODELS` (default `${ALVEUS_HOME}/models`),
-`ALVEUS_LLAMA_SERVER` (default `llama-server` on PATH).
+`ALVEUS_LLAMA_SERVER` (default `llama-server` on PATH), `ALVEUS_LLAMA_SERVER_UPSTREAM` (upstream
+llama.cpp for architectures the Bonsai fork lacks; default `${ALVEUS_LLAMA_SERVER}`). Below
+`ALVEUS_MODELS`: `llm/` (GGUF files, one folder per model), `tts/` (Qwen3-TTS weights),
+`wakeword/` (custom wake-word models).
 
 Only put in `local.yaml` what differs from the defaults, e.g.:
 
 ```yaml
 env:
-  ALVEUS_MODELS: ~/local/model
+  ALVEUS_MODELS: /mnt/data/models   # llm/, tts/, wakeword/ below it
   ALVEUS_LLAMA_SERVER: ~/local/lib/llama.cpp-bonsai/build/bin/llama-server
+  ALVEUS_LLAMA_SERVER_UPSTREAM: ~/local/lib/llama.cpp/build/bin/llama-server
 assistant:
   user_name: Charles
 audio:
@@ -73,6 +77,7 @@ never written to. Switching or editing takes effect from the next request, witho
 | `max_tool_rounds` | `12` | maximum LLM↔tool iterations in one turn |
 | `manage_local_server` | `true` | when the assistant starts, align the `alveus-llm` unit with the profile: stop it for a profile without `serve:` (cloud, external server), start it if it is down, restart it if it serves another model. Skipped for one-off overrides (`--profile`, `ALVEUS_LLM_PROFILE`) and when the unit is not installed |
 | `profiles.<name>.provider` | | preset from `alveus/llm/providers.py`: `llama_server`, `vllm`, `ollama`, `openai_compat`, `openai`, `anthropic`, `deepseek`, `openrouter` (or any name, with `api` + `base_url`). Old profiles with `backend: openai` still work (= `openai_compat`) |
+| `profiles.<name>.alias` | | the name the settings page shows (model list, header); e.g. `Qwen3.8 27B · direct`. Without it, the file name or model id |
 | `profiles.<name>.model` | | model id; for local servers it must equal an id in `GET /v1/models` (llama-server: set with `--alias`) |
 | `profiles.<name>.api` | from provider | protocol: `openai_chat` \| `openai_responses` \| `anthropic_messages` |
 | `profiles.<name>.base_url` | from provider | e.g. `http://127.0.0.1:8080/v1`; required for `openai_compat` |
@@ -155,7 +160,7 @@ stt:
 | `chatterbox.exaggeration`, `.cfg_weight` | `0.5`, `0.5` | standard and multilingual: expressiveness and pacing |
 | `qwen3.model` | `1_7b` | `1_7b` (Qwen3-TTS-12Hz-1.7B-Base) or `0_6b` (0.6B-Base, faster); keys without dots because they are config paths (`qwen3.models.1_7b.voice_ref`) |
 | `qwen3.python` | `${ALVEUS_HOME}/.venv-qwen3tts/bin/python` | the environment the worker runs in (`scripts/install_qwen3_tts.sh`) |
-| `qwen3.weights_dir` | `null` | folder with one subfolder per model (downloaded there when missing); `null` = Hugging Face cache. This machine: `/mnt/data/models/tts` |
+| `qwen3.weights_dir` | `${ALVEUS_MODELS}/tts` | folder with one subfolder per model (downloaded there when missing); `null` = Hugging Face cache |
 | `qwen3.voices_dir`, `.voice_ref` | `tts.voices_dir`, `null` | the recording to copy (no built-in voice: `null` copies the folder's first recording). Its words in `NAME.txt` beside it give the closest copy in its own language |
 | `qwen3.language`, `.fallback_language` | `auto`, `en` | `auto` detects each sentence's language; or one of `zh en ja ko de fr ru pt es it` |
 | `qwen3.temperature` | `0.9` | "Variation": lower is steadier and flatter, higher livelier |

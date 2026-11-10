@@ -1,6 +1,8 @@
 """Which models a provider offers, for the settings page's model picker.
 
-  llama_server         GGUF files under ALVEUS_MODELS (vision projectors ``mmproj*`` skipped)
+  llama_server         GGUF files under ALVEUS_MODELS/llm (or ALVEUS_MODELS itself when it has no llm
+                       folder); vision projectors (``mmproj*``) and draft models for speculative
+                       decoding (DSpark, FastMTP, ``*draft*``) are skipped, they are not chat models
   cloud / servers      the provider's live list (``GET /models``; Anthropic through the SDK), with
                        the suggested notes from PROVIDER_INFO attached; when the list cannot be fetched
                        (no key yet, offline) the suggested models are returned instead
@@ -25,6 +27,8 @@ log = logging.getLogger(__name__)
 
 _CACHE: dict[tuple, tuple[float, dict[str, Any]]] = {}
 TTL = 600.0
+# companion files next to a model: vision projectors and speculative-decoding drafters
+_NOT_A_CHAT_MODEL = re.compile(r"(mmproj|dspark|fastmtp|draft)", re.I)
 # OpenAI's /models also lists embedding, audio, image and moderation models
 _OPENAI_SKIP = re.compile(r"(audio|realtime|tts|transcribe|image|embedding|moderation|whisper|dall-e|search|"
                           r"babbage|davinci|instruct|computer-use)", re.I)
@@ -36,13 +40,19 @@ def slug(s: str) -> str:
     return s or "model"
 
 
+def llm_dir(models_dir: str) -> Path:
+    """Where the GGUF files live: ALVEUS_MODELS/llm, or ALVEUS_MODELS itself (older layout)."""
+    root = Path(os.path.expanduser(models_dir))
+    return root / "llm" if (root / "llm").is_dir() else root
+
+
 def local_files(models_dir: str) -> list[dict[str, Any]]:
     root = Path(os.path.expanduser(models_dir))
     out = []
     if not root.is_dir():
         return out
-    for p in sorted(root.rglob("*.gguf")):
-        if "mmproj" in p.name.lower() or not p.is_file():
+    for p in sorted(llm_dir(models_dir).rglob("*.gguf")):
+        if _NOT_A_CHAT_MODEL.search(p.name) or not p.is_file():
             continue
         rel = p.relative_to(root).as_posix()
         out.append({"id": slug(p.stem), "file": p.name, "path": str(p), "portable": f"${{ALVEUS_MODELS}}/{rel}",
@@ -86,7 +96,7 @@ async def provider_models(cfg, provider: str, base_url: str | None = None,
     """{models: [{id, name, note, …}], source: files | live | suggested, error?}"""
     if provider == "llama_server":
         return {"models": local_files(cfg._env["ALVEUS_MODELS"]), "source": "files",
-                "dir": cfg._env["ALVEUS_MODELS"]}
+                "dir": str(llm_dir(cfg._env["ALVEUS_MODELS"]))}
     preset = PROVIDERS.get(provider, {})
     base_url = base_url or preset.get("base_url")
     env = api_key_env or preset.get("api_key_env")
