@@ -128,7 +128,8 @@ API: `POST /chat`, `POST /chat/stream` (SSE), `POST /confirm`, `POST /interrupt`
 alveus/            core package: config, llm/, stt/, tts/, audio/, agent/, voice.py, api.py, cli.py, web/index.html (GUI)
 mcp_servers/       built-in MCP servers (files_shell, desktop, system, web, coder)
 config/            alveus.yaml (defaults), instructions.md, personalities/, local.yaml (per machine, git-ignored)
-scripts/           build_llama.sh, download_models.sh, pip_install_env.sh, install_services.sh, train_wakeword.sh
+scripts/           build_llama.sh, download_models.sh, pip_install_env.sh, install_services.sh,
+                   install_launcher.sh + alveus-start (desktop launcher), train_wakeword.sh
 systemd/           user unit templates
 docs/              wake-words.md and more
 ```

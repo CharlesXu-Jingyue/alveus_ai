@@ -33,6 +33,16 @@ profile is a one-line patch; `llm.effort` exists for cloud models, local ones on
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
 
+## 2026-11-10 (evening) — started from a launcher, not at login
+
+- Owner: "turn everything off from starting automatically after login … make sure that the …
+  desktop shortcut starts everything". `alveus` and `alveus-llm` are disabled (`comfyui` already
+  was). New `scripts/alveus-start` starts comfyui (if the unit exists), alveus-llm and alveus, waits
+  for `/health` and opens the GUI, with a desktop notification on failure. New
+  `scripts/install_launcher.sh` writes the app-grid entry and the desktop icon (trusted via `gio`).
+- Tested from all three stopped through `gtk-launch alveus`: the GUI answered after 2 s, all three
+  units active, the language model up a little later.
+
 ## 2026-11-10 — pictures through ComfyUI (generate and redraw)
 
 - New MCP server `images` (`mcp_servers/comfy.py`) with `generate_image`, `edit_image` (now `restyle_image`) and

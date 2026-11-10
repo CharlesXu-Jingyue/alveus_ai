@@ -38,7 +38,8 @@ change with a descriptive message (see `git log` for the style).
 | llama.cpp (PrismML fork, **prism** branch, relocatable build) | `~/local/lib/llama.cpp-bonsai/build/bin/llama-server` |
 | voice samples for cloning | `~/local/repo/alveus-ai/voices/` (`tts.voices_dir`, git-ignored): `m_charles_demo.wav` plus six curated female voices (`f_*_ja`, `f_*_zh`) with `.txt` transcripts; sources and terms in `voices/SOURCES.md` |
 | Qwen3-TTS | own env `.venv-qwen3tts/` (venv on the alveus Python, transformers 4.57.3), weights `/mnt/data/models/tts/Qwen3-TTS-12Hz-1.7B-Base` (`tts.qwen3.weights_dir`) |
-| systemd user units | `~/.config/systemd/user/alveus-llm.service`, `alveus.service` (rendered from `systemd/*.in` by `scripts/install_services.sh`) |
+| systemd user units | `~/.config/systemd/user/alveus-llm.service`, `alveus.service` (rendered from `systemd/*.in` by `scripts/install_services.sh`); not enabled, so nothing starts at login |
+| launcher | `~/.local/share/applications/alveus.desktop` and `~/Desktop/alveus.desktop` (`scripts/install_launcher.sh`) run `scripts/alveus-start`: starts comfyui, alveus-llm, alveus and opens the GUI |
 | logs | `journalctl --user -u alveus -f`, `logs/alveus.log` |
 | GUI + API | http://127.0.0.1:8765/ (served by the `alveus` service), API docs at `/docs`, handbook at `/handbook` |
 | LLM server | http://127.0.0.1:8080/v1 (OpenAI-compatible) |

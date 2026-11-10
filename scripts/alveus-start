@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Start everything Alveus uses (ComfyUI if its unit exists, the language model, the assistant),
+# wait for the GUI to answer, then open it. The "Alveus" launcher runs this
+# (scripts/install_launcher.sh). Starting a unit that already runs does nothing, so it is safe twice.
+PORT="${ALVEUS_PORT:-8765}"
+URL="http://127.0.0.1:$PORT/"
+units=(alveus-llm alveus)
+systemctl --user cat comfyui.service >/dev/null 2>&1 && units=(comfyui "${units[@]}")
+if ! systemctl --user start "${units[@]}"; then
+  notify-send -i dialog-error "Alveus could not start" "systemctl --user status ${units[*]}" 2>/dev/null
+  exit 1
+fi
+for _ in $(seq 90); do
+  if curl -sf "${URL}health" >/dev/null; then xdg-open "$URL" >/dev/null 2>&1; exit 0; fi
+  sleep 1
+done
+notify-send -i dialog-error "Alveus did not answer" "journalctl --user -u alveus -e" 2>/dev/null
+exit 1

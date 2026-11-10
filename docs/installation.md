@@ -38,7 +38,7 @@ What it does, in order (each step is also a standalone script under `scripts/`):
    Only the needed GGUF files are fetched (the repos also contain 54 GB F16 files).
 5. **Config** – writes `config/local.yaml` with the model dir, llama-server path, and your name.
 6. **Services** (`--services`) – renders and enables `alveus-llm.service` and `alveus.service`
-   as systemd user units.
+   as systemd user units. To start Alveus by hand instead, see *Starting from a launcher* below.
 
 Cloud models need nothing extra at install time (the `anthropic` SDK is a regular dependency):
 pick the `claude`, `chatgpt` or `deepseek` profile in the GUI and paste the key under
@@ -87,21 +87,40 @@ alveus stt test           # microphone works (speak for 5 s)
 | `~/local/repo/alveus-ai/.venv-qwen3tts` | Qwen3-TTS's own environment (git-ignored) |
 | `~/local/repo/alveus-ai/voices/` | recordings to copy, their `.txt` words, `SOURCES.md` (git-ignored) |
 | `~/miniconda3/envs/alveus/lib/python3.12/site-packages/openwakeword/resources/models` | pretrained wake-word models |
-| `~/.config/systemd/user/alveus*.service` | rendered service units |
+| `~/.config/systemd/user/alveus*.service` | rendered service units (not enabled: started by the launcher) |
+| `~/.local/share/applications/alveus.desktop`, `~/Desktop/alveus.desktop` | the Alveus launcher (`scripts/install_launcher.sh`), runs `scripts/alveus-start` |
 | `~/.config/opencode/opencode.jsonc` | opencode provider `bonsai` pointing at llama-server |
 | `~/local/repo/alveus-ai/logs/alveus.log` | rotating text log (also `journalctl --user -u alveus`) |
 
+## Starting from a launcher
+
+On this machine nothing starts at login (since 2026-11-10): the **Alveus** launcher starts it.
+
+```bash
+scripts/install_launcher.sh          # app-grid entry + desktop icon (--no-desktop: only the app grid)
+systemctl --user disable alveus alveus-llm   # turn off autostart (enable to turn it back on)
+```
+
+The launcher runs `scripts/alveus-start`. That starts `comfyui` (if the unit exists), `alveus-llm`
+and `alveus`, waits for the GUI to answer and opens it in the browser. If something fails it shows a
+desktop notification naming the command to look at. The GUI is up within seconds, and the header
+shows the language model loading. Running it while Alveus is up just opens the GUI. On the desktop,
+an icon that looks like a plain file needs right-click → *Allow Launching* once. Search
+"Alveus" in Activities to pin it to the dock. `scripts/install_services.sh` only enables autostart
+with `--enable`, so re-rendering the units after an update keeps it off.
+
 ## Services
 
-Both units are enabled and start automatically at login, so a reboot needs no manual steps
-(models take about a minute to load).
+With `install.sh --services` both units are enabled and start at login, so a reboot needs no
+manual steps (models take about a minute to load). Here they are disabled and started by the
+launcher above; the commands below work either way.
 
 ```bash
 systemctl --user stop alveus alveus-llm        # stop everything
 systemctl --user start alveus-llm alveus       # start everything
 systemctl --user status alveus-llm alveus      # state
 systemctl --user restart alveus                # after config changes
-systemctl --user disable alveus alveus-llm     # stop autostart
+systemctl --user disable alveus alveus-llm     # stop autostart (as on this machine)
 journalctl --user -u alveus -f                 # live log
 ```
 
@@ -124,6 +143,7 @@ scripts/install_services.sh --start                                      # re-re
 
 ```bash
 systemctl --user disable --now alveus alveus-llm && rm ~/.config/systemd/user/alveus*.service
+rm -f ~/.local/share/applications/alveus.desktop ~/Desktop/alveus.desktop
 conda env remove -n alveus
 rm -rf ~/local/repo/alveus-ai ~/local/lib/llama.cpp-bonsai ~/local/lib/llama.cpp
 rm -rf "$ALVEUS_MODELS"/llm "$ALVEUS_MODELS"/tts "$ALVEUS_MODELS"/wakeword   # weights
