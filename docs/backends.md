@@ -82,10 +82,10 @@ answer that request". Without a key in Alveus' store, the SDK's own credential l
 |---|---|---|---|
 | `bonsai-1bit` (default), *Bonsai 27B · 1-bit* | `llama_server` | `Bonsai-27B-Q1_0.gguf`, 3.8 GB | ~90 % of FP16 quality, 27B params, Qwen3.6 base, 262k ctx, native tool calling + thinking. ~60–95 tok/s |
 | `bonsai-ternary`, *Ternary Bonsai 27B* | `llama_server` | `Ternary-Bonsai-27B-PQ2_0.gguf`, 7.2 GB | ~95 %; better agentic/tool scores (BFCL, τ²-bench); same server flags |
-| `qwen-local`, *Qwen3.8 27B* | `llama_server` | `Qwen3.8-27B-Q4_K_M.gguf` (not downloaded) | template for any standard GGUF; put the file at `serve.model_path` first |
-| `bonsai2-ternary`, *Ternary Bonsai 2 27B* | `llama_server` | `Ternary-Bonsai-2-27B-Uncensored-Heretic-v2-PQ2_0.gguf`, 7.2 GB | OS-Software's refusal-removed Ternary Bonsai 2; Prism fork |
-| `lfm25-moe`, *LFM2.5 24B-A2B MoE* | `llama_server` | `LFM2.5-24B-A2B-GSQ-RCO-IQ4_XS.gguf`, 13.8 GB + DSpark drafter 0.4 GB | Liquid's mixture of experts (2B active per token); `--spec-type draft-dspark`; temperature 0.1 |
-| `lfm3-small`, *LFM3 1.7B* | `llama_server` | `LFM3-1.7B-Uncensored-AD-Q6_K.gguf`, 1.6 GB | needs upstream llama.cpp (`ALVEUS_LLAMA_SERVER_UPSTREAM`) |
+| `qwen-local`, *Qwen3.8 27B* | `llama_server` | `Qwen3.8-27B-UD-Q4_K_M.gguf`, 16.5 GB + `MTP/mtp-Qwen3.8-27B-Q4_0.gguf` 1.4 GB (unsloth) | the stock model; its MTP head is a separate file (`-md … --spec-type draft-mtp`) |
+| `bonsai2-ternary`, *Ternary Bonsai 27B · uncensored* | `llama_server` | `Ternary-Bonsai-2-27B-Uncensored-Heretic-v2-PQ2_0.gguf`, 7.2 GB | OS-Software's refusal-removed Ternary Bonsai 2; Prism fork |
+| `lfm25-moe`, *LFM2.5 24B-A2B MoE · uncensored* | `llama_server` | `LFM2.5-24B-A2B-GSQ-RCO-IQ4_XS.gguf`, 13.8 GB + DSpark drafter 0.4 GB | Liquid's mixture of experts (2B active per token); `--spec-type draft-dspark`; temperature 0.1 |
+| `lfm3-small`, *LFM3 1.7B · uncensored* | `llama_server` | `LFM3-1.7B-Uncensored-AD-Q6_K.gguf`, 1.6 GB | needs upstream llama.cpp (`ALVEUS_LLAMA_SERVER_UPSTREAM`) |
 | `qwen38-direct`, *Qwen3.8 27B · direct* | `llama_server` | `Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-Q4_K_P.gguf`, 17.9 GB | HauhauCS "Aggressive": answers without preamble; MTP drafting |
 | `qwen38-coder`, *Qwen3.8 27B · coder merge* | `llama_server` | `Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-MTP-Q4_K_M.gguf`, 18.5 GB | DavidAU's merge tuned for code with much shorter thinking; MTP drafting |
 | `qwen38-abliterated`, *Qwen3.8 27B · abliterated* | `llama_server` | `Qwen3.8-27B-Uncensored-Q4_K_M.gguf`, 16.8 GB | orcarouter: stock Qwen3.8 with the refusal direction removed; MTP drafting |
@@ -98,10 +98,12 @@ there as "Name in the list"; without one the file name or model id is shown. The
 `bonsai2-ternary` on come from `scripts/download_models.sh --extra` into `$ALVEUS_MODELS/llm/`.
 Their makers removed the refusal training, so they answer what the stock models decline; Alveus's
 own boundaries (confirmations, `tools.no_confirm`, the instructions) are enforced outside the model
-and still apply. The aliases leave out the uploaders' names and their marketing words ("Uncensored",
-"Heretic", "TURBO", "MAX") and keep what tells the models apart.
+and still apply. The aliases leave out the uploaders' names and their marketing words ("Heretic",
+"TURBO", "MAX", "Aggressive") and keep what tells the models apart; the modified Bonsai and LFM models
+end in "· uncensored", the Qwen3.8 variants say how they differ from the stock one (direct, coder
+merge, abliterated).
 
-The three Qwen3.8 files carry Qwen's multi-token-prediction (MTP) head: with `--spec-type
+The three modified Qwen3.8 files carry Qwen's multi-token-prediction (MTP) head (the stock one has it as a separate file, given with `-md`): with `--spec-type
 draft-mtp` llama-server drafts two tokens ahead with it and the full model verifies them, so the
 answers are the same and come faster. The LFM2.5 profile does the same with Liquid's separate DSpark
 drafter (`-md …-DSpark-Q8_0.gguf --spec-type draft-dspark`). Both work on the Prism fork as built in
@@ -109,7 +111,7 @@ September 2026. Profiles without `-ngl` leave the GPU layers to llama-server's `
 default): it puts as many layers on the GPU as fit with 1 GB to spare and runs the rest on the CPU.
 That matters on a 24 GB card, where the speech models (Whisper large-v3 ~4.7 GB, Qwen3-TTS ~6.5 GB)
 leave about 12 GB for the language model: measured beside them, Ternary Bonsai 2 runs at ~70 tok/s and
-LFM2.5 at ~110 tok/s, LFM3 1.7B (upstream llama.cpp, 2.4 GB) at ~320 tok/s, but the 27B Qwen3.8 files at 8–14 tok/s (about half their layers on the CPU),
+LFM2.5 at ~110 tok/s, LFM3 1.7B (upstream llama.cpp, 2.4 GB) at ~320 tok/s, but the 27B Qwen3.8 files at 7–14 tok/s (about half their layers on the CPU),
 too slow for conversation. They need lighter speech engines (Kokoro, Whisper large-v3-turbo), the GPU
 to themselves, or a 3-bit file. `--fit` does not count a separate drafter, hence `-fitt 2048` in the
 LFM2.5 profile. LFM2.5 always reasons (its template ignores the thinking switch).

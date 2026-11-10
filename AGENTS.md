@@ -34,7 +34,7 @@ change with a descriptive message (see `git log` for the style).
 |---|---|
 | repo / `ALVEUS_HOME` | `~/local/repo/alveus-ai` |
 | machine-specific config (git-ignored) | `config/local.yaml` — read it first; defaults are `config/alveus.yaml` |
-| models (`ALVEUS_MODELS`) | `/mnt/data/models`: `llm/<model>/*.gguf` (Bonsai 1-bit and ternary, Ternary Bonsai 2, LFM2.5, LFM3, three Qwen3.8 27B), `tts/` (Qwen3-TTS), `wakeword/` |
+| models (`ALVEUS_MODELS`) | `/mnt/data/models`: `llm/<model>/*.gguf` (Bonsai 1-bit and ternary, Ternary Bonsai 2, LFM2.5, LFM3, stock Qwen3.8 27B and three variants), `tts/` (Qwen3-TTS), `wakeword/` |
 | llama.cpp (PrismML fork, **prism** branch, relocatable build) | `~/local/lib/llama.cpp-bonsai/build/bin/llama-server` |
 | voice samples for cloning | `~/local/repo/alveus-ai/voices/` (`tts.voices_dir`, git-ignored): `m_charles_demo.wav` plus six curated female voices (`f_*_ja`, `f_*_zh`) with `.txt` transcripts; sources and terms in `voices/SOURCES.md` |
 | Qwen3-TTS | own env `.venv-qwen3tts/` (venv on the alveus Python, transformers 4.57.3), weights `/mnt/data/models/tts/Qwen3-TTS-12Hz-1.7B-Base` (`tts.qwen3.weights_dir`) |

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Download LLM weights into $ALVEUS_MODELS/llm/ (and pre-fetch speech models).
 # Usage: scripts/download_models.sh [--ternary] [--no-1bit] [--extra] [--speech]
-#   --extra   the six further local models with profiles in config/alveus.yaml (about 76 GB):
-#             Ternary Bonsai 2 27B, LFM2.5 24B-A2B MoE, LFM3 1.7B and three Qwen3.8 27B variants
+#   --extra   the further local models with profiles in config/alveus.yaml (about 94 GB):
+#             Ternary Bonsai 2 27B, LFM2.5 24B-A2B MoE, LFM3 1.7B, stock Qwen3.8 27B and three variants
 # Layout: $ALVEUS_MODELS/llm/<model>/ (GGUF), $ALVEUS_MODELS/tts/ (Qwen3-TTS), $ALVEUS_MODELS/wakeword/
 set -euo pipefail
 MODELS="${ALVEUS_MODELS:-$HOME/local/model}"
@@ -26,7 +26,8 @@ if [ "$EXTRA" = 1 ]; then
     Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-Q4_K_P.gguf --local-dir "$LLM/qwen3.8-27b-direct"
   hf download DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF \
     Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-MTP-Q4_K_M.gguf --local-dir "$LLM/qwen3.8-27b-coder"
-  hf download orcarouter/Qwen3.8-27B-Uncensored-GGUF Qwen3.8-27B-Uncensored-Q4_K_M.gguf --local-dir "$LLM/qwen3.8-27b-abliterated"
+  hf download orcarouter/Qwen3.8-27B-Uncensored-GGUF Qwen3.8-27B-Uncensored-Q4_K_M.gguf --local-dir "$LLM/qwen3.8-27b-abliterated"   # gated: accept its terms on the page first
+  hf download unsloth/Qwen3.8-27B-GGUF Qwen3.8-27B-UD-Q4_K_M.gguf MTP/mtp-Qwen3.8-27B-Q4_0.gguf --local-dir "$LLM/qwen3.8-27b"
 fi
 if [ "$SPEECH" = 1 ]; then
   python - <<'PY'

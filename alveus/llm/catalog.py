@@ -2,7 +2,7 @@
 
   llama_server         GGUF files under ALVEUS_MODELS/llm (or ALVEUS_MODELS itself when it has no llm
                        folder); vision projectors (``mmproj*``) and draft models for speculative
-                       decoding (DSpark, FastMTP, ``*draft*``) are skipped, they are not chat models
+                       decoding (DSpark, DFlash, FastMTP, ``mtp-*``, ``*draft*``) are skipped, they are not chat models
   cloud / servers      the provider's live list (``GET /models``; Anthropic through the SDK), with
                        the suggested notes from PROVIDER_INFO attached; when the list cannot be fetched
                        (no key yet, offline) the suggested models are returned instead
@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 _CACHE: dict[tuple, tuple[float, dict[str, Any]]] = {}
 TTL = 600.0
 # companion files next to a model: vision projectors and speculative-decoding drafters
-_NOT_A_CHAT_MODEL = re.compile(r"(mmproj|dspark|fastmtp|draft)", re.I)
+_NOT_A_CHAT_MODEL = re.compile(r"(mmproj|dspark|dflash|fastmtp|draft|^mtp-)", re.I)
 # OpenAI's /models also lists embedding, audio, image and moderation models
 _OPENAI_SKIP = re.compile(r"(audio|realtime|tts|transcribe|image|embedding|moderation|whisper|dall-e|search|"
                           r"babbage|davinci|instruct|computer-use)", re.I)

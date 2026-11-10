@@ -77,7 +77,7 @@ alveus stt test           # microphone works (speak for 5 s)
 |---|---|
 | `~/local/repo/alveus-ai` | this repository (`ALVEUS_HOME`) |
 | `/mnt/data/models` | `ALVEUS_MODELS` (set in `config/local.yaml`; the second disk) |
-| `/mnt/data/models/llm/<model>/*.gguf` | language models: `bonsai/` 1-bit (3.8 GB), `bonsai-ternary/` (7.2 GB), `bonsai2-ternary/`, `lfm2.5-24b-a2b/`, `lfm3-1.7b/`, `qwen3.8-27b-{direct,coder,abliterated}/` |
+| `/mnt/data/models/llm/<model>/*.gguf` | language models: `bonsai/` 1-bit (3.8 GB), `bonsai-ternary/` (7.2 GB), `bonsai2-ternary/`, `lfm2.5-24b-a2b/`, `lfm3-1.7b/`, `qwen3.8-27b/` (stock), `qwen3.8-27b-{direct,coder,abliterated}/` |
 | `/mnt/data/models/tts/` | Qwen3-TTS weights (`tts.qwen3.weights_dir`) |
 | `/mnt/data/models/wakeword/` | custom openWakeWord `.onnx` models (`alveus`, `aurea`) and their training samples |
 | `~/local/lib/llama.cpp-bonsai/build/bin/llama-server` | inference server binary (Prism fork, `ALVEUS_LLAMA_SERVER`) |
