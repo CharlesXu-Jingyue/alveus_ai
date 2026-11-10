@@ -140,6 +140,11 @@ materials, lighting, season, or another animal/person in the same pose all work;
 one object does not (that needs an inpainting or instruction-editing model such as Qwen-Image-Edit).
 The tool description tells the model to describe the whole result, not the change.
 
+**Stopping.** Interrupt, the header Stop button, the hotkey or the wake word cancel the tool call
+(Alveus's agent cancels it and the MCP client sends `notifications/cancelled`); the server then
+deletes its own job from ComfyUI's queue or interrupts it by `prompt_id`, so a job started in
+ComfyUI's GUI keeps running. The model gets `{"cancelled": true, "message": "Stopped by the user…"}`.
+
 **GPU memory.** Z-Image Turbo bf16 + its Qwen3-4B text encoder take about 8 GB on the GPU while
 loaded (ComfyUI offloads the rest to RAM). After `ALVEUS_COMFY_UNLOAD_AFTER_S` idle seconds (default
 120; 0 = after each picture, -1 = never) the server calls ComfyUI's `POST /free`, and it also does so

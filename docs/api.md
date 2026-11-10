@@ -13,8 +13,8 @@ another device, tunnel instead of exposing the port: `ssh -L 8765:127.0.0.1:8765
 | `POST /speak` | `{"text": str, "play": bool=false}` | WAV bytes (`audio/wav`), or `{"played": true, "seconds": n}` when `play` | synthesize with the active TTS backend |
 | `POST /transcribe` | multipart `file=@audio.wav` | `{"text": str}` | any sample rate/channels; resampled to 16 kHz mono |
 | `POST /trigger` | | `{"triggered": bool}` | start listening now (equivalent to the hotkey); `false` in `alveus api` mode |
-| `POST /stop` | | `{"stopped": true}` | stop current speech output and drop the queue |
-| `POST /interrupt` | | `{"interrupted": true}` | abort the running turn (voice or GUI): stop generating, skip pending tool calls, cut speech, deny open confirmations; the stream then emits `interrupted` and `done` |
+| `POST /stop` | | `{"stopped": true}` | stop current speech output and drop the queue; while a tool call is running it does what `/interrupt` does and answers `{"interrupted": true}` |
+| `POST /interrupt` | | `{"interrupted": true}` | abort the running turn (voice or GUI): stop generating, cancel the running tool call (the MCP server gets `notifications/cancelled`), skip pending tool calls, cut speech, deny open confirmations; the stream then emits `interrupted` and `done` |
 | `GET /` | | HTML | the browser GUI (chat + settings) |
 | `POST /chat/stream` | `{"text": str, "speak": bool=false, "reset": bool=false}` | SSE stream | events: `reasoning`, `content`, `tool_start {tool,args}`, `tool_result {tool,text}`, `confirm {id,description,sudo}`, `interrupted`, `error`, `done {reply}`. Destructive and sudo tools wait for `POST /confirm` (120 s, then denied) |
 | `POST /confirm` | `{"id": str, "ok": bool, "password"?: str}` | `{"resolved": bool}` | answer a `confirm` event from `/chat/stream` or `/events`; when the event has `sudo: true`, `password` is the sudo password for that one command |

@@ -75,11 +75,13 @@ say out loud appear in the same log (tagged *voice*) and stream live, with their
 question asked aloud ("I am about to … Should I go ahead?"), because GUI and microphone share one
 conversation. The header shows the live state (idle, listening, thinking, speaking) and the LLM
 health. Next to the message box, **Listen** starts a voice turn (same as the hotkey); pressed while it is thinking or speaking, it cuts that reply off first. While a reply
-is running the **Send** button turns into **Interrupt**, which stops generation, skips pending tool
+is running the **Send** button turns into **Interrupt**, which stops generation, stops a tool call
+that is still running (a picture being made is dropped from ComfyUI's queue), skips pending tool
 calls, cuts speech and denies any open confirmation. Under each answer: **Copy**, **Speak** (say it
 again), **Stop** (stop speaking) and **Retry** (ask the same question again).
 
-**Header buttons.** **■ Stop** cuts speech. **↻ Restart** restarts the assistant service (the
+**Header buttons.** **■ Stop** cuts speech; while a tool is running (a picture, a coding task) it
+interrupts the turn like **Interrupt**. The hotkey and the wake word stop a running tool the same way. **↻ Restart** restarts the assistant service (the
 conversation is cleared, the LLM server keeps running). **⏻ Power** opens a menu to stop the
 assistant, the LLM server, or both; each asks for confirmation. Stopping the LLM server alone frees
 its VRAM for ComfyUI while the page stays up (the LLM light turns red until the server is started

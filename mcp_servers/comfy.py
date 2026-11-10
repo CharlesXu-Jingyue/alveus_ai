@@ -218,6 +218,22 @@ async def run_workflow(c: httpx.AsyncClient, wf: dict[str, Any], outs: list[str]
     if r.status_code != 200:
         raise RuntimeError(f"ComfyUI rejected the workflow: {_node_errors(r.json(), wf)}")
     pid = r.json()["prompt_id"]
+    try:
+        h = await _wait(c, pid)
+    except asyncio.CancelledError:      # the user stopped the turn: Alveus cancelled this tool call
+        _drop(pid)
+        raise
+    for k in outs:
+        for img in (h.get("outputs", {}).get(k) or {}).get("images", []):
+            v = await c.get("/view", params={"filename": img["filename"], "subfolder": img.get("subfolder", ""),
+                                             "type": img.get("type", "temp")})
+            v.raise_for_status()
+            return v.content
+    raise RuntimeError("ComfyUI finished without a picture")
+
+
+async def _wait(c: httpx.AsyncClient, pid: str) -> dict[str, Any]:
+    """Poll ComfyUI's history until the job is finished; its history entry."""
     deadline = time.monotonic() + TIMEOUT_S
     while True:
         h = (await c.get(f"/history/{pid}")).json().get(pid)
@@ -227,18 +243,22 @@ async def run_workflow(c: httpx.AsyncClient, wf: dict[str, Any], outs: list[str]
                 why = [m[1].get("exception_message", "") for m in st.get("messages", []) if m[0] == "execution_error"]
                 raise RuntimeError(f"ComfyUI failed: {'; '.join(w.strip() for w in why) or 'see its log'}")
             if st.get("completed", True):
-                break
+                return h
         if time.monotonic() > deadline:
-            await c.post("/interrupt")
+            _drop(pid)
             raise TimeoutError(f"no picture after {TIMEOUT_S:.0f} s; the job was stopped")
         await asyncio.sleep(0.4)
-    for k in outs:
-        for img in (h.get("outputs", {}).get(k) or {}).get("images", []):
-            v = await c.get("/view", params={"filename": img["filename"], "subfolder": img.get("subfolder", ""),
-                                             "type": img.get("type", "temp")})
-            v.raise_for_status()
-            return v.content
-    raise RuntimeError("ComfyUI finished without a picture")
+
+
+def _drop(pid: str) -> None:
+    """Stop our job only (a job started in ComfyUI's own GUI keeps running): take it off the queue if
+    it is waiting, interrupt it if it is running. Synchronous, because it runs while the tool call is
+    being cancelled, when further awaits would be cancelled too."""
+    for path, body in (("/queue", {"delete": [pid]}), ("/interrupt", {"prompt_id": pid})):
+        try:
+            httpx.post(f"{URL}{path}", json=body, timeout=5)
+        except httpx.HTTPError:
+            pass
 
 
 async def render(wf: dict[str, Any], outs: list[str], name: str, upload: bytes | None = None,

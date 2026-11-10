@@ -288,3 +288,58 @@ def test_an_unclear_reply_gets_one_more_question():
     assert res is True and len(v.prompts) == 2
     res, v = ask(["no"])
     assert res is False and len(v.prompts) == 1
+
+
+# ------------------------------------------------------------------ stopping a running tool call
+class SlowHub(Hub):
+    """A tool that takes long (a picture being rendered) and notices when it is cancelled."""
+    cancelled = False
+
+    async def call(self, name, args):
+        try:
+            await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            SlowHub.cancelled = True
+            raise
+        return json.dumps({"ok": True})
+
+
+IMAGE = ToolInfo(server="images", name="generate_image", full_name="images__generate_image", description="", schema={})
+
+
+def test_interrupt_cancels_a_running_tool_call():
+    agent = Agent(OneCall("images__generate_image", {"prompt": "a fox"}), SlowHub(IMAGE), load_config())
+
+    async def go():
+        events = []
+
+        async def stop_soon():
+            while agent.tool_running is None:
+                await asyncio.sleep(0.01)
+            agent.interrupt()
+        stopper = asyncio.ensure_future(stop_soon())
+        t0 = asyncio.get_running_loop().time()
+        async for ev in agent.run("draw a fox"):
+            events.append(ev.kind)
+        await stopper
+        return events, asyncio.get_running_loop().time() - t0
+    events, took = asyncio.run(go())
+    assert took < 5 and SlowHub.cancelled and agent.tool_running is None
+    assert events[-1] == "interrupted" and "tool_result" in events
+    result = json.loads([m for m in agent.history if m["role"] == "tool"][-1]["content"])
+    assert result["cancelled"] and "Stopped by the user" in result["message"]
+
+
+def test_interrupt_from_another_thread_reaches_the_tool():
+    import threading
+    agent = Agent(OneCall("images__generate_image", {"prompt": "a fox"}), SlowHub(IMAGE), load_config())
+
+    async def go():
+        def later():
+            import time
+            while agent.tool_running is None:
+                time.sleep(0.01)
+            agent.interrupt()
+        threading.Thread(target=later, daemon=True).start()
+        return [ev.kind async for ev in agent.run("draw a fox")]
+    assert asyncio.run(asyncio.wait_for(go(), 5))[-1] == "interrupted"

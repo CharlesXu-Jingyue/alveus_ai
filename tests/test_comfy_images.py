@@ -131,3 +131,24 @@ def test_gui_serves_only_pictures_in_the_folder(tmp_path, monkeypatch):
     assert c.get("/images/file", params={"name": "x.png"}).content == b"\x89PNG fake"
     for bad in ("notes.txt", "../x.png", "missing.png", str(tmp_path / "x.png")):
         assert c.get("/images/file", params={"name": bad}).status_code == 404
+
+
+def test_header_stop_interrupts_while_a_tool_runs():
+    from fastapi.testclient import TestClient
+
+    from alveus.api import build_app
+    from alveus.config import load_config
+
+    class Agent:
+        tool_running = "images__generate_image"
+        stopped = 0
+        lock = asyncio.Lock()
+
+        def interrupt(self):
+            Agent.stopped += 1
+    a = type("A", (), {})()
+    a.cfg, a.agent, a.stt, a.tts = load_config(), Agent(), None, None
+    c = TestClient(build_app(a))
+    assert c.post("/stop").json() == {"interrupted": True} and Agent.stopped == 1
+    Agent.tool_running = None                       # nothing running: Stop only cuts speech, as before
+    assert c.post("/stop").json() == {"stopped": True} and Agent.stopped == 1

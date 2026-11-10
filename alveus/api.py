@@ -498,7 +498,11 @@ def build_app(assistant, bus: EventBus | None = None) -> FastAPI:
 
     @app.post("/stop")
     async def stop() -> dict[str, bool]:
-        """Stop speaking: drop sentences not yet synthesized, then cut playback (generation continues)."""
+        """Stop speaking: drop sentences not yet synthesized, then cut playback (generation continues).
+        While a tool call is running (a picture being made, a coding task) there is nothing to cut, so
+        Stop interrupts the turn instead, as /interrupt does."""
+        if assistant.agent is not None and assistant.agent.tool_running:
+            return await interrupt()
         sp = getattr(assistant, "speaker", None)
         if sp is not None:
             sp.abort()

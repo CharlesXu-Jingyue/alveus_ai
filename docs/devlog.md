@@ -58,6 +58,16 @@ cloud profile once keys exist, switching profiles without a restart, a Gemini pr
   while loaded. End to end through LFM3: "draw a cozy cabin…" 14 s, "redraw it as a watercolour"
   11 s, both correct calls; the reply no longer reads the file path aloud once the result says the
   picture is already on screen.
+- **Stop now stops a running tool** (owner: "the stop buttons don't interrupt the image
+  generation"). `Agent.interrupt()` only set a flag that was checked between stream chunks and
+  between tool calls, so a 10 s render ran to the end. Now each tool call runs as a task raced
+  against an interrupt event (`_execute_interruptible`, thread-safe for the voice loop); on
+  interrupt it is cancelled. The MCP SDK (2.1) then sends `notifications/cancelled` and the server
+  cancels the handler, so `comfy.py` catches `CancelledError` and drops its own job (queue delete,
+  then `/interrupt` with `prompt_id`; synchronous calls, since awaits are cancelled at that point).
+  The header **Stop** (otherwise "stop speaking") interrupts the turn while a tool is running,
+  because there is no speech to cut then. Measured: cancelled at once, ComfyUI's queue empty
+  1.5 s later, the next picture fine.
 - Lessons:
   - The edit workflow keeps outlines, not content. Watercolour, fox → wolf in the same pose, and
     night lighting all work; local edits (erase or add one object) do not, so the tool description

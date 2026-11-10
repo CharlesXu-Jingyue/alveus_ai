@@ -119,10 +119,26 @@ class Agent:
         # one conversation at a time (voice loop, GUI and API share the history)
         self.lock = asyncio.Lock()
         self._interrupted = False
+        self._stop: asyncio.Event | None = None          # set by interrupt(): cancels a running tool call
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self.tool_running: str | None = None              # full name of the tool being executed, if any
 
     def interrupt(self) -> None:
-        """Stop the current turn as soon as possible (checked between chunks and tool calls)."""
+        """Stop the current turn as soon as possible: checked between chunks and tool calls, and a
+        tool call that is running is cancelled (the MCP server is told, e.g. ComfyUI drops its job).
+        Safe to call from another thread."""
         self._interrupted = True
+        loop, stop = self._loop, self._stop
+        if loop is None or stop is None or loop.is_closed():
+            return
+        try:
+            same = asyncio.get_running_loop() is loop
+        except RuntimeError:
+            same = False
+        if same:
+            stop.set()
+        else:
+            loop.call_soon_threadsafe(stop.set)
 
     # ------------------------------------------------------------------ prompt
     def _build_system_prompt(self) -> str:
@@ -169,6 +185,7 @@ class Agent:
         confirm = confirm or self.confirm
         self._declined_this_turn = False
         self._interrupted = False
+        self._loop, self._stop = asyncio.get_running_loop(), asyncio.Event()
         self.history.append({"role": "user", "content": user_text})
         self._trim()
         tools = self.hub.openai_tools() if self.hub else None
@@ -264,12 +281,34 @@ class Agent:
                 if self._interrupted:
                     result = json.dumps({"cancelled": True, "message": "Interrupted by the user before running."})
                 else:
-                    result = await self._execute(tc, confirm)
+                    result = await self._execute_interruptible(tc, confirm)
                 self.history.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
                 yield AgentEvent("tool_result", tool=tc["name"], text=result[:2000])
             if self._interrupted:
                 yield AgentEvent("interrupted", text="Interrupted.")
                 return
+
+    async def _execute_interruptible(self, tc: dict[str, Any], confirm: ConfirmFn | None) -> str:
+        """Run one tool call; an interrupt cancels it instead of waiting for it to finish."""
+        task = asyncio.ensure_future(self._execute(tc, confirm))
+        stop = asyncio.ensure_future(self._stop.wait())
+        self.tool_running = tc["name"]
+        try:
+            done, _ = await asyncio.wait({task, stop}, return_when=asyncio.FIRST_COMPLETED)
+            if task in done:
+                return task.result()
+            task.cancel()
+            try:
+                await asyncio.wait_for(task, timeout=10)
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+            log.info("interrupt: cancelled tool call %s", tc["name"])
+            return json.dumps({"cancelled": True, "message": "Stopped by the user while it was running."})
+        finally:
+            self.tool_running = None
+            stop.cancel()
+            if not task.done():
+                task.cancel()
 
     async def _execute(self, tc: dict[str, Any], confirm: ConfirmFn | None) -> str:
         name, raw_args = tc["name"], tc["arguments"]
