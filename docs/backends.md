@@ -109,7 +109,7 @@ September 2026. Profiles without `-ngl` leave the GPU layers to llama-server's `
 default): it puts as many layers on the GPU as fit with 1 GB to spare and runs the rest on the CPU.
 That matters on a 24 GB card, where the speech models (Whisper large-v3 ~4.7 GB, Qwen3-TTS ~6.5 GB)
 leave about 12 GB for the language model: measured beside them, Ternary Bonsai 2 runs at ~70 tok/s and
-LFM2.5 at ~110 tok/s, but the 27B Qwen3.8 files at 8–14 tok/s (about half their layers on the CPU),
+LFM2.5 at ~110 tok/s, LFM3 1.7B (upstream llama.cpp, 2.4 GB) at ~320 tok/s, but the 27B Qwen3.8 files at 8–14 tok/s (about half their layers on the CPU),
 too slow for conversation. They need lighter speech engines (Kokoro, Whisper large-v3-turbo), the GPU
 to themselves, or a 3-bit file. `--fit` does not count a separate drafter, hence `-fitt 2048` in the
 LFM2.5 profile. LFM2.5 always reasons (its template ignores the thinking switch).

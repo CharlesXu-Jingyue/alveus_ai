@@ -61,15 +61,15 @@ cloud profile once keys exist, switching profiles without a restart, a Gemini pr
   |---|---|---|
   | Ternary Bonsai 2 27B | PQ2_0, 7.2 GB (no Q4 exists; ternary is the format) | loads in 3 s, 8.3 GB VRAM, ~70 tok/s, tool call correct |
   | LFM2.5 24B-A2B MoE | IQ4_XS 13.8 GB (the 4-bit file) + DSpark Q8_0 drafter | ~105–119 tok/s, 55–70 % of drafts accepted; reasons even with thinking off and reaches for tools eagerly (called the clock for "why is the sky blue") |
-  | LFM3 1.7B | Q6_K, 1.6 GB | the Prism fork says `unknown model architecture: 'lfm3'`: needs upstream llama.cpp |
+  | LFM3 1.7B | Q6_K, 1.6 GB | the Prism fork says `unknown model architecture: 'lfm3'`; on upstream llama.cpp (master @ 6122b56, built by the owner) it loads in 2 s, 2.4 GB VRAM, ~320 tok/s, tool call correct |
   | Qwen3.8 27B · direct | Q4_K_P, 17.9 GB | correct, tool call correct, **8 tok/s**: only ~9 GB of it fits beside the speech models |
   | Qwen3.8 27B · coder merge | MTP Q4_K_M, 18.5 GB | the same, 9 tok/s, 85 % of MTP drafts accepted |
   | Qwen3.8 27B · abliterated | Q4_K_M, 16.8 GB | correct, tool call correct, 12–14 tok/s (the smallest of the three, a little more on the GPU); the repo became gated during the download, the owner accepted its terms |
 
 - **What was learned.** The Prism fork (built 2026-09-04) already runs Qwen3.8 (`qwen35`), LFM2.5
   (`lfm2moe`), MTP and DSpark drafting and `--fit`; only LFM3 needs upstream (`scripts/build_llama.sh
-  --upstream`, `ALVEUS_LLAMA_SERVER_UPSTREAM`, which defaults to the fork until set). Building it was
-  left to the owner. `--fit` sizes the layers without the drafter: LFM2.5 with DSpark crashed with
+  --upstream`, `ALVEUS_LLAMA_SERVER_UPSTREAM`, which defaults to the fork until set; this machine sets it
+  in `local.yaml`). The owner ran the build: a session may not fetch and build outside code. `--fit` sizes the layers without the drafter: LFM2.5 with DSpark crashed with
   "failed to allocate compute pp buffers" until `-fitt 2048` left room. A 27B Q4 model and Qwen3-TTS
   do not fit on 24 GB together; for voice use, the Qwen3.8 models need the GPU to themselves or the
   lighter speech engines (Kokoro, Whisper large-v3-turbo), or a 3-bit file. A stalled `hf download`
