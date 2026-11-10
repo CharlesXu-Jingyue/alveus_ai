@@ -40,6 +40,41 @@ profile is a one-line patch; `llm.effort` exists for cloud models, local ones on
 llama-server's `--reasoning-budget`). LLM layer follow-ups (see 2026-11-07): a live run of each
 cloud profile once keys exist, switching profiles without a restart, a Gemini preset.
 
+## 2026-11-09 — models on the data disk; six more local language models with aliases
+
+- **Layout.** `ALVEUS_MODELS` is now `/mnt/data/models` (the 1.9 TB disk; the root disk was 96 %
+  full): `llm/<model>/` for GGUF files, `tts/` for Qwen3-TTS (`tts.qwen3.weights_dir` defaults to
+  `${ALVEUS_MODELS}/tts` now), `wakeword/`. The two Bonsai files and the wake words moved there
+  (verified byte for byte, then `~/local/model` removed, 10 GB freed); the systemd units were
+  re-rendered (`scripts/install_services.sh`) because their `Environment=ALVEUS_MODELS` wins over
+  `local.yaml`. The model picker scans `llm/` and leaves out drafters (DSpark, FastMTP) like mmproj.
+- **Aliases.** A profile's `alias` is what the settings page shows (model list, header, "Running"),
+  editable as "Name in the list"; `alveus llm profiles` lists it. The owner asked for names without
+  the uploaders and without their claims ("Uncensored", "Heretic", "TURBO", "MAX"), keeping what
+  tells the models apart. Profile keys have no dots (`qwen38-direct`), because the settings page
+  splits config paths on dots; the served model ids keep them.
+- **Six models** (`scripts/download_models.sh --extra`, ~76 GB). Each was started on a spare port with
+  its profile's own flags while the assistant ran (Whisper large-v3 4.7 GB + Qwen3-TTS 6.5 GB on the
+  4090), asked one question with thinking off and one needing a tool with thinking on:
+
+  | alias | file | result |
+  |---|---|---|
+  | Ternary Bonsai 2 27B | PQ2_0, 7.2 GB (no Q4 exists; ternary is the format) | loads in 3 s, 8.3 GB VRAM, ~70 tok/s, tool call correct |
+  | LFM2.5 24B-A2B MoE | IQ4_XS 13.8 GB (the 4-bit file) + DSpark Q8_0 drafter | ~105–119 tok/s, 55–70 % of drafts accepted; reasons even with thinking off and reaches for tools eagerly (called the clock for "why is the sky blue") |
+  | LFM3 1.7B | Q6_K, 1.6 GB | the Prism fork says `unknown model architecture: 'lfm3'`: needs upstream llama.cpp |
+  | Qwen3.8 27B · direct | Q4_K_P, 17.9 GB | correct, tool call correct, **8 tok/s**: only ~9 GB of it fits beside the speech models |
+  | Qwen3.8 27B · coder merge | MTP Q4_K_M, 18.5 GB | the same, 9 tok/s, 85 % of MTP drafts accepted |
+  | Qwen3.8 27B · abliterated | Q4_K_M, 16.8 GB | correct, tool call correct, 12–14 tok/s (the smallest of the three, a little more on the GPU); the repo became gated during the download, the owner accepted its terms |
+
+- **What was learned.** The Prism fork (built 2026-09-04) already runs Qwen3.8 (`qwen35`), LFM2.5
+  (`lfm2moe`), MTP and DSpark drafting and `--fit`; only LFM3 needs upstream (`scripts/build_llama.sh
+  --upstream`, `ALVEUS_LLAMA_SERVER_UPSTREAM`, which defaults to the fork until set). Building it was
+  left to the owner. `--fit` sizes the layers without the drafter: LFM2.5 with DSpark crashed with
+  "failed to allocate compute pp buffers" until `-fitt 2048` left room. A 27B Q4 model and Qwen3-TTS
+  do not fit on 24 GB together; for voice use, the Qwen3.8 models need the GPU to themselves or the
+  lighter speech engines (Kokoro, Whisper large-v3-turbo), or a 3-bit file. A stalled `hf download`
+  (0 % CPU for 28 min, no file) was the gated repo; plain HTTP returned 401.
+
 ## 2026-11-07 (late afternoon) — Qwen3-TTS as a third voice engine; curated female voices
 
 - Follow-up: the owner listened and removed Xiaoyu and Wanqing (TTS-SCDuFSC): not good enough. They

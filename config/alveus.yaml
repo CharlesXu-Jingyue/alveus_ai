@@ -119,6 +119,7 @@ llm:
         args: ["-c", "32768", "--jinja", "--reasoning-format", "deepseek", "-fa", "on",
                "-md", "${ALVEUS_MODELS}/llm/lfm2.5-24b-a2b/LFM2.5-24B-A2B-DSpark-Q8_0.gguf",
                "--spec-type", "draft-dspark", "--spec-draft-n-max", "3", "-ngld", "99",
+               "-fitt", "2048",          # --fit sizes the layers without the drafter: leave room for it
                "--temp", "0.1", "--top-k", "50", "--repeat-penalty", "1.05"]
     lfm3-small:                   # AtomicChat/LFM3-1.7B-Uncensored-GGUF, Q6_K
       provider: llama_server     # small and quick; needs upstream llama.cpp
